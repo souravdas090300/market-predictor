@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market lean</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --ink: #13202c;
+    --muted: #5a6876;
+    --line: #d5dbe2;
+    --bull: #0e7c66;
+    --bear: #b23a2b;
+    --flat: #8791a0;
+    --focus: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 16px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; font-weight: 600; letter-spacing: -0.01em; }
+  .lede { margin: 0 0 24px; color: var(--muted); max-width: 62ch; }
+  form.add { display: flex; gap: 8px; margin-bottom: 20px; }
+  input[type=text] {
+    flex: 1; min-width: 0; max-width: 320px; padding: 10px 12px; font: inherit; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+  }
+  button {
+    font: inherit; font-weight: 500; padding: 10px 16px; border-radius: 6px; cursor: pointer;
+    background: var(--ink); color: #fff; border: 1px solid var(--ink);
+  }
+  button.quiet { background: transparent; color: var(--ink); border-color: var(--line); padding: 6px 10px; }
+  input:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px;
+  }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .filters button[aria-pressed=true] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  textarea {
+    width: 100%; padding: 10px 12px; font: inherit; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 6px; resize: vertical; min-height: 120px;
+  }
+  textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  label.field { display: block; font-weight: 500; margin: 12px 0 6px; }
+  .material-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .material-actions button.quiet { padding: 10px 16px; }
+  .hints { margin: 0 0 4px; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .hints li { margin: 2px 0; }
+  .result { margin-top: 12px; }
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .row { border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row > summary {
+    list-style: none; cursor: pointer; display: grid; align-items: center; gap: 16px;
+    grid-template-columns: minmax(150px, 1fr) minmax(200px, 2fr) 130px; padding: 16px 20px;
+  }
+  .row > summary::-webkit-details-marker { display: none; }
+  .who b { display: block; font-weight: 600; }
+  .who span { color: var(--muted); font-size: 14px; }
+  .call { text-align: right; }
+  .call b { display: block; font-weight: 600; font-size: 18px; }
+  .call span { color: var(--muted); font-size: 14px; }
+  .bullish { color: var(--bull); } .bearish { color: var(--bear); } .neutral { color: var(--flat); }
+
+  /* The lean gauge: distance from the centre tick shows how far the estimate leans. */
+  .gauge { position: relative; height: 26px; }
+  .gauge .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: var(--line); border-radius: 2px; }
+  .gauge .fill { position: absolute; top: 11px; height: 4px; border-radius: 2px; }
+  .gauge .mid { position: absolute; left: 50%; top: 5px; width: 1px; height: 16px; background: var(--muted); }
+  .gauge .dot { position: absolute; top: 6px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--surface); }
+  .gauge .ends { position: absolute; left: 0; right: 0; top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .gauge { margin-bottom: 12px; }
+
+  .state { color: var(--muted); font-size: 14px; }
+  .state.error { color: var(--bear); }
+
+  .detail { padding: 4px 20px 24px; display: grid; gap: 24px; grid-template-columns: 1fr; }
+  .detail h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  .detail p { margin: 0 0 8px; }
+  .chart { width: 100%; height: auto; display: block; background: #fafbfc; border: 1px solid var(--line); border-radius: 6px; }
+  .cols { display: grid; gap: 24px; grid-template-columns: 1fr 1fr; }
+  ul.plain { list-style: none; margin: 0; padding: 0; }
+  ul.plain li { padding: 8px 0; border-top: 1px solid var(--line); }
+  ul.plain li:first-child { border-top: 0; }
+  .tag { font-weight: 600; }
+  .small { font-size: 14px; color: var(--muted); }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; }
+  dt { color: var(--muted); } dd { margin: 0; text-align: right; }
+  a { color: var(--focus); }
+  footer { margin-top: 24px; color: var(--muted); font-size: 14px; max-width: 70ch; }
+
+  .advanced { padding: 16px 20px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 20px; }
+  .advanced details > summary { cursor: pointer; font-weight: 500; margin-bottom: 12px; }
+  .advanced textarea { width: 100%; }
+  #bulk-result, #portfolio-result, #history-result { margin-top: 12px; padding: 8px; background: var(--paper); border-radius: 6px; }
+  .advanced button { margin-right: 6px; }
+  @media (max-width: 720px) {
+    .row > summary { grid-template-columns: 1fr auto; }
+    .row > summary .gauge { grid-column: 1 / -1; grid-row: 2; }
+    .cols { grid-template-columns: 1fr; }
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #0f1720; --surface: #17212c; --ink: #e6ecf2; --muted: #98a6b5; --line: #2a3745;
+            --bull: #3fc2a5; --bear: #ee7d6d; --flat: #8f9bab; --focus: #7aa2ff; }
+    button { background: var(--ink); color: var(--paper); }
+    .chart { background: #131c26; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Market lean</h1>
+  <p class="lede">For shares, crypto, forex and commodities: the estimated chance each asset closes higher in 5 trading days.
+    The automatic signal combines price indicators, candlestick patterns and recent news. Open a row to see the
+    evidence, or add your own material to check or adjust the signal.</p>
+
+  <form class="add" id="add">
+    <input type="text" id="sym" placeholder="Symbol, e.g. TSLA or SOL-USD" aria-label="Symbol" autocomplete="off">
+    <button type="submit">Analyse</button>
+  </form>
+
+  <div class="filters" id="filters" role="group" aria-label="Filter by market"></div>
+  <div class="list" id="list"></div>
+
+  <footer>Not financial advice. These are statistical estimates from past data, and any signal can be wrong.
+    The first analysis of a symbol trains its model and can take up to a minute.</footer>
+</main>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElementNS(attrs.svg ? "http://www.w3.org/2000/svg" : "http://www.w3.org/1999/xhtml", tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "svg") continue;
+    if (k === "class") el.setAttribute("class", v); else el.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(k));
+  return el;
+}
+const pct = (x, d = 0) => (x * 100).toFixed(d) + "%";
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const rows = new Map();
+let classes = [];
+let uid = 0;
+let filter = "all";
+const cap = w => w[0].toUpperCase() + w.slice(1);
+const classLabel = k => (classes.find(c => c.key === k) || {}).label || k;
+
+function gauge(p, label) {
+  const color = `var(--${label === "bullish" ? "bull" : label === "bearish" ? "bear" : "flat"})`;
+  const left = Math.min(p, 0.5) * 100, width = Math.abs(p - 0.5) * 100;
+  return h("div", { class: "gauge", role: "img", "aria-label": `Chance of closing higher: ${pct(p)}` },
+    h("div", { class: "track" }),
+    h("div", { class: "fill", style: `left:${left}%;width:${width}%;background:${color}` }),
+    h("div", { class: "mid" }),
+    h("div", { class: "dot", style: `left:${p * 100}%;background:${color}` }),
+    h("div", { class: "ends" }, h("span", {}, "Bearish"), h("span", {}, "Bullish")));
+}
+
+function candleChart(candles, patterns) {
+  const W = 720, H = 280, padL = 8, padR = 56, padT = 14, padB = 22;
+  const hi = Math.max(...candles.map(c => c.h)), lo = Math.min(...candles.map(c => c.l));
+  const span = (hi - lo) || 1;
+  const y = v => padT + (hi - v) / span * (H - padT - padB);
+  const step = (W - padL - padR) / candles.length, bw = Math.max(2, step * 0.62);
+  const bull = cssVar("--bull"), bear = cssVar("--bear"), muted = cssVar("--muted"), line = cssVar("--line");
+  const svg = h("svg", { svg: 1, viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
+                         "aria-label": "Candlestick chart of the last 60 trading days" });
+  for (let i = 0; i <= 3; i++) {
+    const v = lo + span * i / 3, yy = y(v);
+    svg.append(h("line", { svg: 1, x1: padL, x2: W - padR, y1: yy, y2: yy, stroke: line, "stroke-width": 1 }));
+    svg.append(h("text", { svg: 1, x: W - padR + 6, y: yy + 4, fill: muted, "font-size": 11 }, v.toPrecision(5)));
+  }
+  const byDate = new Map();
+  for (const p of patterns) if (!byDate.has(p.date)) byDate.set(p.date, p);
+  candles.forEach((c, i) => {
+    const x = padL + step * i + step / 2, up = c.c >= c.o, col = up ? bull : bear;
+    svg.append(h("line", { svg: 1, x1: x, x2: x, y1: y(c.h), y2: y(c.l), stroke: col, "stroke-width": 1.2 }));
+    const top = y(Math.max(c.o, c.c)), bh = Math.max(1.2, Math.abs(y(c.o) - y(c.c)));
+    svg.append(h("rect", { svg: 1, x: x - bw / 2, y: top, width: bw, height: bh, fill: up ? "none" : col, stroke: col, "stroke-width": 1.2 }));
+    const p = byDate.get(c.d);
+    if (p) {
+      const pc = p.bias === "bullish" ? bull : p.bias === "bearish" ? bear : muted;
+      const below = p.bias !== "bearish", yy = below ? y(c.l) + 12 : y(c.h) - 8;
+      const tri = below ? `${x},${yy - 7} ${x - 5},${yy + 2} ${x + 5},${yy + 2}` : `${x},${yy + 7} ${x - 5},${yy - 2} ${x + 5},${yy - 2}`;
+      const g = h("polygon", { svg: 1, points: tri, fill: pc });
+      g.append(h("title", { svg: 1 }, `${p.date}: ${p.pattern}`));
+      svg.append(g);
+    }
+  });
+  svg.append(h("text", { svg: 1, x: padL, y: H - 6, fill: muted, "font-size": 11 }, candles[0].d));
+  svg.append(h("text", { svg: 1, x: W - padR, y: H - 6, fill: muted, "font-size": 11, "text-anchor": "end" }, candles.at(-1).d));
+  return svg;
+}
+
+function driverList(title, items, cls) {
+  if (!items.length) return null;
+  return h("div", {}, h("h3", {}, title), h("ul", { class: "plain" }, items.map(i => h("li", {},
+    h("span", { class: cls }, `${i.score > 0 ? "+" : ""}${i.score.toFixed(2)} `), i.text))));
+}
+
+function renderMaterial(out, r, res) {
+  const m = res.material, c = res.combined;
+  const line = (label, key, text) => h("li", {}, h("span", { class: `tag ${key}` }, label), h("span", { class: "small" }, ` ${text}`));
+  const shift = c ? `${c.material_shift >= 0 ? "+" : ""}${(c.material_shift * 100).toFixed(1)} points from your material` : "";
+  out.replaceChildren(...[
+    h("ul", { class: "plain" },
+      line(`Automatic signal: ${cap(r.signal)}`, r.signal, `${pct(r.probability_up)} chance up, from prices, candles and news`),
+      line(`Your material: ${cap(m.label)}`, m.label, `strength ${m.strength.toFixed(2)}, from ${m.signals} signal sentences out of ${m.sentences}`),
+      c ? line(`Combined: ${cap(c.signal)}`, c.signal, `${pct(c.probability_up)} chance up (${shift})`) : null),
+    m.signals < 3 ? h("p", { class: "small" }, "Only a few sentences carried a clear signal, so this has little effect. Paste more text, or more specific wording.") : null,
+    driverList("Sentences pushing up", m.pushing_up, "bullish"),
+    driverList("Sentences pushing down", m.pushing_down, "bearish"),
+    h("p", { class: "small" }, "Material is scored on its wording, not checked for accuracy, and it has no track record like the model does. Treat it as one input.")
+  ].filter(Boolean));
+}
+
+function materialPanel(r) {
+  const id = `mat-${++uid}`;
+  const cls = classes.find(c => c.key === r["class"]) || { hints: [] };
+  const ta = h("textarea", { id, rows: 6, maxlength: 20000, placeholder: "Paste an article, a report summary, or your own notes." });
+  const out = h("div", { class: "result", "aria-live": "polite" });
+  async function run(combine, btn) {
+    const text = ta.value.trim();
+    if (!text) { out.replaceChildren(h("p", { class: "state error" }, "Paste some material first: news, a report summary, or your own notes.")); return; }
+    btn.disabled = true;
+    out.replaceChildren(h("p", { class: "state" }, combine ? "Reading your material and combining it with the automatic signal." : "Reading your material."));
+    try {
+      const res = await fetch("/api/material", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol: r.symbol, text, combine }) });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.detail || res.statusText);
+      renderMaterial(out, r, body);
+    } catch (e) { out.replaceChildren(h("p", { class: "state error" }, `Couldn't read that: ${e.message}`)); }
+    btn.disabled = false;
+  }
+  const alone = h("button", { type: "button", class: "quiet" }, "Read my material");
+  const both = h("button", { type: "button" }, "Combine with automatic signal");
+  alone.addEventListener("click", () => run(false, alone));
+  both.addEventListener("click", () => run(true, both));
+  return h("div", {},
+    h("h3", {}, "Your material"),
+    h("p", { class: "small" }, "The automatic signal above needs nothing from you. Add material to read it on its own, or to let it adjust the signal."),
+    cls.hints.length ? h("div", {}, h("p", { class: "small" }, `Useful to paste for ${classLabel(r["class"]).toLowerCase()}:`),
+      h("ul", { class: "hints" }, cls.hints.map(t => h("li", {}, t)))) : null,
+    h("label", { class: "field", for: id }, `Material about ${r.name}`), ta,
+    h("div", { class: "material-actions" }, alone, both), out);
+}
+
+function detail(r) {
+  const b = r.backtest, ind = r.indicators, s = r.sentiment;
+  const beats = b.accuracy - b.baseline_accuracy;
+  const verdict = beats > 0.02 ? "better than" : beats < -0.02 ? "worse than" : "about the same as";
+  const patterns = r.candle_patterns.length
+    ? h("ul", { class: "plain" }, r.candle_patterns.map(p => h("li", {},
+        h("span", { class: `tag ${p.bias}` }, `${p.pattern} (${p.bias})`), h("span", { class: "small" }, ` ${p.date}`),
+        h("div", {}, p.meaning))))
+    : h("p", { class: "small" }, "No recognised patterns in the last 5 candles.");
+  const news = s.headlines.length
+    ? h("ul", { class: "plain" }, s.headlines.map(n => h("li", {},
+        h("a", { href: n.link, target: "_blank", rel: "noopener noreferrer" }, n.title),
+        h("div", { class: "small" }, `${n.source || "Unknown source"}, tone ${n.score > 0 ? "+" : ""}${n.score.toFixed(2)}`))))
+    : h("p", { class: "small" }, "No recent headlines found, so this signal uses price data only.");
+
+  return h("div", { class: "detail" },
+    h("div", {}, h("h3", {}, "Last 60 trading days"), candleChart(r.candles, r.candle_patterns),
+      h("p", { class: "small" }, "Triangles mark candlestick patterns from the last 5 candles. Green outline is a rising day, filled red a falling day.")),
+    h("div", {}, h("h3", {}, "Candlestick patterns"), patterns),
+    h("div", { class: "cols" },
+      h("div", {}, h("h3", {}, "Indicators"), h("dl", {},
+        h("dt", {}, "RSI (14)"), h("dd", {}, ind.rsi_14),
+        h("dt", {}, "MACD histogram"), h("dd", {}, ind.macd_hist_pct + "% of price"),
+        h("dt", {}, "Vs 50-day average"), h("dd", {}, ind.vs_sma_50_pct + "%"),
+        h("dt", {}, "Vs 200-day average"), h("dd", {}, ind.vs_sma_200_pct + "%"),
+        h("dt", {}, "20-day volatility"), h("dd", {}, ind.volatility_20d_pct + "% per day"),
+        h("dt", {}, "Model before news"), h("dd", {}, pct(r.model_probability_up, 1) + " up"))),
+      h("div", {}, h("h3", {}, "Track record on past data"),
+        h("p", {}, `Tested only on data it had not seen, the model called the direction right ${pct(b.accuracy, 1)} of the time. Always guessing the more common outcome gets ${pct(b.baseline_accuracy, 1)}, so it is ${verdict} that.`),
+        b.high_conviction_accuracy != null ? h("p", { class: "small" }, `When it leaned hard (${b.high_conviction_signals} times), it was right ${pct(b.high_conviction_accuracy, 1)}.`) : null,
+        h("p", { class: "small" }, `${b.samples} tests, ${b.horizon_days}-day horizon. Model trained ${r.model_trained_at.slice(0, 10)}.`))),
+    h("div", {}, h("h3", {}, `News tone: ${s.score > 0 ? "+" : ""}${s.score.toFixed(2)} across ${s.headline_count} headlines`), news),
+    materialPanel(r));
+}
+
+function applyFilter() {
+  for (const item of rows.values()) item.hidden = filter !== "all" && item.dataset.class !== filter;
+}
+
+function renderFilters() {
+  const box = $("#filters");
+  box.replaceChildren(...[{ key: "all", label: "All" }, ...classes.filter(c => c.key !== "other")].map(c => {
+    const b = h("button", { type: "button", class: "quiet", "aria-pressed": String(filter === c.key) }, c.label);
+    b.addEventListener("click", () => { filter = c.key; renderFilters(); applyFilter(); });
+    return b;
+  }));
+}
+
+function fill(item, r) {
+  item.dataset.class = r["class"];
+  const sum = $("summary", item), label = r.signal;
+  sum.replaceChildren(
+    h("div", { class: "who" }, h("b", {}, r.name), h("span", {}, `${r.symbol}, ${r["class"]}, close ${r.last_close}`)),
+    gauge(r.probability_up, label),
+    h("div", { class: "call" }, h("b", { class: label }, label[0].toUpperCase() + label.slice(1)),
+      h("span", {}, `${pct(r.probability_up)} chance up`)));
+  const old = $(".detail", item); if (old) old.remove();
+  item.append(detail(r));
+  applyFilter();
+}
+
+function failed(item, symbol, msg) {
+  $("summary", item).replaceChildren(
+    h("div", { class: "who" }, h("b", {}, symbol)),
+    h("div", { class: "state error" }, `Couldn't analyse ${symbol}: ${msg}`),
+    h("div", { class: "call" }, h("button", { type: "button", class: "quiet", onclick: e => { e.preventDefault(); load(symbol, item); } }, "Try again")));
+}
+
+async function load(symbol, item) {
+  $("summary", item).replaceChildren(
+    h("div", { class: "who" }, h("b", {}, symbol)),
+    h("div", { class: "state" }, "Analysing. The first run trains a model for this symbol."),
+    h("div", {}));
+  try {
+    const res = await fetch(`/api/signal/${encodeURIComponent(symbol)}`);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || res.statusText);
+    fill(item, body);
+  } catch (e) { failed(item, symbol, e.message); }
+}
+
+function addRow(symbol, cls) {
+  if (rows.has(symbol.toUpperCase())) return null;
+  const item = h("details", { class: "row" }, h("summary", {}));
+  if (cls) item.dataset.class = cls;
+  rows.set(symbol.toUpperCase(), item);
+  $("#list").append(item);
+  return item;
+}
+
+async function pool(items, n, fn) {
+  const q = [...items];
+  await Promise.all(Array.from({ length: n }, async () => { while (q.length) await fn(q.shift()); }));
+}
+
+$("#add").addEventListener("submit", e => {
+  e.preventDefault();
+  const v = $("#sym").value.trim();
+  if (!v) return;
+  filter = "all"; renderFilters(); applyFilter();
+  const item = addRow(v);
+  if (item) load(v, item);
+  $("#sym").value = "";
+});
+
+(async () => {
+  try {
+    classes = await (await fetch("/api/classes")).json();
+    renderFilters();
+    const list = await (await fetch("/api/watchlist")).json();
+    const todo = list.map(a => [a.symbol, addRow(a.symbol, a["class"])]);
+    await pool(todo, 2, ([s, item]) => load(s, item));
+  } catch (e) {
+    $("#list").append(h("p", { class: "state error", style: "padding:16px 20px" }, "Couldn't reach the server. Start it with: uvicorn app.api:app"));
+  }
+})();
+
+// ---- Advanced features ----
+$("#advanced").hidden = $("#list").childElementCount < 4;  // hide if not enough rows
+
+document.getElementById("bulk-btn").addEventListener("click", async () => {
+  const txt = $("#bulk-symbols").value.trim();
+  if (!txt) return alert("Paste symbols, comma or newline separated");
+  const syms = txt.split(/[,\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+  const res = $("#bulk-result"); res.innerHTML = "Analysing " + syms.length + " symbols...";
+  try {
+    const r = await fetch("/api/bulk", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(syms) });
+    const data = await r.json();
+    res.innerHTML = h("ul", { class: "plain" }, data.map(d => h("li", {},
+      h("b", {}, d.symbol), " " + (d.error || `${d.signal} ${d.probability_up.toFixed(2)}`)))).outerHTML;
+  } catch (e) { res.innerHTML = "Error: " + e.message; }
+});
+
+document.getElementById("portfolio-btn").addEventListener("click", async () => {
+  const syms = Array.from(rows.keys());
+  if (!syms.length) return alert("No symbols loaded");
+  const res = $("#portfolio-result");
+  res.innerHTML = "Computing metrics...";
+  try {
+    const r = await fetch(`/api/portfolio?${new URLSearchParams({symbols: syms}).toString()}`);
+    const data = await r.json();
+    res.innerHTML = `<p>Tracked: ${data.symbols} symbols, ${data.total_signals} signals total</p>
+      <p>Bullish ${data.bullish_count}, Bearish ${data.bearish_count}, Neutral ${data.neutral_count}</p>
+      <p>Avg probability: ${data.avg_probability}</p>`;
+  } catch (e) { res.innerHTML = "Error: " + e.message; }
+});
+
+document.getElementById("history-btn").addEventListener("click", async () => {
+  const syms = Array.from(rows.keys());
+  const res = $("#history-result");
+  res.innerHTML = "Fetching history...";
+  try {
+    const entries = [];
+    for (const s of syms.slice(0, 8)) {
+      const r = await fetch(`/api/signal/${s}/history?days=30`);
+      const data = await r.json();
+      entries.push(...data.entries);
+    }
+    res.innerHTML = entries.length ? `<p>${entries.length} signals in last 30 days</p>` +
+      entries.slice(-10).reverse().map(e => `<div><small>${e.timestamp.slice(0, 10)}</small> 
+      ${e.symbol} ${e.signal} ${e.probability_up}</div>`).join("") : "<p>No history</p>";
+  } catch (e) { res.innerHTML = "Error: " + e.message; }
+});
+
+document.getElementById("export-csv-btn").addEventListener("click", async () => {
+  const s = prompt("Symbol to export (or leave empty for first tracked symbol)");
+  const sym = s || Array.from(rows.keys())[0];
+  if (!sym) return alert("No symbols loaded");
+  try {
+    const r = await fetch(`/api/export/${sym}?format=csv`);
+    const data = await r.json();
+    const a = h("a", { href: `data:text/csv,${encodeURIComponent(data.data)}`, download: data.filename });
+    a.click();
+  } catch (e) { alert("Error: " + e.message); }
+});
+
+// Make advanced visible once rows load
+const obs = new MutationObserver(() => {
+  if (rows.size >= 4) {
+    $("#advanced").hidden = false;
+    obs.disconnect();
+  }
+});
+obs.observe($("#list"), { childList: true });
+</script>
+</body>
+</html>
