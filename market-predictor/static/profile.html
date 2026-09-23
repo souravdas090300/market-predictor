@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile - Market Predictor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0F172A;
+            color: #F9FAFB;
+            min-height: 100vh;
+        }
+
+        .profile-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .profile-header {
+            background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid #2D3748;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .profile-info h1 {
+            font-size: 1.75rem;
+            color: #F9FAFB;
+            margin-bottom: 0.5rem;
+        }
+
+        .profile-info p {
+            color: #D1D5DB;
+            font-size: 0.9rem;
+        }
+
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: rgba(16, 185, 129, 0.2);
+            color: #10B981;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .profile-section {
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #2D3748;
+        }
+
+        .profile-section h2 {
+            font-size: 1.25rem;
+            color: #F9FAFB;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #2D3748;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .info-item {
+            background: #111827;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #2D3748;
+        }
+
+        .info-item label {
+            display: block;
+            color: #D1D5DB;
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .info-item .value {
+            color: #F9FAFB;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .subscription-card {
+            background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #2D3748;
+            margin-bottom: 1rem;
+        }
+
+        .subscription-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .subscription-plan {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #FBBF24;
+        }
+
+        .subscription-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .subscription-status.active {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10B981;
+        }
+
+        .subscription-status.expired {
+            background: rgba(239, 68, 68, 0.2);
+            color: #EF4444;
+        }
+
+        .subscription-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .subscription-details .item {
+            background: #111827;
+            padding: 0.75rem;
+            border-radius: 6px;
+            border: 1px solid #2D3748;
+        }
+
+        .subscription-details .item label {
+            display: block;
+            color: #D1D5DB;
+            font-size: 0.75rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .subscription-details .item .value {
+            color: #F9FAFB;
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: #D1D5DB;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #2D3748;
+            border-radius: 6px;
+            background: #111827;
+            color: #F9FAFB;
+            font-size: 0.875rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #10B981;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #10B981;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #059669;
+        }
+
+        .btn-secondary {
+            background: #2D3748;
+            color: #F9FAFB;
+        }
+
+        .btn-secondary:hover {
+            background: #374151;
+        }
+
+        .btn-google {
+            background: #DB4437;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-google:hover {
+            background: #C53929;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .message.success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10B981;
+            color: #10B981;
+        }
+
+        .message.error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #EF4444;
+            color: #EF4444;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #D1D5DB;
+        }
+
+        .nav-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .nav-bar a {
+            color: #D1D5DB;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .nav-bar a:hover,
+        .nav-bar a.active {
+            background: #111827;
+            color: #F9FAFB;
+        }
+
+        @media (max-width: 768px) {
+            .profile-container {
+                padding: 1rem;
+            }
+
+            .profile-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-container">
+        <div class="nav-bar">
+            <a href="/index.html">Dashboard</a>
+            <a href="#" class="active">Profile</a>
+            <a href="#" onclick="handleLogout()">Logout</a>
+        </div>
+
+        <div id="message-container"></div>
+
+        <div id="loading" class="loading">Loading profile...</div>
+
+        <div id="profile-content" style="display: none;">
+            <div class="profile-header">
+                <div class="avatar" id="avatar">U</div>
+                <div class="profile-info">
+                    <h1>
+                        <span id="username">Username</span>
+                        <span id="verified-badge" class="verified-badge" style="display: none;">✓ Verified</span>
+                    </h1>
+                    <p id="email">email@example.com</p>
+                    <p id="joined-date">Joined: January 1, 2024</p>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <h2>Account Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>User ID</label>
+                        <div class="value" id="user-id">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Username</label>
+                        <div class="value" id="display-username">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Email</label>
+                        <div class="value" id="display-email">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Account Created</label>
+                        <div class="value" id="created-at">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Last Login</label>
+                        <div class="value" id="last-login">-</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Roles</label>
+                        <div class="value" id="roles">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <h2>Subscription</h2>
+                <div class="subscription-card">
+                    <div class="subscription-header">
+                        <div class="subscription-plan" id="subscription-plan">Free Plan</div>
+                        <div class="subscription-status" id="subscription-status">Active</div>
+                    </div>
+                    <div class="subscription-details">
+                        <div class="item">
+                            <label>Start Date</label>
+                            <div class="value" id="sub-start-date">-</div>
+                        </div>
+                        <div class="item">
+                            <label>Expiry Date</label>
+                            <div class="value" id="sub-expiry-date">-</div>
+                        </div>
+                        <div class="item">
+                            <label>Auto Renew</label>
+                            <div class="value" id="sub-auto-renew">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-primary" onclick="upgradeSubscription()">Upgrade Subscription</button>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <h2>Profile Settings</h2>
+                <form id="profile-form" onsubmit="updateProfile(event)">
+                    <div class="info-grid">
+                        <div class="form-group">
+                            <label>First Name</label>
+                            <input type="text" id="first-name" placeholder="Enter first name">
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name</label>
+                            <input type="text" id="last-name" placeholder="Enter last name">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Bio</label>
+                        <textarea id="bio" rows="3" placeholder="Tell us about yourself"></textarea>
+                    </div>
+                    <div class="info-grid">
+                        <div class="form-group">
+                            <label>Location</label>
+                            <input type="text" id="location" placeholder="City, Country">
+                        </div>
+                        <div class="form-group">
+                            <label>Website</label>
+                            <input type="url" id="website" placeholder="https://yourwebsite.com">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                </form>
+            </div>
+
+            <div class="profile-section">
+                <h2>Authentication</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>OAuth Providers</label>
+                        <div class="value" id="oauth-providers">None</div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-google" onclick="googleSignIn()">
+                        <span>G</span> Sign in with Google
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API helpers
+        async function apiCall(endpoint, options = {}) {
+            const token = localStorage.getItem('access_token');
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
+            };
+            
+            const response = await fetch(endpoint, {
+                ...options,
+                headers: { ...headers, ...options.headers }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+            
+            return response.json();
+        }
+
+        function showMessage(message, type = 'success') {
+            const container = document.getElementById('message-container');
+            const msg = document.createElement('div');
+            msg.className = `message ${type}`;
+            msg.textContent = message;
+            container.appendChild(msg);
+            
+            setTimeout(() => msg.remove(), 5000);
+        }
+
+        async function loadProfile() {
+            try {
+                const user = await apiCall('/api/auth/me');
+                
+                // Update UI
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('profile-content').style.display = 'block';
+                
+                // Header
+                document.getElementById('username').textContent = user.username;
+                document.getElementById('email').textContent = user.email;
+                document.getElementById('avatar').textContent = user.username.charAt(0).toUpperCase();
+                
+                if (user.email_verified) {
+                    document.getElementById('verified-badge').style.display = 'inline-flex';
+                }
+                
+                document.getElementById('joined-date').textContent = `Joined: ${new Date(user.created_at).toLocaleDateString()}`;
+                
+                // Account Information
+                document.getElementById('user-id').textContent = user.user_id;
+                document.getElementById('display-username').textContent = user.username;
+                document.getElementById('display-email').textContent = user.email;
+                document.getElementById('created-at').textContent = new Date(user.created_at).toLocaleString();
+                document.getElementById('last-login').textContent = user.last_login ? new Date(user.last_login).toLocaleString() : 'Never';
+                document.getElementById('roles').textContent = user.roles.join(', ');
+                
+                // Subscription
+                const subscription = user.subscription;
+                document.getElementById('subscription-plan').textContent = subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1) + ' Plan';
+                
+                const statusEl = document.getElementById('subscription-status');
+                statusEl.textContent = subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1);
+                statusEl.className = `subscription-status ${subscription.status}`;
+                
+                document.getElementById('sub-start-date').textContent = subscription.start_date ? new Date(subscription.start_date).toLocaleDateString() : 'N/A';
+                document.getElementById('sub-expiry-date').textContent = subscription.expiry_date ? new Date(subscription.expiry_date).toLocaleDateString() : 'N/A';
+                document.getElementById('sub-auto-renew').textContent = subscription.auto_renew ? 'Yes' : 'No';
+                
+                // Profile
+                if (user.profile) {
+                    document.getElementById('first-name').value = user.profile.first_name || '';
+                    document.getElementById('last-name').value = user.profile.last_name || '';
+                    document.getElementById('bio').value = user.profile.bio || '';
+                    document.getElementById('location').value = user.profile.location || '';
+                    document.getElementById('website').value = user.profile.website || '';
+                }
+                
+                // OAuth
+                document.getElementById('oauth-providers').textContent = user.oauth_providers.length > 0 ? user.oauth_providers.join(', ') : 'None';
+                
+            } catch (error) {
+                document.getElementById('loading').textContent = 'Error loading profile: ' + error.message;
+            }
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+            
+            const profileData = {
+                first_name: document.getElementById('first-name').value,
+                last_name: document.getElementById('last-name').value,
+                bio: document.getElementById('bio').value,
+                location: document.getElementById('location').value,
+                website: document.getElementById('website').value
+            };
+            
+            try {
+                await apiCall('/api/user/profile', {
+                    method: 'PUT',
+                    body: JSON.stringify(profileData)
+                });
+                showMessage('Profile updated successfully');
+            } catch (error) {
+                showMessage('Error updating profile: ' + error.message, 'error');
+            }
+        }
+
+        async function upgradeSubscription() {
+            // This would open a payment page in production
+            alert('Subscription upgrade will be available in production with payment integration.');
+        }
+
+        async function googleSignIn() {
+            try {
+                // Redirect to Google OAuth
+                window.location.href = '/api/auth/oauth/google';
+            } catch (error) {
+                showMessage('Google sign-in not yet implemented', 'error');
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        }
+
+        function checkAuthentication() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Load profile on page load
+        checkAuthentication();
+        loadProfile();
+    </script>
+</body>
+</html>

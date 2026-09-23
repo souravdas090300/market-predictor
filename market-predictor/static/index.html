@@ -1,445 +1,477 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market lean</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --paper: #eef1f4;
-    --surface: #ffffff;
-    --ink: #13202c;
-    --muted: #5a6876;
-    --line: #d5dbe2;
-    --bull: #0e7c66;
-    --bear: #b23a2b;
-    --flat: #8791a0;
-    --focus: #1d4ed8;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--paper); color: var(--ink);
-    font: 400 16px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-    font-variant-numeric: tabular-nums;
-  }
-  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
-  h1 { font-size: 30px; line-height: 1.15; margin: 0 0 8px; font-weight: 600; letter-spacing: -0.01em; }
-  .lede { margin: 0 0 24px; color: var(--muted); max-width: 62ch; }
-  form.add { display: flex; gap: 8px; margin-bottom: 20px; }
-  input[type=text] {
-    flex: 1; min-width: 0; max-width: 320px; padding: 10px 12px; font: inherit; color: var(--ink);
-    background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
-  }
-  button {
-    font: inherit; font-weight: 500; padding: 10px 16px; border-radius: 6px; cursor: pointer;
-    background: var(--ink); color: #fff; border: 1px solid var(--ink);
-  }
-  button.quiet { background: transparent; color: var(--ink); border-color: var(--line); padding: 6px 10px; }
-  input:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible {
-    outline: 2px solid var(--focus); outline-offset: 2px;
-  }
-
-  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-  .filters button[aria-pressed=true] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  textarea {
-    width: 100%; padding: 10px 12px; font: inherit; color: var(--ink); background: var(--surface);
-    border: 1px solid var(--line); border-radius: 6px; resize: vertical; min-height: 120px;
-  }
-  textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-  label.field { display: block; font-weight: 500; margin: 12px 0 6px; }
-  .material-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 4px; }
-  .material-actions button.quiet { padding: 10px 16px; }
-  .hints { margin: 0 0 4px; padding-left: 18px; color: var(--muted); font-size: 14px; }
-  .hints li { margin: 2px 0; }
-  .result { margin-top: 12px; }
-  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-  .row { border-top: 1px solid var(--line); }
-  .row:first-child { border-top: 0; }
-  .row > summary {
-    list-style: none; cursor: pointer; display: grid; align-items: center; gap: 16px;
-    grid-template-columns: minmax(150px, 1fr) minmax(200px, 2fr) 130px; padding: 16px 20px;
-  }
-  .row > summary::-webkit-details-marker { display: none; }
-  .who b { display: block; font-weight: 600; }
-  .who span { color: var(--muted); font-size: 14px; }
-  .call { text-align: right; }
-  .call b { display: block; font-weight: 600; font-size: 18px; }
-  .call span { color: var(--muted); font-size: 14px; }
-  .bullish { color: var(--bull); } .bearish { color: var(--bear); } .neutral { color: var(--flat); }
-
-  /* The lean gauge: distance from the centre tick shows how far the estimate leans. */
-  .gauge { position: relative; height: 26px; }
-  .gauge .track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: var(--line); border-radius: 2px; }
-  .gauge .fill { position: absolute; top: 11px; height: 4px; border-radius: 2px; }
-  .gauge .mid { position: absolute; left: 50%; top: 5px; width: 1px; height: 16px; background: var(--muted); }
-  .gauge .dot { position: absolute; top: 6px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--surface); }
-  .gauge .ends { position: absolute; left: 0; right: 0; top: 24px; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
-  .gauge { margin-bottom: 12px; }
-
-  .state { color: var(--muted); font-size: 14px; }
-  .state.error { color: var(--bear); }
-
-  .detail { padding: 4px 20px 24px; display: grid; gap: 24px; grid-template-columns: 1fr; }
-  .detail h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
-  .detail p { margin: 0 0 8px; }
-  .chart { width: 100%; height: auto; display: block; background: #fafbfc; border: 1px solid var(--line); border-radius: 6px; }
-  .cols { display: grid; gap: 24px; grid-template-columns: 1fr 1fr; }
-  ul.plain { list-style: none; margin: 0; padding: 0; }
-  ul.plain li { padding: 8px 0; border-top: 1px solid var(--line); }
-  ul.plain li:first-child { border-top: 0; }
-  .tag { font-weight: 600; }
-  .small { font-size: 14px; color: var(--muted); }
-  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; }
-  dt { color: var(--muted); } dd { margin: 0; text-align: right; }
-  a { color: var(--focus); }
-  footer { margin-top: 24px; color: var(--muted); font-size: 14px; max-width: 70ch; }
-
-  .advanced { padding: 16px 20px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 20px; }
-  .advanced details > summary { cursor: pointer; font-weight: 500; margin-bottom: 12px; }
-  .advanced textarea { width: 100%; }
-  #bulk-result, #portfolio-result, #history-result { margin-top: 12px; padding: 8px; background: var(--paper); border-radius: 6px; }
-  .advanced button { margin-right: 6px; }
-  @media (max-width: 720px) {
-    .row > summary { grid-template-columns: 1fr auto; }
-    .row > summary .gauge { grid-column: 1 / -1; grid-row: 2; }
-    .cols { grid-template-columns: 1fr; }
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --paper: #0f1720; --surface: #17212c; --ink: #e6ecf2; --muted: #98a6b5; --line: #2a3745;
-            --bull: #3fc2a5; --bear: #ee7d6d; --flat: #8f9bab; --focus: #7aa2ff; }
-    button { background: var(--ink); color: var(--paper); }
-    .chart { background: #131c26; }
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Predictor – Live signals</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --color-bullish: #10B981;
+            --color-bearish: #EF4444;
+            --color-navy: #0F172A;
+            --color-gold: #FBBF24;
+            --color-slate: #1F2937;
+            --color-gray-dark: #111827;
+            --color-border: #2D3748;
+            --color-text-primary: #F9FAFB;
+            --color-text-secondary: #D1D5DB;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --spacing-xs: 0.5rem;
+            --spacing-sm: 1rem;
+            --spacing-md: 1.5rem;
+            --spacing-lg: 2rem;
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        body {
+            background: linear-gradient(135deg, var(--color-navy) 0%, #1a2a4a 100%);
+            color: var(--color-text-primary);
+            font-family: var(--font-body);
+            font-size: 14px;
+            line-height: 1.6;
+            overflow: hidden;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 70px 1fr;
+            height: 100vh;
+        }
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--color-border);
+            padding: 0 var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--spacing-sm);
+        }
+        .header-logo { display: flex; align-items: center; gap: var(--spacing-sm); font-weight: 700; font-size: 18px; }
+        .logo-icon {
+            width: 28px; height: 28px;
+            background: linear-gradient(135deg, var(--color-gold), var(--color-bullish));
+            border-radius: var(--radius-md);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .header-controls { display: flex; gap: var(--spacing-sm); align-items: center; flex-wrap: wrap; }
+        .live-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+            color: var(--color-bullish);
+        }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-bullish); animation: pulse 1.6s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .refresh-btn, .ghost-link {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            text-decoration: none;
+        }
+        .symbol-search {
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-primary);
+            border-radius: var(--radius-sm);
+            padding: 6px 10px;
+            width: 140px;
+            font-family: var(--font-mono);
+        }
+        .hamburger { display: none; background: none; border: 1px solid var(--color-border); color: #fff; padding: 6px 10px; border-radius: 6px; }
+        .sidebar {
+            background: rgba(17, 24, 39, 0.5);
+            border-right: 1px solid var(--color-border);
+            padding: var(--spacing-lg) var(--spacing-sm);
+            overflow-y: auto;
+        }
+        .sidebar-section-title {
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; color: var(--color-text-secondary);
+            padding: var(--spacing-md) 0 var(--spacing-xs);
+        }
+        .watchlist-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 6px;
+        }
+        .watchlist-item.active, .watchlist-item:hover { background: rgba(16, 185, 129, 0.12); border-color: var(--color-bullish); }
+        .watchlist-symbol { font-weight: 600; font-size: 13px; }
+        .watchlist-meta { text-align: right; }
+        .watchlist-price { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-secondary); }
+        .watchlist-signal { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+        .watchlist-signal.bullish { background: rgba(16, 185, 129, 0.3); color: var(--color-bullish); }
+        .watchlist-signal.bearish { background: rgba(239, 68, 68, 0.3); color: var(--color-bearish); }
+        .watchlist-signal.neutral { background: rgba(251, 191, 36, 0.25); color: var(--color-gold); }
+        .main {
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: var(--spacing-lg);
+        }
+        .hero-card, .card, .metric-card, .signals-table {
+            background: rgba(31, 41, 55, 0.55);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+        }
+        .hero-card { padding: var(--spacing-lg); }
+        .hero-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+        .symbol-main { font-size: 32px; font-weight: 700; }
+        .symbol-class { font-size: 12px; color: var(--color-text-secondary); text-transform: uppercase; }
+        .live-price { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
+        .live-price.up { color: var(--color-bullish); }
+        .live-price.down { color: var(--color-bearish); }
+        .signal-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 14px; border-radius: var(--radius-md);
+            font-weight: 700; text-transform: uppercase;
+        }
+        .signal-badge.bullish { color: var(--color-bullish); border: 1px solid var(--color-bullish); }
+        .signal-badge.bearish { color: var(--color-bearish); border: 1px solid var(--color-bearish); }
+        .signal-badge.neutral { color: var(--color-gold); border: 1px solid var(--color-gold); }
+        .note { font-size: 12px; color: var(--color-text-secondary); margin: 8px 0 12px; }
+        .chart-container { height: 320px; position: relative; }
+        canvas { width: 100%; height: 100%; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--spacing-md); margin: var(--spacing-lg) 0; }
+        .metric-card { padding: var(--spacing-md); }
+        .metric-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-secondary); }
+        .metric-value { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
+        .metric-value.positive { color: var(--color-bullish); }
+        .metric-value.negative { color: var(--color-bearish); }
+        .metric-subtext { font-size: 12px; color: var(--color-text-secondary); }
+        .signals-section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 8px; }
+        .table-header, .table-row {
+            display: grid; grid-template-columns: 90px 1fr 90px 80px;
+            gap: 12px; padding: 12px; align-items: center;
+        }
+        .table-header { font-size: 11px; text-transform: uppercase; color: var(--color-text-secondary); border-bottom: 1px solid var(--color-border); }
+        .table-row { border-bottom: 1px solid var(--color-border); cursor: pointer; }
+        .sidebar-right { display: flex; flex-direction: column; gap: var(--spacing-md); }
+        .card { padding: var(--spacing-md); }
+        .card-title { font-weight: 700; margin-bottom: 10px; }
+        .material-input, textarea.material-input {
+            width: 100%; min-height: 90px; background: rgba(0,0,0,0.25);
+            border: 1px solid var(--color-border); color: #fff; border-radius: 8px; padding: 8px;
+        }
+        .material-btn, .table-action {
+            margin-top: 8px; padding: 8px 12px; width: 100%;
+            background: rgba(16, 185, 129, 0.15); border: 1px solid var(--color-bullish);
+            color: var(--color-bullish); border-radius: 6px; cursor: pointer; font-weight: 600;
+        }
+        .insight-item { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 8px; }
+        .insight-label { color: var(--color-text-primary); font-weight: 600; }
+        .news-item { font-size: 12px; margin-bottom: 10px; }
+        .news-item a { color: var(--color-text-primary); text-decoration: none; }
+        .status { font-size: 12px; color: var(--color-gold); }
+        .error { color: var(--color-bearish); font-size: 12px; }
+        @media (max-width: 1100px) {
+            .container { grid-template-columns: 1fr; }
+            .sidebar { display: none; position: absolute; top: 70px; left: 0; bottom: 0; width: 280px; z-index: 20; background: #111827; }
+            .sidebar.open { display: block; }
+            .hamburger { display: inline-block; }
+            .main { grid-template-columns: 1fr; }
+            .metrics-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
 </head>
 <body>
-<main>
-  <h1>Market lean</h1>
-  <p class="lede">For shares, crypto, forex and commodities: the estimated chance each asset closes higher in 5 trading days.
-    The automatic signal combines price indicators, candlestick patterns and recent news. Open a row to see the
-    evidence, or add your own material to check or adjust the signal.</p>
+    <div class="container">
+        <header class="header">
+            <div class="header-logo">
+                <button class="hamburger" id="menuBtn" type="button">Menu</button>
+                <div class="logo-icon">MP</div>
+                Market Predictor
+            </div>
+            <div class="header-controls">
+                <span class="live-pill"><span class="live-dot"></span> LIVE</span>
+                <input class="symbol-search" id="symbolInput" placeholder="TSLA, SOL-USD" />
+                <button class="refresh-btn" id="goBtn" type="button">Load</button>
+                <button class="refresh-btn" id="refreshBtn" type="button">Refresh</button>
+                <a class="ghost-link" href="/profile.html">Account</a>
+            </div>
+        </header>
+        <aside class="sidebar" id="sidebar"></aside>
+        <main class="main">
+            <div>
+                <div class="hero-card">
+                    <div class="hero-header">
+                        <div>
+                            <div class="symbol-main" id="symName">—</div>
+                            <div class="symbol-class" id="symClass">Select an asset</div>
+                            <div class="live-price" id="livePrice">Live quote loading…</div>
+                        </div>
+                        <div class="signal-badge neutral" id="signalBadge">…</div>
+                    </div>
+                    <p class="note" id="modelNote">The model predicts the next 5 completed trading days. Live price is shown separately so it cannot leak into training.</p>
+                    <div class="chart-container"><canvas id="chart"></canvas></div>
+                    <p class="status" id="status"></p>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">P(up) 5 days</div>
+                        <div class="metric-value" id="mProb">—</div>
+                        <div class="metric-subtext" id="mConv">calibrated model + news nudge</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">News tone</div>
+                        <div class="metric-value" id="mNews">—</div>
+                        <div class="metric-subtext" id="mNewsN">headlines</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Walk-forward acc.</div>
+                        <div class="metric-value" id="mAcc">—</div>
+                        <div class="metric-subtext" id="mBase">vs always-guess baseline</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">RSI / vs SMA50</div>
+                        <div class="metric-value" id="mRsi">—</div>
+                        <div class="metric-subtext" id="mSma">from last completed day</div>
+                    </div>
+                </div>
+                <h3 class="signals-section-title">Watchlist snapshots</h3>
+                <div class="signals-table" id="table"></div>
+            </div>
+            <div class="sidebar-right">
+                <div class="card">
+                    <div class="card-title">Your material</div>
+                    <textarea class="material-input" id="materialText" placeholder="Paste a few sentences of news or notes…"></textarea>
+                    <button class="material-btn" id="materialBtn" type="button">Blend with auto signal</button>
+                    <div class="insight-item" id="materialOut">Material can shift P(up) by at most ±15%.</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Patterns (last 5 days)</div>
+                    <div id="patterns"><div class="insight-item">Waiting for a signal…</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Live headlines</div>
+                    <div id="news"><div class="insight-item">Waiting for news…</div></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        const CLASS_LABELS = { stock: 'Shares', crypto: 'Crypto', forex: 'Forex', commodity: 'Commodities' };
+        let watchlist = [];
+        let current = null;
+        let lastSignal = null;
+        let quotes = {};
+        let source = null;
 
-  <form class="add" id="add">
-    <input type="text" id="sym" placeholder="Symbol, e.g. TSLA or SOL-USD" aria-label="Symbol" autocomplete="off">
-    <button type="submit">Analyse</button>
-  </form>
+        const $ = (id) => document.getElementById(id);
 
-  <div class="filters" id="filters" role="group" aria-label="Filter by market"></div>
-  <div class="list" id="list"></div>
+        function fmt(n, d=2) {
+            if (n == null || Number.isNaN(n)) return '—';
+            return Number(n).toLocaleString(undefined, { maximumFractionDigits: d });
+        }
+        function pct(n) {
+            if (n == null) return '—';
+            const s = (n * 100).toFixed(2);
+            return (n >= 0 ? '+' : '') + s + '%';
+        }
 
-  <footer>Not financial advice. These are statistical estimates from past data, and any signal can be wrong.
-    The first analysis of a symbol trains its model and can take up to a minute.</footer>
-</main>
+        function drawChart(candles, live) {
+            const canvas = $('chart');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * devicePixelRatio;
+            canvas.height = rect.height * devicePixelRatio;
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, rect.width, rect.height);
+            if (!candles || candles.length < 2) return;
+            const bars = candles.slice();
+            if (live && live.price) {
+                const last = bars[bars.length - 1];
+                bars.push({ d: 'live', o: last.c, h: Math.max(last.c, live.price), l: Math.min(last.c, live.price), c: live.price });
+            }
+            const highs = bars.map(b => b.h);
+            const lows = bars.map(b => b.l);
+            const max = Math.max(...highs);
+            const min = Math.min(...lows);
+            const pad = (max - min) * 0.08 || 1;
+            const top = max + pad, bot = min - pad;
+            const w = rect.width, h = rect.height;
+            const bw = Math.max(2, (w - 20) / bars.length - 2);
+            bars.forEach((b, i) => {
+                const x = 10 + i * ((w - 20) / bars.length);
+                const yH = h * (1 - (b.h - bot) / (top - bot));
+                const yL = h * (1 - (b.l - bot) / (top - bot));
+                const yO = h * (1 - (b.o - bot) / (top - bot));
+                const yC = h * (1 - (b.c - bot) / (top - bot));
+                const up = b.c >= b.o;
+                ctx.strokeStyle = up ? '#10B981' : '#EF4444';
+                ctx.fillStyle = up ? '#10B981' : '#EF4444';
+                ctx.beginPath(); ctx.moveTo(x + bw / 2, yH); ctx.lineTo(x + bw / 2, yL); ctx.stroke();
+                const bodyTop = Math.min(yO, yC);
+                const bodyH = Math.max(1, Math.abs(yC - yO));
+                ctx.fillRect(x, bodyTop, bw, bodyH);
+            });
+        }
 
-<script>
-const $ = (s, r = document) => r.querySelector(s);
-function h(tag, attrs = {}, ...kids) {
-  const el = document.createElementNS(attrs.svg ? "http://www.w3.org/2000/svg" : "http://www.w3.org/1999/xhtml", tag);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === "svg") continue;
-    if (k === "class") el.setAttribute("class", v); else el.setAttribute(k, v);
-  }
-  for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(k));
-  return el;
-}
-const pct = (x, d = 0) => (x * 100).toFixed(d) + "%";
-const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const rows = new Map();
-let classes = [];
-let uid = 0;
-let filter = "all";
-const cap = w => w[0].toUpperCase() + w.slice(1);
-const classLabel = k => (classes.find(c => c.key === k) || {}).label || k;
+        function renderWatchlist() {
+            const grouped = {};
+            watchlist.forEach(a => {
+                (grouped[a.class] ||= []).push(a);
+            });
+            const side = $('sidebar');
+            side.innerHTML = '';
+            Object.keys(grouped).forEach(cls => {
+                const title = document.createElement('div');
+                title.className = 'sidebar-section-title';
+                title.textContent = CLASS_LABELS[cls] || cls;
+                side.appendChild(title);
+                grouped[cls].forEach(a => {
+                    const q = quotes[a.symbol];
+                    const el = document.createElement('div');
+                    el.className = 'watchlist-item' + (current === a.symbol ? ' active' : '');
+                    const chg = q ? q.change_pct : null;
+                    el.innerHTML = `<span class="watchlist-symbol">${a.name}</span>
+                        <span class="watchlist-meta">
+                            <div class="watchlist-price">${q ? fmt(q.price, 4) : '…'} ${chg == null ? '' : pct(chg)}</div>
+                        </span>`;
+                    el.onclick = () => loadSymbol(a.symbol);
+                    side.appendChild(el);
+                });
+            });
+        }
 
-function gauge(p, label) {
-  const color = `var(--${label === "bullish" ? "bull" : label === "bearish" ? "bear" : "flat"})`;
-  const left = Math.min(p, 0.5) * 100, width = Math.abs(p - 0.5) * 100;
-  return h("div", { class: "gauge", role: "img", "aria-label": `Chance of closing higher: ${pct(p)}` },
-    h("div", { class: "track" }),
-    h("div", { class: "fill", style: `left:${left}%;width:${width}%;background:${color}` }),
-    h("div", { class: "mid" }),
-    h("div", { class: "dot", style: `left:${p * 100}%;background:${color}` }),
-    h("div", { class: "ends" }, h("span", {}, "Bearish"), h("span", {}, "Bullish")));
-}
+        function applyQuote(symbol, q) {
+            if (!q) return;
+            quotes[symbol] = q;
+            if (symbol === current) {
+                const el = $('livePrice');
+                el.textContent = `${fmt(q.price, 4)}  ${pct(q.change_pct)}`;
+                el.className = 'live-price ' + (q.change_pct >= 0 ? 'up' : 'down');
+                if (lastSignal) drawChart(lastSignal.candles, q);
+            }
+            renderWatchlist();
+        }
 
-function candleChart(candles, patterns) {
-  const W = 720, H = 280, padL = 8, padR = 56, padT = 14, padB = 22;
-  const hi = Math.max(...candles.map(c => c.h)), lo = Math.min(...candles.map(c => c.l));
-  const span = (hi - lo) || 1;
-  const y = v => padT + (hi - v) / span * (H - padT - padB);
-  const step = (W - padL - padR) / candles.length, bw = Math.max(2, step * 0.62);
-  const bull = cssVar("--bull"), bear = cssVar("--bear"), muted = cssVar("--muted"), line = cssVar("--line");
-  const svg = h("svg", { svg: 1, viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
-                         "aria-label": "Candlestick chart of the last 60 trading days" });
-  for (let i = 0; i <= 3; i++) {
-    const v = lo + span * i / 3, yy = y(v);
-    svg.append(h("line", { svg: 1, x1: padL, x2: W - padR, y1: yy, y2: yy, stroke: line, "stroke-width": 1 }));
-    svg.append(h("text", { svg: 1, x: W - padR + 6, y: yy + 4, fill: muted, "font-size": 11 }, v.toPrecision(5)));
-  }
-  const byDate = new Map();
-  for (const p of patterns) if (!byDate.has(p.date)) byDate.set(p.date, p);
-  candles.forEach((c, i) => {
-    const x = padL + step * i + step / 2, up = c.c >= c.o, col = up ? bull : bear;
-    svg.append(h("line", { svg: 1, x1: x, x2: x, y1: y(c.h), y2: y(c.l), stroke: col, "stroke-width": 1.2 }));
-    const top = y(Math.max(c.o, c.c)), bh = Math.max(1.2, Math.abs(y(c.o) - y(c.c)));
-    svg.append(h("rect", { svg: 1, x: x - bw / 2, y: top, width: bw, height: bh, fill: up ? "none" : col, stroke: col, "stroke-width": 1.2 }));
-    const p = byDate.get(c.d);
-    if (p) {
-      const pc = p.bias === "bullish" ? bull : p.bias === "bearish" ? bear : muted;
-      const below = p.bias !== "bearish", yy = below ? y(c.l) + 12 : y(c.h) - 8;
-      const tri = below ? `${x},${yy - 7} ${x - 5},${yy + 2} ${x + 5},${yy + 2}` : `${x},${yy + 7} ${x - 5},${yy - 2} ${x + 5},${yy - 2}`;
-      const g = h("polygon", { svg: 1, points: tri, fill: pc });
-      g.append(h("title", { svg: 1 }, `${p.date}: ${p.pattern}`));
-      svg.append(g);
-    }
-  });
-  svg.append(h("text", { svg: 1, x: padL, y: H - 6, fill: muted, "font-size": 11 }, candles[0].d));
-  svg.append(h("text", { svg: 1, x: W - padR, y: H - 6, fill: muted, "font-size": 11, "text-anchor": "end" }, candles.at(-1).d));
-  return svg;
-}
+        function renderSignal(s) {
+            lastSignal = s;
+            current = s.symbol;
+            $('symName').textContent = s.name || s.symbol;
+            $('symClass').textContent = `${s.symbol} · ${CLASS_LABELS[s.class] || s.class} · last completed ${s.as_of}`;
+            $('signalBadge').className = 'signal-badge ' + s.signal;
+            $('signalBadge').textContent = `${s.signal}  ${(s.probability_up * 100).toFixed(1)}%`;
+            $('mProb').textContent = (s.probability_up * 100).toFixed(1) + '%';
+            $('mProb').className = 'metric-value ' + (s.probability_up >= 0.5 ? 'positive' : 'negative');
+            $('mConv').textContent = `conviction ${(s.conviction * 100).toFixed(0)}% · model ${(s.model_probability_up * 100).toFixed(1)}%`;
+            $('mNews').textContent = (s.sentiment.score >= 0 ? '+' : '') + s.sentiment.score.toFixed(2);
+            $('mNews').className = 'metric-value ' + (s.sentiment.score >= 0 ? 'positive' : 'negative');
+            $('mNewsN').textContent = `${s.sentiment.headline_count} headlines (max ±10% nudge)`;
+            const bt = s.backtest || {};
+            $('mAcc').textContent = bt.accuracy != null ? (bt.accuracy * 100).toFixed(1) + '%' : '—';
+            $('mBase').textContent = bt.baseline_accuracy != null
+                ? `baseline ${(bt.baseline_accuracy * 100).toFixed(1)}% · ${bt.samples} oos samples`
+                : 'no backtest';
+            $('mRsi').textContent = s.indicators.rsi_14;
+            $('mSma').textContent = `SMA50 ${s.indicators.vs_sma_50_pct}% · vol ${s.indicators.volatility_20d_pct}%`;
+            $('modelNote').textContent = s.note || $('modelNote').textContent;
+            if (s.live) applyQuote(s.symbol, s.live);
+            drawChart(s.candles, s.live);
+            const pats = s.candle_patterns || [];
+            $('patterns').innerHTML = pats.length
+                ? pats.slice(0, 6).map(p => `<div class="insight-item"><div class="insight-label">${p.pattern} · ${p.bias}</div>${p.meaning}</div>`).join('')
+                : '<div class="insight-item">No classic patterns on the last 5 bars.</div>';
+            const news = (s.sentiment.headlines || []);
+            $('news').innerHTML = news.length
+                ? news.map(n => `<div class="news-item"><a href="${n.link || '#'}" target="_blank" rel="noopener">${n.title}</a><div>${n.source || ''} · ${n.score}</div></div>`).join('')
+                : '<div class="insight-item">No headlines returned.</div>';
+            renderWatchlist();
+        }
 
-function driverList(title, items, cls) {
-  if (!items.length) return null;
-  return h("div", {}, h("h3", {}, title), h("ul", { class: "plain" }, items.map(i => h("li", {},
-    h("span", { class: cls }, `${i.score > 0 ? "+" : ""}${i.score.toFixed(2)} `), i.text))));
-}
+        async function loadSymbol(symbol, refresh=false) {
+            current = symbol;
+            $('status').textContent = 'Fetching live quote + training/loading model… first run can take a minute.';
+            renderWatchlist();
+            try {
+                const r = await fetch(`/api/signal/${encodeURIComponent(symbol)}?news=true&refresh=${refresh}`);
+                const s = await r.json();
+                if (!r.ok) throw new Error(s.detail || 'signal failed');
+                renderSignal(s);
+                $('status').textContent = `Updated ${new Date().toLocaleTimeString()} · live quotes stream every ~12s`;
+            } catch (e) {
+                $('status').innerHTML = `<span class="error">${e.message}</span>`;
+            }
+        }
 
-function renderMaterial(out, r, res) {
-  const m = res.material, c = res.combined;
-  const line = (label, key, text) => h("li", {}, h("span", { class: `tag ${key}` }, label), h("span", { class: "small" }, ` ${text}`));
-  const shift = c ? `${c.material_shift >= 0 ? "+" : ""}${(c.material_shift * 100).toFixed(1)} points from your material` : "";
-  out.replaceChildren(...[
-    h("ul", { class: "plain" },
-      line(`Automatic signal: ${cap(r.signal)}`, r.signal, `${pct(r.probability_up)} chance up, from prices, candles and news`),
-      line(`Your material: ${cap(m.label)}`, m.label, `strength ${m.strength.toFixed(2)}, from ${m.signals} signal sentences out of ${m.sentences}`),
-      c ? line(`Combined: ${cap(c.signal)}`, c.signal, `${pct(c.probability_up)} chance up (${shift})`) : null),
-    m.signals < 3 ? h("p", { class: "small" }, "Only a few sentences carried a clear signal, so this has little effect. Paste more text, or more specific wording.") : null,
-    driverList("Sentences pushing up", m.pushing_up, "bullish"),
-    driverList("Sentences pushing down", m.pushing_down, "bearish"),
-    h("p", { class: "small" }, "Material is scored on its wording, not checked for accuracy, and it has no track record like the model does. Treat it as one input.")
-  ].filter(Boolean));
-}
+        function startStream() {
+            if (source) source.close();
+            const symbols = watchlist.map(a => a.symbol).join(',');
+            if (!symbols || !window.EventSource) return;
+            source = new EventSource('/api/live/quotes?symbols=' + encodeURIComponent(symbols));
+            source.onmessage = (ev) => {
+                const data = JSON.parse(ev.data);
+                Object.entries(data).forEach(([sym, q]) => applyQuote(sym, q));
+            };
+        }
 
-function materialPanel(r) {
-  const id = `mat-${++uid}`;
-  const cls = classes.find(c => c.key === r["class"]) || { hints: [] };
-  const ta = h("textarea", { id, rows: 6, maxlength: 20000, placeholder: "Paste an article, a report summary, or your own notes." });
-  const out = h("div", { class: "result", "aria-live": "polite" });
-  async function run(combine, btn) {
-    const text = ta.value.trim();
-    if (!text) { out.replaceChildren(h("p", { class: "state error" }, "Paste some material first: news, a report summary, or your own notes.")); return; }
-    btn.disabled = true;
-    out.replaceChildren(h("p", { class: "state" }, combine ? "Reading your material and combining it with the automatic signal." : "Reading your material."));
-    try {
-      const res = await fetch("/api/material", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol: r.symbol, text, combine }) });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.detail || res.statusText);
-      renderMaterial(out, r, body);
-    } catch (e) { out.replaceChildren(h("p", { class: "state error" }, `Couldn't read that: ${e.message}`)); }
-    btn.disabled = false;
-  }
-  const alone = h("button", { type: "button", class: "quiet" }, "Read my material");
-  const both = h("button", { type: "button" }, "Combine with automatic signal");
-  alone.addEventListener("click", () => run(false, alone));
-  both.addEventListener("click", () => run(true, both));
-  return h("div", {},
-    h("h3", {}, "Your material"),
-    h("p", { class: "small" }, "The automatic signal above needs nothing from you. Add material to read it on its own, or to let it adjust the signal."),
-    cls.hints.length ? h("div", {}, h("p", { class: "small" }, `Useful to paste for ${classLabel(r["class"]).toLowerCase()}:`),
-      h("ul", { class: "hints" }, cls.hints.map(t => h("li", {}, t)))) : null,
-    h("label", { class: "field", for: id }, `Material about ${r.name}`), ta,
-    h("div", { class: "material-actions" }, alone, both), out);
-}
+        async function snapshotTable() {
+            const rows = [];
+            for (const a of watchlist.slice(0, 8)) {
+                try {
+                    const r = await fetch(`/api/signal/${encodeURIComponent(a.symbol)}`);
+                    if (!r.ok) continue;
+                    const s = await r.json();
+                    rows.push(s);
+                } catch {}
+            }
+            $('table').innerHTML = `<div class="table-header"><div>Symbol</div><div>Signal</div><div>P(up)</div><div>Acc.</div></div>` +
+                rows.map(s => `<div class="table-row" data-sym="${s.symbol}">
+                    <div class="table-symbol">${s.symbol}</div>
+                    <div class="table-signal">${s.signal} · news ${s.sentiment.score}</div>
+                    <div>${(s.probability_up * 100).toFixed(1)}%</div>
+                    <div>${s.backtest && s.backtest.accuracy != null ? (s.backtest.accuracy * 100).toFixed(1) + '%' : '—'}</div>
+                </div>`).join('');
+            $('table').querySelectorAll('.table-row').forEach(row => {
+                row.onclick = () => loadSymbol(row.dataset.sym);
+            });
+        }
 
-function detail(r) {
-  const b = r.backtest, ind = r.indicators, s = r.sentiment;
-  const beats = b.accuracy - b.baseline_accuracy;
-  const verdict = beats > 0.02 ? "better than" : beats < -0.02 ? "worse than" : "about the same as";
-  const patterns = r.candle_patterns.length
-    ? h("ul", { class: "plain" }, r.candle_patterns.map(p => h("li", {},
-        h("span", { class: `tag ${p.bias}` }, `${p.pattern} (${p.bias})`), h("span", { class: "small" }, ` ${p.date}`),
-        h("div", {}, p.meaning))))
-    : h("p", { class: "small" }, "No recognised patterns in the last 5 candles.");
-  const news = s.headlines.length
-    ? h("ul", { class: "plain" }, s.headlines.map(n => h("li", {},
-        h("a", { href: n.link, target: "_blank", rel: "noopener noreferrer" }, n.title),
-        h("div", { class: "small" }, `${n.source || "Unknown source"}, tone ${n.score > 0 ? "+" : ""}${n.score.toFixed(2)}`))))
-    : h("p", { class: "small" }, "No recent headlines found, so this signal uses price data only.");
+        $('goBtn').onclick = () => {
+            const v = $('symbolInput').value.trim();
+            if (v) loadSymbol(v.toUpperCase());
+        };
+        $('symbolInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('goBtn').click(); });
+        $('refreshBtn').onclick = () => current && loadSymbol(current, true);
+        $('menuBtn').onclick = () => $('sidebar').classList.toggle('open');
+        $('materialBtn').onclick = async () => {
+            const text = $('materialText').value;
+            if (!current || !text.trim()) return;
+            const r = await fetch('/api/material', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: current, text, combine: true })
+            });
+            const d = await r.json();
+            if (!r.ok) { $('materialOut').textContent = d.detail || 'Could not read that text.'; return; }
+            const c = d.combined;
+            $('materialOut').textContent = c
+                ? `${c.signal} after material · P(up) ${(c.probability_up * 100).toFixed(1)}% (shift ${c.material_shift})`
+                : d.material.label;
+        };
 
-  return h("div", { class: "detail" },
-    h("div", {}, h("h3", {}, "Last 60 trading days"), candleChart(r.candles, r.candle_patterns),
-      h("p", { class: "small" }, "Triangles mark candlestick patterns from the last 5 candles. Green outline is a rising day, filled red a falling day.")),
-    h("div", {}, h("h3", {}, "Candlestick patterns"), patterns),
-    h("div", { class: "cols" },
-      h("div", {}, h("h3", {}, "Indicators"), h("dl", {},
-        h("dt", {}, "RSI (14)"), h("dd", {}, ind.rsi_14),
-        h("dt", {}, "MACD histogram"), h("dd", {}, ind.macd_hist_pct + "% of price"),
-        h("dt", {}, "Vs 50-day average"), h("dd", {}, ind.vs_sma_50_pct + "%"),
-        h("dt", {}, "Vs 200-day average"), h("dd", {}, ind.vs_sma_200_pct + "%"),
-        h("dt", {}, "20-day volatility"), h("dd", {}, ind.volatility_20d_pct + "% per day"),
-        h("dt", {}, "Model before news"), h("dd", {}, pct(r.model_probability_up, 1) + " up"))),
-      h("div", {}, h("h3", {}, "Track record on past data"),
-        h("p", {}, `Tested only on data it had not seen, the model called the direction right ${pct(b.accuracy, 1)} of the time. Always guessing the more common outcome gets ${pct(b.baseline_accuracy, 1)}, so it is ${verdict} that.`),
-        b.high_conviction_accuracy != null ? h("p", { class: "small" }, `When it leaned hard (${b.high_conviction_signals} times), it was right ${pct(b.high_conviction_accuracy, 1)}.`) : null,
-        h("p", { class: "small" }, `${b.samples} tests, ${b.horizon_days}-day horizon. Model trained ${r.model_trained_at.slice(0, 10)}.`))),
-    h("div", {}, h("h3", {}, `News tone: ${s.score > 0 ? "+" : ""}${s.score.toFixed(2)} across ${s.headline_count} headlines`), news),
-    materialPanel(r));
-}
-
-function applyFilter() {
-  for (const item of rows.values()) item.hidden = filter !== "all" && item.dataset.class !== filter;
-}
-
-function renderFilters() {
-  const box = $("#filters");
-  box.replaceChildren(...[{ key: "all", label: "All" }, ...classes.filter(c => c.key !== "other")].map(c => {
-    const b = h("button", { type: "button", class: "quiet", "aria-pressed": String(filter === c.key) }, c.label);
-    b.addEventListener("click", () => { filter = c.key; renderFilters(); applyFilter(); });
-    return b;
-  }));
-}
-
-function fill(item, r) {
-  item.dataset.class = r["class"];
-  const sum = $("summary", item), label = r.signal;
-  sum.replaceChildren(
-    h("div", { class: "who" }, h("b", {}, r.name), h("span", {}, `${r.symbol}, ${r["class"]}, close ${r.last_close}`)),
-    gauge(r.probability_up, label),
-    h("div", { class: "call" }, h("b", { class: label }, label[0].toUpperCase() + label.slice(1)),
-      h("span", {}, `${pct(r.probability_up)} chance up`)));
-  const old = $(".detail", item); if (old) old.remove();
-  item.append(detail(r));
-  applyFilter();
-}
-
-function failed(item, symbol, msg) {
-  $("summary", item).replaceChildren(
-    h("div", { class: "who" }, h("b", {}, symbol)),
-    h("div", { class: "state error" }, `Couldn't analyse ${symbol}: ${msg}`),
-    h("div", { class: "call" }, h("button", { type: "button", class: "quiet", onclick: e => { e.preventDefault(); load(symbol, item); } }, "Try again")));
-}
-
-async function load(symbol, item) {
-  $("summary", item).replaceChildren(
-    h("div", { class: "who" }, h("b", {}, symbol)),
-    h("div", { class: "state" }, "Analysing. The first run trains a model for this symbol."),
-    h("div", {}));
-  try {
-    const res = await fetch(`/api/signal/${encodeURIComponent(symbol)}`);
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.detail || res.statusText);
-    fill(item, body);
-  } catch (e) { failed(item, symbol, e.message); }
-}
-
-function addRow(symbol, cls) {
-  if (rows.has(symbol.toUpperCase())) return null;
-  const item = h("details", { class: "row" }, h("summary", {}));
-  if (cls) item.dataset.class = cls;
-  rows.set(symbol.toUpperCase(), item);
-  $("#list").append(item);
-  return item;
-}
-
-async function pool(items, n, fn) {
-  const q = [...items];
-  await Promise.all(Array.from({ length: n }, async () => { while (q.length) await fn(q.shift()); }));
-}
-
-$("#add").addEventListener("submit", e => {
-  e.preventDefault();
-  const v = $("#sym").value.trim();
-  if (!v) return;
-  filter = "all"; renderFilters(); applyFilter();
-  const item = addRow(v);
-  if (item) load(v, item);
-  $("#sym").value = "";
-});
-
-(async () => {
-  try {
-    classes = await (await fetch("/api/classes")).json();
-    renderFilters();
-    const list = await (await fetch("/api/watchlist")).json();
-    const todo = list.map(a => [a.symbol, addRow(a.symbol, a["class"])]);
-    await pool(todo, 2, ([s, item]) => load(s, item));
-  } catch (e) {
-    $("#list").append(h("p", { class: "state error", style: "padding:16px 20px" }, "Couldn't reach the server. Start it with: uvicorn app.api:app"));
-  }
-})();
-
-// ---- Advanced features ----
-$("#advanced").hidden = $("#list").childElementCount < 4;  // hide if not enough rows
-
-document.getElementById("bulk-btn").addEventListener("click", async () => {
-  const txt = $("#bulk-symbols").value.trim();
-  if (!txt) return alert("Paste symbols, comma or newline separated");
-  const syms = txt.split(/[,\n]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
-  const res = $("#bulk-result"); res.innerHTML = "Analysing " + syms.length + " symbols...";
-  try {
-    const r = await fetch("/api/bulk", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(syms) });
-    const data = await r.json();
-    res.innerHTML = h("ul", { class: "plain" }, data.map(d => h("li", {},
-      h("b", {}, d.symbol), " " + (d.error || `${d.signal} ${d.probability_up.toFixed(2)}`)))).outerHTML;
-  } catch (e) { res.innerHTML = "Error: " + e.message; }
-});
-
-document.getElementById("portfolio-btn").addEventListener("click", async () => {
-  const syms = Array.from(rows.keys());
-  if (!syms.length) return alert("No symbols loaded");
-  const res = $("#portfolio-result");
-  res.innerHTML = "Computing metrics...";
-  try {
-    const r = await fetch(`/api/portfolio?${new URLSearchParams({symbols: syms}).toString()}`);
-    const data = await r.json();
-    res.innerHTML = `<p>Tracked: ${data.symbols} symbols, ${data.total_signals} signals total</p>
-      <p>Bullish ${data.bullish_count}, Bearish ${data.bearish_count}, Neutral ${data.neutral_count}</p>
-      <p>Avg probability: ${data.avg_probability}</p>`;
-  } catch (e) { res.innerHTML = "Error: " + e.message; }
-});
-
-document.getElementById("history-btn").addEventListener("click", async () => {
-  const syms = Array.from(rows.keys());
-  const res = $("#history-result");
-  res.innerHTML = "Fetching history...";
-  try {
-    const entries = [];
-    for (const s of syms.slice(0, 8)) {
-      const r = await fetch(`/api/signal/${s}/history?days=30`);
-      const data = await r.json();
-      entries.push(...data.entries);
-    }
-    res.innerHTML = entries.length ? `<p>${entries.length} signals in last 30 days</p>` +
-      entries.slice(-10).reverse().map(e => `<div><small>${e.timestamp.slice(0, 10)}</small> 
-      ${e.symbol} ${e.signal} ${e.probability_up}</div>`).join("") : "<p>No history</p>";
-  } catch (e) { res.innerHTML = "Error: " + e.message; }
-});
-
-document.getElementById("export-csv-btn").addEventListener("click", async () => {
-  const s = prompt("Symbol to export (or leave empty for first tracked symbol)");
-  const sym = s || Array.from(rows.keys())[0];
-  if (!sym) return alert("No symbols loaded");
-  try {
-    const r = await fetch(`/api/export/${sym}?format=csv`);
-    const data = await r.json();
-    const a = h("a", { href: `data:text/csv,${encodeURIComponent(data.data)}`, download: data.filename });
-    a.click();
-  } catch (e) { alert("Error: " + e.message); }
-});
-
-// Make advanced visible once rows load
-const obs = new MutationObserver(() => {
-  if (rows.size >= 4) {
-    $("#advanced").hidden = false;
-    obs.disconnect();
-  }
-});
-obs.observe($("#list"), { childList: true });
-</script>
+        (async function init() {
+            watchlist = await (await fetch('/api/watchlist')).json();
+            current = watchlist[0] && watchlist[0].symbol;
+            renderWatchlist();
+            startStream();
+            if (current) await loadSymbol(current);
+            snapshotTable();
+        })();
+    </script>
 </body>
 </html>

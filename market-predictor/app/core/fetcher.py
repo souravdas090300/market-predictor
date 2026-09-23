@@ -4,7 +4,8 @@ from __future__ import annotations
 import tempfile
 from io import StringIO
 
-from . import config, material
+from . import config
+from ..services import material
 
 
 def fetch_url(url: str) -> dict:

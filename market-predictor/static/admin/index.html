@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Market Predictor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0F172A;
+            color: #F9FAFB;
+            min-height: 100vh;
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid #2D3748;
+        }
+
+        .admin-header h1 {
+            font-size: 2rem;
+            color: #F9FAFB;
+            margin-bottom: 0.5rem;
+        }
+
+        .admin-header p {
+            color: #D1D5DB;
+            font-size: 0.9rem;
+        }
+
+        .admin-section {
+            background: #1F2937;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #2D3748;
+        }
+
+        .admin-section h2 {
+            font-size: 1.25rem;
+            color: #F9FAFB;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #2D3748;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: #111827;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #2D3748;
+        }
+
+        .stat-card h3 {
+            font-size: 0.875rem;
+            color: #D1D5DB;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #10B981;
+        }
+
+        .stat-card .value.bearish {
+            color: #EF4444;
+        }
+
+        .stat-card .value.neutral {
+            color: #FBBF24;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: #111827;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            border: 1px solid #2D3748;
+        }
+
+        .control-row label {
+            color: #D1D5DB;
+            font-size: 0.9rem;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #374151;
+            transition: .4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #10B981;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #10B981;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #EF4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #DC2626;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .input-group input {
+            padding: 0.5rem;
+            border: 1px solid #2D3748;
+            border-radius: 6px;
+            background: #111827;
+            color: #F9FAFB;
+            font-size: 0.875rem;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #10B981;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #2D3748;
+        }
+
+        .table th {
+            background: #111827;
+            color: #D1D5DB;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .table td {
+            color: #F9FAFB;
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.enabled {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10B981;
+        }
+
+        .status-badge.disabled {
+            background: rgba(239, 68, 68, 0.2);
+            color: #EF4444;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #D1D5DB;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #EF4444;
+            color: #EF4444;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10B981;
+            color: #10B981;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .nav-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .nav-bar a {
+            color: #D1D5DB;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .nav-bar a:hover,
+        .nav-bar a.active {
+            background: #111827;
+            color: #F9FAFB;
+        }
+
+        @media (max-width: 768px) {
+            .admin-container {
+                padding: 1rem;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Login Form (shown when not authenticated) -->
+        <div id="login-section" class="admin-section" style="display: none;">
+            <h2>Admin Login</h2>
+            <div class="control-row">
+                <div class="input-group">
+                    <input type="text" id="login-username" placeholder="Username">
+                    <input type="password" id="login-password" placeholder="Password">
+                    <button class="btn btn-primary" onclick="handleLogin()">Login</button>
+                </div>
+            </div>
+            <div id="login-message"></div>
+        </div>
+
+        <!-- Admin Dashboard (shown when authenticated) -->
+        <div id="dashboard-section" style="display: none;">
+            <div class="admin-header">
+                <h1>🔧 Admin Dashboard</h1>
+                <p>Manage system settings, rate limiting, and batch predictions</p>
+                <button class="btn btn-danger" onclick="handleLogout()" style="margin-top: 1rem;">Logout</button>
+            </div>
+
+            <div class="nav-bar">
+                <a href="#" class="active" data-section="overview">Overview</a>
+                <a href="#" data-section="rate-limiting">Rate Limiting</a>
+                <a href="#" data-section="batch">Batch Predictions</a>
+                <a href="#" data-section="users">Users</a>
+                <a href="/index.html">Back to Main App</a>
+            </div>
+
+            <div id="message-container"></div>
+
+        <!-- Overview Section -->
+        <div id="overview-section" class="admin-section">
+            <h2>System Overview</h2>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <h3>Total Assets</h3>
+                    <div class="value" id="total-assets">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Bullish</h3>
+                    <div class="value" id="bullish-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Bearish</h3>
+                    <div class="value bearish" id="bearish-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Neutral</h3>
+                    <div class="value neutral" id="neutral-count">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Conviction</h3>
+                    <div class="value" id="avg-conviction">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Rate Limiting</h3>
+                    <div class="value" id="rate-limiting-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Maintenance Mode</h3>
+                    <div class="value" id="maintenance-status">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Admin Users</h3>
+                    <div class="value" id="admin-users-count">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limiting Section -->
+        <div id="rate-limiting-section" class="admin-section" style="display: none;">
+            <h2>Rate Limiting Configuration</h2>
+            
+            <div class="control-row">
+                <label>Enable Rate Limiting</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="rate-limiting-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="control-row">
+                <label>Maintenance Mode</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="maintenance-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <h3>Endpoint Rate Limits</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Endpoint</th>
+                        <th>Current Limit</th>
+                        <th>New Limit</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="rate-limits-table">
+                    <tr>
+                        <td colspan="4" class="loading">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Batch Predictions Section -->
+        <div id="batch-section" class="admin-section" style="display: none;">
+            <h2>Batch Predictions</h2>
+            
+            <div class="control-row">
+                <button class="btn btn-primary" onclick="runBatchPrediction()">Run Batch Prediction Now</button>
+                <button class="btn btn-primary" onclick="refreshBatchStatus()">Refresh Status</button>
+            </div>
+
+            <div id="batch-results" class="loading">Click "Run Batch Prediction" to start</div>
+        </div>
+
+        <!-- Users Section -->
+        <div id="users-section" class="admin-section" style="display: none;">
+            <h2>User Management</h2>
+            
+            <div class="control-row">
+                <div class="input-group">
+                    <input type="text" id="admin-username" placeholder="Username">
+                    <button class="btn btn-primary" onclick="addAdminUser()">Add Admin</button>
+                </div>
+            </div>
+
+            <h3>Admin Users</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-users-table">
+                    <tr>
+                        <td colspan="2" class="loading">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Navigation
+        document.querySelectorAll('.nav-bar a[data-section]').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const section = link.dataset.section;
+                
+                // Update active state
+                document.querySelectorAll('.nav-bar a').forEach(a => a.classList.remove('active'));
+                link.classList.add('active');
+                
+                // Show/hide sections
+                document.querySelectorAll('.admin-section').forEach(s => s.style.display = 'none');
+                document.getElementById(`${section}-section`).style.display = 'block';
+                
+                // Load section data
+                if (section === 'overview') loadOverview();
+                if (section === 'rate-limiting') loadRateLimiting();
+                if (section === 'batch') loadBatchStatus();
+                if (section === 'users') loadAdminUsers();
+            });
+        });
+
+        // API helpers
+        const ADMIN_API_BASE = '/api/admin'; // Admin API now on same port under /api/admin path
+        
+        async function apiCall(endpoint, options = {}) {
+            const token = localStorage.getItem('access_token');
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
+            };
+            
+            const response = await fetch(ADMIN_API_BASE + endpoint, {
+                ...options,
+                headers: { ...headers, ...options.headers }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status}`);
+            }
+            
+            return response.json();
+        }
+        
+        // Auth helpers
+        async function adminLogin(username, password) {
+            try {
+                const response = await fetch('/api/admin/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('refresh_token', data.refresh_token);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                
+                return data;
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        function showMessage(message, type = 'success') {
+            const container = document.getElementById('message-container');
+            const msg = document.createElement('div');
+            msg.className = type;
+            msg.textContent = message;
+            container.appendChild(msg);
+            
+            setTimeout(() => msg.remove(), 5000);
+        }
+
+        // Overview
+        async function loadOverview() {
+            try {
+                const stats = await apiCall('/stats');
+                
+                document.getElementById('total-assets').textContent = stats.batch_predictions.total_assets;
+                document.getElementById('bullish-count').textContent = stats.batch_predictions.bullish_count;
+                document.getElementById('bearish-count').textContent = stats.batch_predictions.bearish_count;
+                document.getElementById('neutral-count').textContent = stats.batch_predictions.neutral_count;
+                document.getElementById('avg-conviction').textContent = stats.batch_predictions.average_conviction.toFixed(3);
+                document.getElementById('rate-limiting-status').textContent = stats.config.rate_limiting_enabled ? 'Enabled' : 'Disabled';
+                document.getElementById('maintenance-status').textContent = stats.config.maintenance_mode ? 'Enabled' : 'Disabled';
+                document.getElementById('admin-users-count').textContent = stats.config.total_admin_users;
+            } catch (error) {
+                showMessage('Error loading overview: ' + error.message, 'error');
+            }
+        }
+
+        // Rate Limiting
+        async function loadRateLimiting() {
+            try {
+                const config = await apiCall('/config');
+                
+                document.getElementById('rate-limiting-toggle').checked = config.rate_limiting_enabled;
+                document.getElementById('maintenance-toggle').checked = config.maintenance_mode;
+                
+                // Load rate limits table
+                const tbody = document.getElementById('rate-limits-table');
+                tbody.innerHTML = '';
+                
+                for (const [endpoint, limit] of Object.entries(config.rate_limits)) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>/api/${endpoint}</td>
+                        <td><span class="status-badge enabled">${limit}</span></td>
+                        <td>
+                            <input type="text" class="new-limit" data-endpoint="${endpoint}" placeholder="${limit}">
+                        </td>
+                        <td>
+                            <button class="btn btn-primary" onclick="updateRateLimit('${endpoint}')">Update</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            } catch (error) {
+                showMessage('Error loading rate limiting config: ' + error.message, 'error');
+            }
+        }
+
+        async function toggleRateLimiting() {
+            const enabled = document.getElementById('rate-limiting-toggle').checked;
+            try {
+                await apiCall('/rate-limiting?enabled=' + enabled, { method: 'POST' });
+                showMessage(`Rate limiting ${enabled ? 'enabled' : 'disabled'}`);
+            } catch (error) {
+                showMessage('Error toggling rate limiting: ' + error.message, 'error');
+            }
+        }
+
+        async function toggleMaintenance() {
+            const enabled = document.getElementById('maintenance-toggle').checked;
+            try {
+                await apiCall('/maintenance?enabled=' + enabled, { method: 'POST' });
+                showMessage(`Maintenance mode ${enabled ? 'enabled' : 'disabled'}`);
+            } catch (error) {
+                showMessage('Error toggling maintenance mode: ' + error.message, 'error');
+            }
+        }
+
+        async function updateRateLimit(endpoint) {
+            const input = document.querySelector(`.new-limit[data-endpoint="${endpoint}"]`);
+            const newLimit = input.value;
+            
+            if (!newLimit) {
+                showMessage('Please enter a new limit', 'error');
+                return;
+            }
+            
+            try {
+                await apiCall(`/rate-limit/${endpoint}?limit=${encodeURIComponent(newLimit)}`, { method: 'POST' });
+                showMessage(`Rate limit updated for ${endpoint}`);
+                loadRateLimiting();
+            } catch (error) {
+                showMessage('Error updating rate limit: ' + error.message, 'error');
+            }
+        }
+
+        // Batch Predictions
+        async function runBatchPrediction() {
+            const resultsDiv = document.getElementById('batch-results');
+            resultsDiv.innerHTML = '<div class="loading">Running batch prediction...</div>';
+            
+            try {
+                const results = await apiCall('/batch/predict?force_refresh=true', { method: 'POST' });
+                
+                let html = `
+                    <div class="success">
+                        Batch prediction completed: ${results.successful_predictions}/${results.total_assets} successful
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Probability</th>
+                                <th>Conviction</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                for (const [symbol, data] of Object.entries(results.results)) {
+                    if (data.error) {
+                        html += `<tr><td>${symbol}</td><td colspan="3" style="color: #EF4444;">${data.error}</td></tr>`;
+                    } else {
+                        html += `
+                            <tr>
+                                <td>${symbol}</td>
+                                <td><span class="status-badge ${data.signal}">${data.signal}</span></td>
+                                <td>${(data.probability_up * 100).toFixed(1)}%</td>
+                                <td>${data.conviction.toFixed(3)}</td>
+                            </tr>
+                        `;
+                    }
+                }
+                
+                html += '</tbody></table>';
+                resultsDiv.innerHTML = html;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error running batch prediction: ${error.message}</div>`;
+            }
+        }
+
+        async function loadBatchStatus() {
+            try {
+                const status = await apiCall('/batch/status');
+                
+                const resultsDiv = document.getElementById('batch-results');
+                resultsDiv.innerHTML = `
+                    <div class="stat-grid">
+                        <div class="stat-card">
+                            <h3>Total Assets</h3>
+                            <div class="value">${status.total_assets}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Bullish</h3>
+                            <div class="value">${status.bullish_count}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Bearish</h3>
+                            <div class="value bearish">${status.bearish_count}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Neutral</h3>
+                            <div class="value neutral">${status.neutral_count}</div>
+                        </div>
+                    </div>
+                    <p style="color: #D1D5DB; margin-top: 1rem;">Last updated: ${new Date(status.timestamp).toLocaleString()}</p>
+                `;
+            } catch (error) {
+                showMessage('Error loading batch status: ' + error.message, 'error');
+            }
+        }
+
+        function refreshBatchStatus() {
+            loadBatchStatus();
+        }
+
+        // Users
+        async function loadAdminUsers() {
+            try {
+                const config = await apiCall('/config');
+                const tbody = document.getElementById('admin-users-table');
+                tbody.innerHTML = '';
+                
+                // Note: Admin users are now determined by superuser status in user accounts
+                // This will be updated to fetch actual user list with superuser status
+                tbody.innerHTML = '<tr><td colspan="2">User management now uses superuser status in user accounts</td></tr>';
+            } catch (error) {
+                showMessage('Error loading admin users: ' + error.message, 'error');
+            }
+        }
+
+        async function addAdminUser() {
+            const username = document.getElementById('admin-username').value;
+            if (!username) {
+                showMessage('Please enter a username', 'error');
+                return;
+            }
+            
+            try {
+                await apiCall(`/add-admin/${username}`, { method: 'POST' });
+                showMessage(`Granted superuser privileges to ${username}`);
+                document.getElementById('admin-username').value = '';
+                loadAdminUsers();
+            } catch (error) {
+                showMessage('Error granting superuser: ' + error.message, 'error');
+            }
+        }
+
+        async function removeAdminUser(username) {
+            try {
+                await apiCall(`/remove-admin/${username}`, { method: 'DELETE' });
+                showMessage(`Revoked superuser privileges from ${username}`);
+                loadAdminUsers();
+            } catch (error) {
+                showMessage('Error revoking superuser: ' + error.message, 'error');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('rate-limiting-toggle').addEventListener('change', toggleRateLimiting);
+        document.getElementById('maintenance-toggle').addEventListener('change', toggleMaintenance);
+
+        // Check authentication on load
+        checkAuthentication();
+
+        // Initial load (if authenticated)
+        if (localStorage.getItem('access_token')) {
+            loadOverview();
+        }
+
+        // Authentication
+        function checkAuthentication() {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                document.getElementById('login-section').style.display = 'none';
+                document.getElementById('dashboard-section').style.display = 'block';
+            } else {
+                document.getElementById('login-section').style.display = 'block';
+                document.getElementById('dashboard-section').style.display = 'none';
+            }
+        }
+
+        async function handleLogin() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!username || !password) {
+                showMessage('Please enter username and password', 'error');
+                return;
+            }
+            
+            try {
+                await adminLogin(username, password);
+                document.getElementById('login-message').innerHTML = '';
+                checkAuthentication();
+                loadOverview();
+            } catch (error) {
+                document.getElementById('login-message').innerHTML = `<div class="error">Login failed: ${error.message}</div>`;
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            checkAuthentication();
+        }
+    </script>
+</body>
+</html>
+        if (localStorage.getItem('access_token')) {
+            loadOverview();
+        }
+    </script>
+</body>
+</html>

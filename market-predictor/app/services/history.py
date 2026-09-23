@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from . import config
+from ..core import config
 
 
 def log_signal(symbol: str, signal: dict, material_result: dict | None = None):

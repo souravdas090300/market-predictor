@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app import candles, config, data, features, model, predict
+from app.models import candles, features, model, predict
+from app.core import config, data
 
 
 def synthetic_prices(n=1500, seed=0):
@@ -77,7 +78,13 @@ def test_walk_forward_reports_sane_metrics():
 @pytest.fixture
 def patched(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "MODEL_DIR", tmp_path)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "signals.db")
     monkeypatch.setattr(data, "get_prices", lambda symbol, period=None: synthetic_prices())
+    monkeypatch.setattr(data, "get_live_quote", lambda symbol: {
+        "symbol": symbol, "price": 101.25, "previous_close": 100.0,
+        "change": 1.25, "change_pct": 0.0125, "as_of": "2026-09-23T00:00:00+00:00",
+        "source": "yahoo",
+    })
     monkeypatch.setattr(data, "get_news", lambda q, max_items=30: [
         {"title": "Stock surges to record high on strong growth", "source": "X",
          "published": pd.Timestamp.now(tz="UTC").to_pydatetime(), "link": "http://x"},
@@ -92,6 +99,7 @@ def test_signal_shape(patched):
     assert 0 < r["probability_up"] < 1
     assert len(r["candles"]) == 60
     assert r["sentiment"]["headline_count"] == 2
+    assert r["live"]["price"] == 101.25
 
 
 def test_api(patched):
@@ -101,11 +109,13 @@ def test_api(patched):
     assert len(c.get("/api/watchlist").json()) == len(config.WATCHLIST)
     r = c.get("/api/signal/EURUSD=X")
     assert r.status_code == 200 and r.json()["signal"]
+    q = c.get("/api/quote/EURUSD=X")
+    assert q.status_code == 200 and q.json()["price"] == 101.25
 
 
 # ---- commodities, market-aware wording and material mode ----
 
-from app import material, sentiment
+from app.services import material, sentiment
 
 
 def test_symbol_class_inference():
@@ -177,7 +187,8 @@ def test_material_api_modes(patched):
 
 # ---- advanced features ----
 
-from app import fetcher, history, metrics
+from app.core import fetcher
+from app.services import history, metrics
 
 
 def test_url_fetch_mock():

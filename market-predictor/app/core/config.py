@@ -1,16 +1,33 @@
 """Central settings. Edit the WATCHLIST to track the assets you care about."""
+import os
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+# Environment
+ENV = os.getenv("ENV", "development").lower()
+
+# Base directory
+ROOT = Path(__file__).resolve().parent.parent.parent
 MODEL_DIR = ROOT / "models"
 MODEL_DIR.mkdir(exist_ok=True)
+
+# Create data and logs directories
+DATA = ROOT / "data"
+LOGS = ROOT / "logs"
+DATA.mkdir(exist_ok=True)
+LOGS.mkdir(exist_ok=True)
 
 # Where every signal is logged so its real outcome can be checked later.
 DB_PATH = ROOT / "data" / "signals.db"
 
-# Reading links: private, local and reserved addresses are blocked. Only tests switch this on.
-ALLOW_PRIVATE_URLS = False
+# Security Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production" if ENV == "development" else "production-secret-key-change-me")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Security Settings
+ALLOW_PRIVATE_URLS = os.getenv("ALLOW_PRIVATE_URLS", "true" if ENV == "development" else "false").lower() == "true"
+ENABLE_RATE_LIMITING = os.getenv("ENABLE_RATE_LIMITING", "true").lower() == "true"
+ENABLE_AUTHENTICATION = os.getenv("ENABLE_AUTHENTICATION", "true").lower() == "true"
 
 # How many trading days ahead the model looks.
 HORIZON_DAYS = 5
@@ -37,7 +54,37 @@ MODEL_MAX_AGE_DAYS = 7
 HISTORY_PERIOD = "5y"
 
 # Cache API responses for this many seconds.
-API_CACHE_SECONDS = 300
+API_CACHE_SECONDS = int(os.getenv("API_CACHE_SECONDS", "60" if ENV == "development" else "300"))
+
+# Live quote polling. Keep this modest — Yahoo rate-limits aggressive clients.
+LIVE_QUOTE_CACHE_SECONDS = int(os.getenv("LIVE_QUOTE_CACHE_SECONDS", "8"))
+LIVE_STREAM_INTERVAL_SECONDS = float(os.getenv("LIVE_STREAM_INTERVAL_SECONDS", "12"))
+
+# Bulk limit
+BULK_LIMIT = int(os.getenv("BULK_LIMIT", "100" if ENV == "development" else "50"))
+
+# File upload limits
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", "10_000_000" if ENV == "development" else "5_000_000"))
+
+# Logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG" if ENV == "development" else "INFO")
+SECURITY_LOG_LEVEL = os.getenv("SECURITY_LOG_LEVEL", "DEBUG" if ENV == "development" else "INFO")
+
+# CORS Settings
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000" if ENV == "development" else "https://yourdomain.com,https://www.yourdomain.com").split(",")
+ADMIN_CORS_ORIGINS = os.getenv("ADMIN_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000" if ENV == "development" else "https://yourdomain.com,https://www.yourdomain.com").split(",")
+
+# Feature Flags
+ENABLE_DEBUG_MODE = os.getenv("ENABLE_DEBUG_MODE", "true" if ENV == "development" else "false").lower() == "true"
+ENABLE_PROFILING = os.getenv("ENABLE_PROFILING", "false").lower() == "true"
+ENABLE_TESTING_MODE = os.getenv("ENABLE_TESTING_MODE", "true" if ENV == "development" else "false").lower() == "true"
+
+# Advanced features
+HISTORY_KEEP_DAYS = 90
+
+# URL fetching
+FETCH_TIMEOUT = 10
+FETCH_MAX_CHARS = 50000
 
 CLASS_LABELS = {
     "stock": "Shares",
@@ -129,14 +176,3 @@ def asset_info(symbol: str) -> dict:
     else:
         query = f"{s} stock"
     return {"symbol": symbol, "name": symbol, "class": cls, "query": query}
-
-# Advanced features
-DB_PATH = ROOT / "signals.db"
-HISTORY_KEEP_DAYS = 90
-BULK_LIMIT = 50  # Max symbols in one /bulk request
-
-# URL fetching
-FETCH_TIMEOUT = 10
-FETCH_MAX_CHARS = 50000
-# PDF and CSV
-MAX_UPLOAD_BYTES = 5_000_000

@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import re
 
-from . import config, sentiment
+from ..core import config
+from . import sentiment
 
 MAX_SENTENCES = 300
 MIN_SENTENCE_CHARS = 15

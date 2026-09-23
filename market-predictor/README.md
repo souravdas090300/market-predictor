@@ -1,4 +1,5 @@
-# Market lean: auto + material signals across all markets
+#
+ Market lean: auto + material signals across all markets
 
 Estimates the chance that a share, crypto, forex pair or commodity closes higher in 5 trading days, and
 labels it bullish, bearish or neutral. It has two modes that you can use together or separately.
@@ -8,9 +9,34 @@ labels it bullish, bearish or neutral. It has two modes that you can use togethe
 ```bash
 pip install -r requirements.txt
 pytest -q
-python -m app.cli AAPL BTC-USD GC=F EURUSD=X       # quick check
-uvicorn app.api:app --reload                        # dashboard at http://127.0.0.1:8000
+python -m scripts.cli AAPL BTC-USD GC=F EURUSD=X    # quick check
 ```
+
+## Running the application
+
+### Development Mode
+```bash
+python scripts/run_dev.py
+```
+This starts the application with:
+- Debug mode enabled
+- Relaxed security settings
+- Verbose logging
+- Auto-reload on code changes
+- Access at http://localhost:8000
+
+### Production Mode
+```bash
+python scripts/run_prod.py
+```
+This starts the application with:
+- Strict security settings
+- Multiple workers for performance
+- Standard logging
+- No auto-reload
+- Access at http://localhost:8000
+
+See [docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md) for detailed environment configuration.
 
 ## Two modes
 
@@ -63,9 +89,9 @@ and commodities (gold, silver, WTI oil, natural gas, copper). Any Yahoo Finance 
 
 ### CLI
 ```
-python -m app.cli AAPL BTC-USD EURUSD=X       # auto signals
-python -m app.cli history --symbol AAPL       # signal history
-python -m app.cli portfolio AAPL,BTC-USD      # portfolio metrics
+python -m scripts.cli AAPL BTC-USD EURUSD=X    # auto signals
+python -m scripts.cli history --symbol AAPL    # signal history
+python -m scripts.cli portfolio AAPL,BTC-USD   # portfolio metrics
 ```
 
 ### Signal history & logging
@@ -139,9 +165,9 @@ CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ### Development
-1. Edit `app/config.py` to change the watchlist, weights or date range
+1. Edit `app/core/config.py` to change the watchlist, weights or date range
 2. Run `pytest -q` after changes
-3. Use `python -m app.cli` for quick testing
+3. Use `python -m scripts.cli` for quick testing
 4. The API caches responses for 5 minutes; use `?refresh=true` to bust the cache
 
 ## What's next?
