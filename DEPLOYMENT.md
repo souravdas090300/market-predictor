@@ -28,13 +28,13 @@ This guide explains how to deploy your Market Predictor application to productio
 
 1. In your Railway project, the service will be created automatically
 2. Click on the service to configure it
-3. Railway's Nixpacks will automatically detect Python from `requirements.txt` at the root
+3. Railway will detect the `Procfile` and use it for process definition
 4. Configure the service settings:
-   - **Build Command**: `cd market-predictor && pip install -r requirements.txt`
-   - **Start Command**: `cd market-predictor && uvicorn app.api:app --host 0.0.0.0 --port $PORT`
+   - **Build Command**: Railway will use `nixpacks.toml` configuration
+   - **Start Command**: Railway will use `Procfile` or `start.sh`
    - **Health Check**: `/api/health`
 
-**Note**: Your repository structure has the application code in a `market-predictor/` subdirectory. The `requirements.txt` and `setup.py` at the root help Railway detect the Python project, while commands navigate into the subdirectory.
+**Note**: Your repository structure has the application code in a `market-predictor/` subdirectory. The `Procfile` and `start.sh` handle the navigation into the subdirectory automatically.
 
 ### 1.3 Add Redis Service
 
