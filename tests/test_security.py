@@ -1,7 +1,6 @@
 """Security tests for authentication, rate limiting, and input validation."""
 import pytest
 import secrets
-from app import security as sec
 from app.security import get_current_active_user
 from app.auth import UserManager, user_manager
 
