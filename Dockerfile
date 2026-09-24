@@ -10,13 +10,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY market-predictor/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY market-predictor/ .
+COPY . .
 
 # Create necessary directories
 RUN mkdir -p data logs models static

@@ -1,2 +1,2 @@
 [tool.vercel]
-entrypoint = "market-predictor.app.api:app"
+entrypoint = "app.api:app"

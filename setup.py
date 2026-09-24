@@ -3,8 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="market-predictor",
     version="1.0.0",
-    package_dir={"": "market-predictor"},
-    packages=find_packages(where="market-predictor"),
+    packages=find_packages(),
     python_requires=">=3.12",
     install_requires=[
         "pandas>=2.0",
