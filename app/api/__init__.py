@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response, FileResponse
 from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -1250,6 +1250,26 @@ def health_check(request: Request):
     }
 
 
+# Favicon endpoint to prevent 404/502 errors
+@app.get("/favicon.ico")
+async def favicon():
+    """Return favicon to prevent browser errors."""
+    favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/png")
+    # Return empty response if favicon doesn't exist
+    return Response(status_code=204)
+
+
+@app.get("/market_predictor_favicon_32x32.png")
+async def favicon_png():
+    """Return PNG favicon directly."""
+    favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/png")
+    return Response(status_code=404)
+
+
 @app.get("/api/status")
 @limiter.limit("30/minute")
 def system_status(request: Request):
@@ -1304,6 +1324,26 @@ def system_status(request: Request):
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
+
+
+# Favicon endpoint to prevent 404/502 errors (must be before static mount)
+@app.get("/favicon.ico")
+async def favicon():
+    """Return favicon to prevent browser errors."""
+    favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/png")
+    # Return empty response if favicon doesn't exist
+    return Response(status_code=204)
+
+
+@app.get("/market_predictor_favicon_32x32.png")
+async def favicon_png():
+    """Return PNG favicon directly."""
+    favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
+    if favicon_path.exists():
+        return FileResponse(favicon_path, media_type="image/png")
+    return Response(status_code=404)
 
 
 # Static files last so they cannot shadow /api routes.

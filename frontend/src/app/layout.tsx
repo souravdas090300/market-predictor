@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Market Predictor - AI-Powered Market Analysis',
   description: 'Advanced market prediction using machine learning, technical analysis, and sentiment analysis',
+  icons: {
+    icon: '/market_predictor_favicon_32x32.png',
+  },
 };
 
 export default function RootLayout({
