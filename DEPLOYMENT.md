@@ -183,6 +183,25 @@ After deployment, create your first admin user:
 - **Logs**: Access build and runtime logs
 - **Deployments**: Preview deployments and production history
 
+## Step 8: Set Up CI/CD Pipeline (Optional but Recommended)
+
+For automated deployment, set up the GitHub Actions CI/CD pipeline:
+
+1. **Add GitHub Secrets**:
+   - `RAILWAY_TOKEN`: Get from Railway account settings
+   - `VERCEL_TOKEN`: Get from Vercel account settings
+
+2. **Configure Workflows**:
+   - `.github/workflows/test.yml` - Runs tests on every push
+   - `.github/workflows/deploy.yml` - Deploys on main branch push
+
+3. **Automatic Deployment**:
+   - Push to main/master triggers deployment
+   - Tests run first, then deployment
+   - Manual trigger available via GitHub UI
+
+See [CI_CD_SETUP.md](CI_CD_SETUP.md) for detailed CI/CD configuration.
+
 ## Troubleshooting
 
 ### Backend Issues

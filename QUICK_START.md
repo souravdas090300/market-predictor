@@ -85,9 +85,10 @@ After deployment, test these endpoints:
 ## Next Steps
 
 1. Read the full [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions
-2. Run `python scripts/deploy.py` for deployment checklist
-3. Configure custom domains for professional appearance
-4. Set up monitoring and error tracking
+2. Read [CI_CD_SETUP.md](./CI_CD_SETUP.md) for automated deployment setup
+3. Run `python market-predictor/scripts/deploy.py` for deployment checklist
+4. Configure custom domains for professional appearance
+5. Set up monitoring and error tracking
 
 ## Support
 

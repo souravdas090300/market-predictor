@@ -55,12 +55,13 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       
-      - name: Deploy to Railway
+      - name: Deploy to Railway (Docker-less)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway login --token $RAILWAY_TOKEN
           railway up
+          echo "Railway deployment completed using Nixpacks (Docker-less)"
 
   deploy-vercel:
     needs: test
