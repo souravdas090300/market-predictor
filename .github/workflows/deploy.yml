@@ -20,13 +20,11 @@ jobs:
       
       - name: Install dependencies
         run: |
-          cd market-predictor
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
       - name: Run tests
         run: |
-          cd market-predictor
           pip install pytest
           pytest tests/ -v
       
@@ -37,12 +35,12 @@ jobs:
       
       - name: Install frontend dependencies
         run: |
-          cd market-predictor/frontend
+          cd frontend
           npm install
       
       - name: Build frontend
         run: |
-          cd market-predictor/frontend
+          cd frontend
           npm run build
 
   deploy-railway:
@@ -55,13 +53,13 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       
-      - name: Deploy to Railway (Docker-less)
+      - name: Deploy to Railway (Docker)
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway login --token $RAILWAY_TOKEN
           railway up
-          echo "Railway deployment completed using Nixpacks (Docker-less)"
+          echo "Railway deployment completed using Docker"
 
   deploy-vercel:
     needs: test

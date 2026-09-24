@@ -76,8 +76,8 @@ Your project has two GitHub Actions workflows:
 ```yaml
 - Install Railway CLI
 - Login with token
-- Deploy using Nixpacks (Docker-less)
-- Railway auto-detects Python from requirements.txt
+- Deploy using Docker
+- Railway uses Dockerfile at root level
 ```
 
 ### Stage 3: Deploy Vercel (Frontend)
@@ -146,7 +146,7 @@ Error: pytest failed
 ```
 Error: railway up failed
 ```
-**Solution**: Check Railway logs, verify requirements.txt at root
+**Solution**: Check Railway logs, verify Dockerfile at root level
 
 **Vercel Build Fails**
 ```
@@ -198,7 +198,6 @@ on:
 ```yaml
 - name: Run linting
   run: |
-    cd market-predictor
     pip install flake8
     flake8 app/
 ```
