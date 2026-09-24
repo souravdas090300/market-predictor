@@ -1,77 +1,76 @@
 # Repository Structure
 
-This repository has a specific structure that requires special handling for deployment:
+This repository has a flattened structure for simplified deployment:
 
 ```
 market-predictor/                    # Repository root
 ├── .github/                         # GitHub workflows
 │   └── workflows/
-│       └── deploy.yml              # CI/CD deployment workflow
-├── market-predictor/               # Application code directory
-│   ├── app/                        # Backend application
-│   │   ├── api/                    # FastAPI endpoints
-│   │   ├── core/                   # Core configuration
-│   │   ├── services/               # Business logic
-│   │   ├── security/               # Security utilities
-│   │   └── auth/                   # Authentication
-│   ├── frontend/                   # Next.js frontend
-│   │   ├── src/                    # React components
-│   │   ├── public/                 # Static assets
-│   │   ├── package.json            # Frontend dependencies
-│   │   └── vercel.json             # Vercel configuration
-│   ├── data/                       # Database files
-│   ├── logs/                       # Application logs
-│   ├── models/                     # ML models
-│   ├── static/                     # Static files
-│   ├── tests/                      # Test files
-│   ├── scripts/                    # Utility scripts
-│   ├── requirements.txt            # Python dependencies
-│   └── .env.example                # Environment template
-├── Dockerfile                      # Container configuration (moved to root)
-├── .dockerignore                   # Docker ignore patterns (moved to root)
-├── railway.json                    # Railway configuration (moved to root)
-├── nixpacks.toml                  # Railway build config (moved to root)
-├── .env.production.template        # Production env template (moved to root)
-├── frontend.env.production.template # Frontend env template (moved to root)
-├── DEPLOYMENT.md                   # Deployment guide (moved to root)
-├── QUICK_START.md                  # Quick deployment guide (moved to root)
+│       ├── deploy.yml              # CI/CD deployment workflow
+│       └── test.yml                # Testing workflow
+├── app/                            # Backend application
+│   ├── api/                        # FastAPI endpoints
+│   ├── core/                       # Core configuration
+│   ├── services/                   # Business logic
+│   ├── security/                   # Security utilities
+│   └── auth/                       # Authentication
+├── frontend/                       # Next.js frontend
+│   ├── src/                        # React components
+│   ├── public/                     # Static assets
+│   ├── package.json                # Frontend dependencies
+│   └── vercel.json                 # Vercel configuration
+├── data/                           # Database files
+├── logs/                           # Application logs
+├── models/                         # ML models
+├── static/                         # Static files
+├── tests/                          # Test files
+├── scripts/                        # Utility scripts
+├── docs/                           # Documentation
+├── Dockerfile                      # Container configuration
+├── .dockerignore                   # Docker ignore patterns
+├── requirements.txt                # Python dependencies
+├── pyproject.toml                  # Python project configuration
+├── setup.py                        # Python package setup
+├── railway.json                    # Railway configuration
+├── railway.toml                    # Railway TOML configuration
+├── nixpacks.toml                  # Railway build config
+├── Procfile                        # Process definition
+├── start.sh                        # Startup script
+├── .env.example                    # Environment template
+├── .env.production.template        # Production env template
+├── frontend.env.production.template # Frontend env template
+├── DEPLOYMENT.md                   # Deployment guide
+├── QUICK_START.md                  # Quick deployment guide
+├── CI_CD_SETUP.md                  # CI/CD setup guide
 └── README.md                       # Main documentation
 ```
 
 ## Deployment Considerations
 
-### Railway (Backend - Docker-less)
-- `requirements.txt` and `setup.py` at root for Python detection
-- `nixpacks.toml` configures build/start commands
-- Build/start commands navigate into `market-predictor/` directory
+### Railway (Backend)
+- Dockerfile at root for container-based deployment
+- `requirements.txt` and `pyproject.toml` for Python dependency management
+- `railway.json` and `railway.toml` for Railway-specific configuration
+- Build runs from repository root using Docker
 - Environment variables are set at the service level
-- Railway's Nixpacks automatically handles the subdirectory structure
-- No Dockerfile needed - uses Railway's native build system
 
 ### Vercel (Frontend)
-- Must be configured to use `market-predictor/frontend` as root directory
+- Must be configured to use `frontend` as root directory
 - The `vercel.json` file is inside the frontend directory
 - Environment variables are set at the project level
+- Next.js 16 with App Router and TypeScript
 
 ### GitHub Actions
 - Workflow runs from repository root
-- All commands navigate into appropriate subdirectories
-- Tests run in `market-predictor/` directory
-- Frontend build runs in `market-predictor/frontend/` directory
+- Tests run in repository root
+- Frontend build runs in `frontend/` directory
+- Backend deployment uses Docker configuration
 
 ## Why This Structure?
 
-This structure was adopted because:
-1. The original codebase was developed in a subdirectory
-2. Moving everything to the root would require significant refactoring
-3. Deployment platforms support subdirectory configurations
-4. This allows separation of deployment configs from application code
-
-## Migration Notes
-
-If you want to flatten this structure in the future:
-1. Move all content from `market-predictor/` to repository root
-2. Update all import paths in Python code
-3. Update all file references in configuration files
-4. Update deployment configurations to remove directory navigation
-5. Update GitHub Actions workflow paths
+This flattened structure was adopted because:
+1. Simplifies deployment configuration across platforms
+2. Eliminates subdirectory navigation issues
+3. Better alignment with modern deployment platforms
+4. Reduces configuration complexity
+5. Easier to maintain and debug deployment issues
