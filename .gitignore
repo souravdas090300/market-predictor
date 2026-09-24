@@ -53,16 +53,10 @@ signals.db
 
 # Security (NEVER COMMIT THESE)
 .env
-.env.dev
-.env.prod
-.env.local
-.env.*.local
 secrets/
 *.key
 *.pem
 *.crt
-*.key
-secrets/
 api_keys.json
 users.json
 
