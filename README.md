@@ -156,7 +156,8 @@ The recommended production setup uses **Vercel** for the Next.js frontend and **
 **Quick Start:**
 - See [QUICK_START.md](QUICK_START.md) for a 5-minute deployment guide
 - See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions
-- Run `python scripts/deploy.py` for deployment preparation checklist
+- See [REPOSITORY_STRUCTURE.md](REPOSITORY_STRUCTURE.md) for repository structure information
+- Run `python market-predictor/scripts/deploy.py` for deployment preparation checklist
 
 **Architecture:**
 - Frontend: Next.js 16 on Vercel (free tier)

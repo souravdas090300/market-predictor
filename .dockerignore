@@ -72,3 +72,12 @@ docs/
 # Frontend (will be deployed separately)
 frontend/
 node_modules/
+
+# Deployment files (already at root)
+Dockerfile
+.dockerignore
+railway.json
+nixpacks.toml
+.env.production.template
+DEPLOYMENT.md
+QUICK_START.md

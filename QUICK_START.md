@@ -17,6 +17,8 @@ This is a condensed version of the full deployment guide. For detailed instructi
 4. Set environment variables (see below)
 5. Click "Deploy" and copy the backend URL
 
+**Important**: Your repository has the application code in a `market-predictor/` subdirectory. The configuration files have been moved to the repository root and updated to handle this structure automatically.
+
 ### Step 2: Deploy Frontend to Vercel (2 minutes)
 
 1. Go to [vercel.com](https://vercel.com) → "Add New Project" → "Import Git Repository"
@@ -24,6 +26,8 @@ This is a condensed version of the full deployment guide. For detailed instructi
 3. Set root directory: `market-predictor/frontend`
 4. Add environment variable: `NEXT_PUBLIC_API_URL=https://your-backend.railway.app`
 5. Click "Deploy"
+
+**Important**: Your repository has the frontend in a subdirectory, so Vercel needs to be configured to use `market-predictor/frontend` as the root directory.
 
 ### Step 3: Update CORS (1 minute)
 

@@ -30,12 +30,14 @@ This guide explains how to deploy your Market Predictor application to productio
 1. In your Railway project, add a new service:
    - Click "New Service" → "GitHub Repo"
    - Select the same repository
-   - Set root directory to `market-predictor` (if applicable)
+   - **Root directory**: Leave empty (Railway will use the repository root)
 
 2. Configure the service settings:
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn app.api:app --host 0.0.0.0 --port $PORT`
+   - **Build Command**: `cd market-predictor && pip install -r requirements.txt`
+   - **Start Command**: `cd market-predictor && uvicorn app.api:app --host 0.0.0.0 --port $PORT`
    - **Health Check**: `/api/health`
+
+**Note**: Your repository structure has the application code in a `market-predictor/` subdirectory, so commands need to navigate into that directory.
 
 ### 1.3 Add Redis Service
 
@@ -103,6 +105,8 @@ ENABLE_TESTING_MODE=false
    - **Root Directory**: `market-predictor/frontend`
    - **Build Command**: `npm run build`
    - **Output Directory**: `.next`
+
+**Note**: Vercel needs to point to the `market-predictor/frontend` subdirectory since that's where the Next.js app is located.
 
 ### 2.2 Set Environment Variables
 

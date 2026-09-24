@@ -20,11 +20,13 @@ jobs:
       
       - name: Install dependencies
         run: |
+          cd market-predictor
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
       - name: Run tests
         run: |
+          cd market-predictor
           pip install pytest
           pytest tests/ -v
       
@@ -35,12 +37,12 @@ jobs:
       
       - name: Install frontend dependencies
         run: |
-          cd frontend
+          cd market-predictor/frontend
           npm install
       
       - name: Build frontend
         run: |
-          cd frontend
+          cd market-predictor/frontend
           npm run build
 
   deploy-railway:
@@ -58,7 +60,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway login --token $RAILWAY_TOKEN
-          railway up --service backend
+          railway up
 
   deploy-vercel:
     needs: test

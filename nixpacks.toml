@@ -1,0 +1,13 @@
+[phases.build]
+cmds = ["cd market-predictor && pip install -r requirements.txt"]
+
+[phases.start]
+cmd = "cd market-predictor && uvicorn app.api:app --host 0.0.0.0 --port $PORT"
+
+[static]
+# Create necessary directories
+dirs = ["market-predictor/data", "market-predictor/logs", "market-predictor/models", "market-predictor/static"]
+
+[environment]
+PYTHONPATH = "/app/market-predictor"
+PYTHONUNBUFFERED = "1"
