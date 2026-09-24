@@ -144,7 +144,33 @@
         .signal-badge.neutral { color: var(--color-gold); border: 1px solid var(--color-gold); }
         .note { font-size: 12px; color: var(--color-text-secondary); margin: 8px 0 12px; }
         .chart-container { height: 320px; position: relative; }
-        canvas { width: 100%; height: 100%; }
+        canvas { width: 100%; height: 100%; cursor: crosshair; }
+        .chart-tooltip {
+            position: absolute;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            pointer-events: none;
+            z-index: 100;
+            min-width: 200px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+        .tooltip-date { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 8px; }
+        .tooltip-price { font-family: var(--font-mono); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+        .tooltip-details { font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; }
+        .tooltip-trend {
+            margin-top: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .tooltip-trend.bullish { background: rgba(16, 185, 129, 0.2); color: var(--color-bullish); }
+        .tooltip-trend.bearish { background: rgba(239, 68, 68, 0.2); color: var(--color-bearish); }
+        .tooltip-trend.neutral { background: rgba(251, 191, 36, 0.2); color: var(--color-gold); }
         .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--spacing-md); margin: var(--spacing-lg) 0; }
         .metric-card { padding: var(--spacing-md); }
         .metric-label { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--color-text-secondary); }
@@ -185,6 +211,23 @@
             .main { grid-template-columns: 1fr; }
             .metrics-grid { grid-template-columns: 1fr 1fr; }
         }
+        .filter-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover { background: rgba(255, 255, 255, 0.1); }
+        .filter-btn.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--color-bullish);
+            color: var(--color-bullish);
+        }
     </style>
 </head>
 <body>
@@ -200,6 +243,7 @@
                 <input class="symbol-search" id="symbolInput" placeholder="TSLA, SOL-USD" />
                 <button class="refresh-btn" id="goBtn" type="button">Load</button>
                 <button class="refresh-btn" id="refreshBtn" type="button">Refresh</button>
+                <button class="refresh-btn" id="assetsBtn" type="button">All Assets</button>
                 <a class="ghost-link" href="/profile.html">Account</a>
             </div>
         </header>
@@ -216,7 +260,10 @@
                         <div class="signal-badge neutral" id="signalBadge">…</div>
                     </div>
                     <p class="note" id="modelNote">The model predicts the next 5 completed trading days. Live price is shown separately so it cannot leak into training.</p>
-                    <div class="chart-container"><canvas id="chart"></canvas></div>
+                    <div class="chart-container">
+                        <canvas id="chart"></canvas>
+                        <div class="chart-tooltip" id="chartTooltip"></div>
+                    </div>
                     <p class="status" id="status"></p>
                 </div>
                 <div class="metrics-grid">
@@ -261,6 +308,29 @@
                 </div>
             </div>
         </main>
+        
+        <!-- Assets Modal -->
+        <div id="assets-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; padding: 2rem;">
+            <div style="background: rgba(31, 41, 55, 0.95); border-radius: 16px; max-width: 1400px; margin: 0 auto; height: 100%; overflow-y: auto; padding: 2rem; border: 1px solid var(--color-border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <h2 style="font-size: 24px; font-weight: 700;">All Assets</h2>
+                    <button onclick="closeAssetsModal()" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #EF4444; color: #EF4444; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Close</button>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                    <button class="filter-btn active" data-filter="all" onclick="filterAssetsModal('all')">All Assets</button>
+                    <button class="filter-btn" data-filter="stock" onclick="filterAssetsModal('stock')">Stocks</button>
+                    <button class="filter-btn" data-filter="crypto" onclick="filterAssetsModal('crypto')">Crypto</button>
+                    <button class="filter-btn" data-filter="forex" onclick="filterAssetsModal('forex')">Forex</button>
+                    <button class="filter-btn" data-filter="commodity" onclick="filterAssetsModal('commodity')">Commodities</button>
+                    <input id="modal-search-input" placeholder="Search assets..." style="padding: 8px 12px; background: rgba(0,0,0,0.25); border: 1px solid var(--color-border); color: #fff; border-radius: 6px; min-width: 200px;" onkeyup="searchAssetsModal()">
+                </div>
+                
+                <div id="modal-assets-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
+                    <div style="text-align: center; padding: 2rem; color: var(--color-text-secondary);">Loading assets...</div>
+                </div>
+            </div>
+        </div>
     </div>
     <script>
         const CLASS_LABELS = { stock: 'Shares', crypto: 'Crypto', forex: 'Forex', commodity: 'Commodities' };
@@ -282,6 +352,9 @@
             return (n >= 0 ? '+' : '') + s + '%';
         }
 
+        let chartBars = []; // Store bar positions for hover detection
+        let chartScale = { top: 0, bot: 0, w: 0, h: 0 };
+
         function drawChart(candles, live) {
             const canvas = $('chart');
             const ctx = canvas.getContext('2d');
@@ -291,6 +364,8 @@
             ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
             ctx.clearRect(0, 0, rect.width, rect.height);
             if (!candles || candles.length < 2) return;
+            
+            chartBars = []; // Reset stored bars
             const bars = candles.slice();
             if (live && live.price) {
                 const last = bars[bars.length - 1];
@@ -304,6 +379,10 @@
             const top = max + pad, bot = min - pad;
             const w = rect.width, h = rect.height;
             const bw = Math.max(2, (w - 20) / bars.length - 2);
+            
+            // Store scale for later calculations
+            chartScale = { top, bot, w, h };
+            
             bars.forEach((b, i) => {
                 const x = 10 + i * ((w - 20) / bars.length);
                 const yH = h * (1 - (b.h - bot) / (top - bot));
@@ -311,12 +390,236 @@
                 const yO = h * (1 - (b.o - bot) / (top - bot));
                 const yC = h * (1 - (b.c - bot) / (top - bot));
                 const up = b.c >= b.o;
+                
+                // Store bar data for hover detection
+                chartBars.push({
+                    index: i,
+                    x: x,
+                    width: bw,
+                    yH: yH,
+                    yL: yL,
+                    yO: yO,
+                    yC: yC,
+                    data: b,
+                    up: up
+                });
+                
                 ctx.strokeStyle = up ? '#10B981' : '#EF4444';
                 ctx.fillStyle = up ? '#10B981' : '#EF4444';
                 ctx.beginPath(); ctx.moveTo(x + bw / 2, yH); ctx.lineTo(x + bw / 2, yL); ctx.stroke();
                 const bodyTop = Math.min(yO, yC);
                 const bodyH = Math.max(1, Math.abs(yC - yO));
                 ctx.fillRect(x, bodyTop, bw, bodyH);
+            });
+        }
+
+        function analyzeCandleTrend(candle, previousCandles) {
+            if (!candle || !previousCandles || previousCandles.length < 2) {
+                return { trend: 'neutral', confidence: 0, analysis: 'Insufficient data' };
+            }
+
+            const c = candle;
+            const prev = previousCandles[previousCandles.length - 1];
+            const prev2 = previousCandles[previousCandles.length - 2];
+
+            // Basic candle analysis
+            const bodySize = Math.abs(c.c - c.o);
+            const wickSize = c.h - c.l;
+            const bodyRatio = bodySize / wickSize;
+            const isBullish = c.c > c.o;
+            const isBearish = c.c < c.o;
+
+            // Trend analysis based on multiple factors
+            let bullishSignals = 0;
+            let bearishSignals = 0;
+            let analysis = [];
+
+            // 1. Current candle direction
+            if (isBullish) {
+                bullishSignals += 1;
+                analysis.push('Bullish candle');
+            } else if (isBearish) {
+                bearishSignals += 1;
+                analysis.push('Bearish candle');
+            }
+
+            // 2. Body size analysis
+            if (bodyRatio > 0.6) {
+                if (isBullish) {
+                    bullishSignals += 2;
+                    analysis.push('Strong bullish body');
+                } else {
+                    bearishSignals += 2;
+                    analysis.push('Strong bearish body');
+                }
+            } else if (bodyRatio < 0.2) {
+                analysis.push('Small body (indecision)');
+            }
+
+            // 3. Position relative to previous candles
+            if (c.c > prev.h) {
+                bullishSignals += 2;
+                analysis.push('Breakout above previous high');
+            } else if (c.c < prev.l) {
+                bearishSignals += 2;
+                analysis.push('Breakdown below previous low');
+            }
+
+            // 4. Higher highs and higher lows (uptrend)
+            if (c.h > prev.h && c.l > prev.l) {
+                bullishSignals += 2;
+                analysis.push('Higher high and higher low');
+            }
+            // Lower highs and lower lows (downtrend)
+            else if (c.h < prev.h && c.l < prev.l) {
+                bearishSignals += 2;
+                analysis.push('Lower high and lower low');
+            }
+
+            // 5. Wick analysis
+            const upperWick = c.h - Math.max(c.o, c.c);
+            const lowerWick = Math.min(c.o, c.c) - c.l;
+            const wickRatio = wickSize > 0 ? Math.max(upperWick, lowerWick) / wickSize : 0;
+
+            if (wickRatio > 0.5) {
+                if (upperWick > lowerWick && isBullish) {
+                    bearishSignals += 1;
+                    analysis.push('Long upper wick (rejection)');
+                } else if (lowerWick > upperWick && isBearish) {
+                    bullishSignals += 1;
+                    analysis.push('Long lower wick (support)');
+                }
+            }
+
+            // 6. Moving average comparison (simple 3-period MA)
+            const last3 = previousCandles.slice(-3).concat(c);
+            const ma3 = last3.reduce((sum, bar) => sum + bar.c, 0) / last3.length;
+            if (c.c > ma3) {
+                bullishSignals += 1;
+                analysis.push('Above 3-period MA');
+            } else {
+                bearishSignals += 1;
+                analysis.push('Below 3-period MA');
+            }
+
+            // Determine overall trend
+            const totalSignals = bullishSignals + bearishSignals;
+            const bullishRatio = totalSignals > 0 ? bullishSignals / totalSignals : 0.5;
+            
+            let trend, confidence;
+            if (bullishRatio >= 0.65) {
+                trend = 'bullish';
+                confidence = Math.round(bullishRatio * 100);
+            } else if (bullishRatio <= 0.35) {
+                trend = 'bearish';
+                confidence = Math.round((1 - bullishRatio) * 100);
+            } else {
+                trend = 'neutral';
+                confidence = Math.round(50 - Math.abs(bullishRatio - 0.5) * 100);
+            }
+
+            // Swing analysis
+            let swing = 'sideways';
+            if (trend === 'bullish' && confidence > 70) {
+                swing = 'upswing';
+            } else if (trend === 'bearish' && confidence > 70) {
+                swing = 'downswing';
+            }
+
+            return {
+                trend,
+                confidence,
+                swing,
+                analysis: analysis.slice(0, 4) // Top 4 signals
+            };
+        }
+
+        function showChartTooltip(barData, mouseX, mouseY) {
+            const tooltip = $('chartTooltip');
+            const candle = barData.data;
+            
+            // Get previous candles for trend analysis
+            const candleIndex = barData.index;
+            const previousCandles = chartBars.slice(0, candleIndex).map(b => b.data);
+            
+            // Analyze trend
+            const trendAnalysis = analyzeCandleTrend(candle, previousCandles);
+            
+            // Format date
+            const dateStr = candle.d === 'live' ? 'Live' : new Date(candle.d).toLocaleDateString();
+            
+            // Calculate change
+            const change = candle.c - candle.o;
+            const changePct = candle.o > 0 ? (change / candle.o) * 100 : 0;
+            
+            tooltip.innerHTML = `
+                <div class="tooltip-date">${dateStr}</div>
+                <div class="tooltip-price" style="color: ${barData.up ? 'var(--color-bullish)' : 'var(--color-bearish)'}">
+                    ${fmt(candle.c, 4)}
+                </div>
+                <div class="tooltip-details">
+                    <div>Open: ${fmt(candle.o, 4)}</div>
+                    <div>High: ${fmt(candle.h, 4)}</div>
+                    <div>Low: ${fmt(candle.l, 4)}</div>
+                    <div>Change: ${fmt(change, 4)} (${pct(changePct / 100)})</div>
+                </div>
+                <div class="tooltip-trend ${trendAnalysis.trend}">
+                    ${trendAnalysis.trend.toUpperCase()} · ${trendAnalysis.confidence}% confidence
+                </div>
+                <div class="tooltip-details" style="margin-top: 8px;">
+                    ${trendAnalysis.swing !== 'sideways' ? `<div>Swing: ${trendAnalysis.swing}</div>` : ''}
+                    ${trendAnalysis.analysis.map(a => `<div>• ${a}</div>`).join('')}
+                </div>
+            `;
+            
+            // Position tooltip
+            const container = $('chart').parentElement;
+            const containerRect = container.getBoundingClientRect();
+            
+            let left = mouseX + 15;
+            let top = mouseY - 10;
+            
+            // Prevent tooltip from going outside container
+            if (left + 220 > containerRect.width) {
+                left = mouseX - 235;
+            }
+            if (top + 200 > containerRect.height) {
+                top = mouseY - 200;
+            }
+            
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        function hideChartTooltip() {
+            $('chartTooltip').style.display = 'none';
+        }
+
+        function setupChartHover() {
+            const canvas = $('chart');
+            
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                // Find the bar under cursor
+                const hoveredBar = chartBars.find(bar => {
+                    return mouseX >= bar.x && mouseX <= bar.x + bar.width;
+                });
+                
+                if (hoveredBar) {
+                    showChartTooltip(hoveredBar, mouseX, mouseY);
+                    canvas.style.cursor = 'pointer';
+                } else {
+                    hideChartTooltip();
+                    canvas.style.cursor = 'crosshair';
+                }
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                hideChartTooltip();
             });
         }
 
@@ -354,7 +657,9 @@
                 const el = $('livePrice');
                 el.textContent = `${fmt(q.price, 4)}  ${pct(q.change_pct)}`;
                 el.className = 'live-price ' + (q.change_pct >= 0 ? 'up' : 'down');
-                if (lastSignal) drawChart(lastSignal.candles, q);
+                if (lastSignal) {
+                    drawChart(lastSignal.candles, q); // This updates chartBars for hover detection
+                }
             }
             renderWatchlist();
         }
@@ -381,7 +686,7 @@
             $('mSma').textContent = `SMA50 ${s.indicators.vs_sma_50_pct}% · vol ${s.indicators.volatility_20d_pct}%`;
             $('modelNote').textContent = s.note || $('modelNote').textContent;
             if (s.live) applyQuote(s.symbol, s.live);
-            drawChart(s.candles, s.live);
+            drawChart(s.candles, s.live); // This now stores bar data for hover
             const pats = s.candle_patterns || [];
             $('patterns').innerHTML = pats.length
                 ? pats.slice(0, 6).map(p => `<div class="insight-item"><div class="insight-label">${p.pattern} · ${p.bias}</div>${p.meaning}</div>`).join('')
@@ -448,6 +753,7 @@
         $('symbolInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('goBtn').click(); });
         $('refreshBtn').onclick = () => current && loadSymbol(current, true);
         $('menuBtn').onclick = () => $('sidebar').classList.toggle('open');
+        $('assetsBtn').onclick = () => openAssetsModal();
         $('materialBtn').onclick = async () => {
             const text = $('materialText').value;
             if (!current || !text.trim()) return;
@@ -464,11 +770,136 @@
                 : d.material.label;
         };
 
+        // Assets Modal Functions
+        let modalAssets = [];
+        let modalCurrentFilter = 'all';
+        let modalSearchQuery = '';
+
+        function openAssetsModal() {
+            $('assets-modal').style.display = 'block';
+            loadModalAssets();
+        }
+
+        function closeAssetsModal() {
+            $('assets-modal').style.display = 'none';
+        }
+
+        async function loadModalAssets() {
+            try {
+                const response = await fetch('/api/assets/all');
+                if (!response.ok) throw new Error('Failed to fetch assets');
+                
+                const data = await response.json();
+                modalAssets = data.assets || [];
+                
+                renderModalAssets();
+            } catch (error) {
+                console.error('Error loading assets:', error);
+                $('modal-assets-grid').innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--color-bearish);">Failed to load assets. Please try again.</div>';
+            }
+        }
+
+        function renderModalAssets() {
+            const grid = $('modal-assets-grid');
+            
+            let filtered = modalAssets;
+            
+            // Apply class filter
+            if (modalCurrentFilter !== 'all') {
+                filtered = filtered.filter(asset => asset.class === modalCurrentFilter);
+            }
+            
+            // Apply search filter
+            if (modalSearchQuery) {
+                const query = modalSearchQuery.toLowerCase();
+                filtered = filtered.filter(asset => 
+                    asset.symbol.toLowerCase().includes(query) ||
+                    asset.name.toLowerCase().includes(query)
+                );
+            }
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--color-text-secondary);">No assets found matching your criteria.</div>';
+                return;
+            }
+            
+            grid.innerHTML = filtered.map(asset => {
+                const quote = asset.quote;
+                if (!quote) {
+                    return `
+                        <div style="background: rgba(31, 41, 55, 0.55); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; cursor: pointer;" onclick="loadSymbolFromModal('${asset.symbol}')">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <div>
+                                    <div style="font-size: 18px; font-weight: 700;">${asset.symbol}</div>
+                                    <div style="font-size: 12px; color: var(--color-text-secondary);">${asset.name}</div>
+                                </div>
+                                <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); color: var(--color-text-secondary);">${asset.class}</span>
+                            </div>
+                            <div style="font-family: var(--font-mono); font-size: 24px; font-weight: 700;">Loading...</div>
+                        </div>
+                    `;
+                }
+                
+                const priceClass = quote.change_pct >= 0 ? 'up' : 'down';
+                const priceColor = quote.change_pct >= 0 ? 'var(--color-bullish)' : 'var(--color-bearish)';
+                
+                return `
+                    <div style="background: rgba(31, 41, 55, 0.55); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--color-bullish)'" onmouseout="this.style.borderColor='var(--color-border)'" onclick="loadSymbolFromModal('${asset.symbol}')">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <div>
+                                <div style="font-size: 18px; font-weight: 700;">${asset.symbol}</div>
+                                <div style="font-size: 12px; color: var(--color-text-secondary);">${asset.name}</div>
+                            </div>
+                            <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); color: var(--color-text-secondary);">${asset.class}</span>
+                        </div>
+                        <div style="font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: ${priceColor};">${fmt(quote.price, 4)}</div>
+                        <div style="font-family: var(--font-mono); font-size: 14px; color: ${priceColor};">
+                            ${fmt(quote.change, 4)} (${pct(quote.change_pct)})
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterAssetsModal(filter) {
+            modalCurrentFilter = filter;
+            
+            // Update button states
+            document.querySelectorAll('#assets-modal .filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.filter === filter) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            renderModalAssets();
+        }
+
+        function searchAssetsModal() {
+            modalSearchQuery = $('modal-search-input').value;
+            renderModalAssets();
+        }
+
+        function loadSymbolFromModal(symbol) {
+            closeAssetsModal();
+            loadSymbol(symbol);
+        }
+
         (async function init() {
             watchlist = await (await fetch('/api/watchlist')).json();
-            current = watchlist[0] && watchlist[0].symbol;
+            
+            // Check if a symbol was selected from the assets page
+            const selectedSymbol = localStorage.getItem('selectedSymbol');
+            if (selectedSymbol) {
+                current = selectedSymbol;
+                localStorage.removeItem('selectedSymbol'); // Clear after use
+            } else {
+                current = watchlist[0] && watchlist[0].symbol;
+            }
+            
             renderWatchlist();
             startStream();
+            setupChartHover(); // Setup interactive chart hover
             if (current) await loadSymbol(current);
             snapshotTable();
         })();

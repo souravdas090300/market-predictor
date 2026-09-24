@@ -218,11 +218,11 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    showMessage('Account created successfully! Please sign in.', 'success');
+                    showMessage('Account created successfully! Redirecting to login...', 'success');
                     
                     // Redirect to login after delay
                     setTimeout(() => {
-                        window.location.href = '/login.html';
+                        window.location.href = '/login.html?redirect=dashboard';
                     }, 1500);
                 } else {
                     showMessage(data.detail || 'Registration failed', 'error');

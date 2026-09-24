@@ -17,7 +17,7 @@ All security features have been implemented and tested successfully.
 - Refresh tokens with 7-day expiration
 - Secure token generation using HS256 algorithm
 - Token validation and error handling
-- Demo account: `demo` / `demo123`
+- Demo account: `demo` / `demo12345`
 
 **User Management**
 - User registration with email validation
@@ -334,7 +334,7 @@ curl -X POST http://localhost:8000/api/auth/register \
 # Login
 curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"demo","password":"demo123"}'
+  -d '{"username":"demo","password":"demo12345"}'
 
 # Use the access token
 curl -X GET http://localhost:8000/api/protected \
@@ -408,7 +408,7 @@ Before deploying to production:
 
 ## Known Limitations
 
-1. **Demo Account**: Currently uses a demo account for testing (`demo`/`demo123`). This should be removed or secured in production.
+1. **Demo Account**: Currently uses a demo account for testing (`demo`/`demo12345`). This should be removed or secured in production.
 
 2. **Database**: User data is stored in JSON files. For production, migrate to a proper database (PostgreSQL, MongoDB, etc.).
 

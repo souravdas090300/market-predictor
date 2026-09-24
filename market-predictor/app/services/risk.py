@@ -227,7 +227,7 @@ class RiskCalculator:
         kelly = (win_rate * win_loss_ratio - (1 - win_rate)) / win_loss_ratio
         
         # Cap Kelly at 25% to prevent overbetting
-        return min(max(kelly, 0.25), 0.0)
+        return min(max(kelly, 0.0), 0.25)
 
 
 def calculate_position_risk(

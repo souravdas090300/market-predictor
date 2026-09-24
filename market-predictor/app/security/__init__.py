@@ -281,9 +281,10 @@ class APIKeyManager:
             scopes = ["read", "write"]
         
         api_key = f"mp_{secrets.token_urlsafe(32)}"
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         
         key_data = {
-            "key_hash": hashlib.sha256(api_key.encode()).hexdigest(),
+            "key_hash": key_hash,
             "user_id": user_id,
             "name": name,
             "scopes": scopes,
@@ -292,7 +293,8 @@ class APIKeyManager:
             "is_active": True
         }
         
-        self.api_keys[api_key] = key_data
+        # Store by hash instead of raw key for security
+        self.api_keys[key_hash] = key_data
         self._save_api_keys()
         
         return api_key
@@ -301,19 +303,19 @@ class APIKeyManager:
         """Validate an API key and return its data."""
         key_hash = hashlib.sha256(api_key.encode()).hexdigest()
         
-        for key, data in self.api_keys.items():
-            if data["key_hash"] == key_hash and data["is_active"]:
-                # Update last used
-                data["last_used"] = datetime.utcnow().isoformat()
-                self._save_api_keys()
-                return data
+        if key_hash in self.api_keys and self.api_keys[key_hash]["is_active"]:
+            # Update last used
+            self.api_keys[key_hash]["last_used"] = datetime.utcnow().isoformat()
+            self._save_api_keys()
+            return self.api_keys[key_hash]
         
         return None
     
     def revoke_api_key(self, api_key: str) -> bool:
         """Revoke an API key."""
-        if api_key in self.api_keys:
-            self.api_keys[api_key]["is_active"] = False
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+        if key_hash in self.api_keys:
+            self.api_keys[key_hash]["is_active"] = False
             self._save_api_keys()
             return True
         return False
@@ -328,7 +330,7 @@ class APIKeyManager:
                 "is_active": data["is_active"],
                 "scopes": data["scopes"]
             }
-            for key, data in self.api_keys.items()
+            for key_hash, data in self.api_keys.items()
             if data["user_id"] == user_id
         ]
 
@@ -447,8 +449,6 @@ class SessionManager:
                 del self.sessions[session_id]
                 return None
         except:
-            del self.sessions[session_id]
-            return None
             del self.sessions[session_id]
             return None
         

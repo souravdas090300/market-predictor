@@ -149,10 +149,36 @@ Multi-word phrases are matched first: "rate cut" (positive), "rate hike" (negati
 
 ## Deployment
 
-### Railway or Render
+### Production Deployment (Vercel + Railway)
+
+The recommended production setup uses **Vercel** for the Next.js frontend and **Railway** for the Python FastAPI backend.
+
+**Quick Start:**
+- See [QUICK_START.md](QUICK_START.md) for a 5-minute deployment guide
+- See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions
+- Run `python scripts/deploy.py` for deployment preparation checklist
+
+**Architecture:**
+- Frontend: Next.js 16 on Vercel (free tier)
+- Backend: Python FastAPI on Railway (free tier with credits)
+- Database: SQLite (persistent storage on Railway)
+- Caching: Redis on Railway for rate limiting and sessions
+
+**Manual Deployment:**
+```bash
+# Generate production secret key
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Follow the deployment guide for platform-specific setup
 ```
-pip install -r requirements.txt
-uvicorn app.api:app --host 0.0.0.0 --port 8000
+
+### Local Development
+```bash
+# Development mode
+python scripts/run_dev.py
+
+# Production mode locally
+python scripts/run_prod.py
 ```
 
 ### Docker

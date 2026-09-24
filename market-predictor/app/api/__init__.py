@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 import os
+import sys
 from typing import Optional, List
 from datetime import datetime
 
@@ -44,7 +45,7 @@ app = FastAPI(title="Market Predictor", version="1.0.0")
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS configuration
-origins = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",")
+origins = config.CORS_ORIGINS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -86,16 +87,17 @@ class MaterialIn(BaseModel):
 
 
 def _auto_signal(symbol: str, news: bool = True, refresh: bool = False) -> dict:
-    key = f"{symbol}|{news}"
+    sanitized_symbol = sanitize_symbol(symbol)
+    key = f"{sanitized_symbol}|{news}"
     hit = _cache.get(key)
     if hit and not refresh and time.time() - hit[0] < config.API_CACHE_SECONDS:
         return hit[1]
     try:
-        result = predict.get_signal(symbol, use_news=news, retrain=refresh)
+        result = predict.get_signal(sanitized_symbol, use_news=news, retrain=refresh)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:  # network errors, yfinance hiccups, etc.
-        raise HTTPException(status_code=502, detail=f"Could not analyse {symbol}: {e}")
+        raise HTTPException(status_code=502, detail=f"Could not analyse {sanitized_symbol}: {e}")
     _cache[key] = (time.time(), result)
     return result
 
@@ -117,7 +119,8 @@ def classes(request: Request):
 @limiter.limit("60/minute")
 def signal(request: Request, symbol: str, news: bool = True, refresh: bool = False):
     """Automatic mode: prices, candlesticks, ML model and recent news."""
-    return _auto_signal(symbol, news, refresh)
+    sanitized_symbol = sanitize_symbol(symbol)
+    return _auto_signal(sanitized_symbol, news, refresh)
 
 
 @app.post("/api/material")
@@ -132,7 +135,7 @@ def read_material(request: Request, body: MaterialIn):
 
     auto = combined = None
     if body.combine:
-        auto = _auto_signal(body.symbol)
+        auto = _auto_signal(sanitize_symbol(body.symbol))
         combined = predict.combine(auto, analysis)
     return {
         "symbol": body.symbol,
@@ -179,6 +182,84 @@ async def live_quotes_stream(request: Request, symbols: str):
             await asyncio.sleep(config.LIVE_STREAM_INTERVAL_SECONDS)
 
     return StreamingResponse(events(), media_type="text/event-stream")
+
+
+@app.get("/api/assets/all")
+@limiter.limit("30/minute")
+def get_all_assets(request: Request):
+    """Get comprehensive data for all assets in the watchlist."""
+    try:
+        watchlist = config.WATCHLIST
+        symbols = [asset["symbol"] for asset in watchlist]
+        
+        # Get live quotes for all symbols
+        quotes = data.get_quotes(symbols)
+        
+        # Combine watchlist info with live quotes
+        assets_data = []
+        for asset in watchlist:
+            symbol = asset["symbol"]
+            quote = quotes.get(symbol)
+            
+            asset_data = {
+                "symbol": symbol,
+                "name": asset["name"],
+                "class": asset["class"],
+                "query": asset.get("query", ""),
+                "quote": quote
+            }
+            assets_data.append(asset_data)
+        
+        return {
+            "assets": assets_data,
+            "total": len(assets_data),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching asset data: {str(e)}")
+
+
+@app.get("/api/assets/by-class")
+@limiter.limit("30/minute")
+def get_assets_by_class(request: Request, asset_class: str):
+    """Get assets filtered by class (stock, crypto, forex, commodity)."""
+    try:
+        if asset_class not in config.CLASS_LABELS:
+            raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
+        
+        watchlist = config.WATCHLIST
+        filtered_assets = [asset for asset in watchlist if asset["class"] == asset_class]
+        symbols = [asset["symbol"] for asset in filtered_assets]
+        
+        # Get live quotes for filtered symbols
+        quotes = data.get_quotes(symbols)
+        
+        # Combine asset info with live quotes
+        assets_data = []
+        for asset in filtered_assets:
+            symbol = asset["symbol"]
+            quote = quotes.get(symbol)
+            
+            asset_data = {
+                "symbol": symbol,
+                "name": asset["name"],
+                "class": asset["class"],
+                "query": asset.get("query", ""),
+                "quote": quote
+            }
+            assets_data.append(asset_data)
+        
+        return {
+            "assets": assets_data,
+            "class": asset_class,
+            "class_label": config.CLASS_LABELS[asset_class],
+            "total": len(assets_data),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching asset data: {str(e)}")
 
 
 # Admin endpoints
@@ -379,6 +460,123 @@ def remove_admin_user(request: Request, username: str, current_user: dict = Depe
         raise HTTPException(status_code=500, detail=f"Error removing superuser: {str(e)}")
 
 
+@app.get("/api/admin/users")
+@limiter.limit("30/minute")
+def list_all_users(request: Request, current_user: dict = Depends(admin_required)):
+    """List all users (admin-only)."""
+    try:
+        users = user_manager.list_users()
+        return {
+            "users": users,
+            "total": len(users)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing users: {str(e)}")
+
+
+@app.put("/api/admin/user/{username}/subscription")
+@limiter.limit("10/minute")
+def update_user_subscription_admin(request: Request, username: str, plan: str, duration_days: int = 30, current_user: dict = Depends(admin_required)):
+    """Update user subscription (admin-only)."""
+    try:
+        # Find user by username
+        user_id = None
+        for uid, user in user_manager.users.items():
+            if user["username"].lower() == username.lower():
+                user_id = uid
+                break
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update subscription
+        subscription = user_manager.update_subscription(user_id, plan, duration_days)
+        
+        log_security_event("SUBSCRIPTION_UPDATED_ADMIN", {
+            "target_user": username,
+            "new_plan": plan,
+            "duration_days": duration_days,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"Subscription updated for {username}",
+            "subscription": subscription
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating subscription: {str(e)}")
+
+
+@app.put("/api/admin/user/{username}/enable")
+@limiter.limit("10/minute")
+def enable_user_account(request: Request, username: str, current_user: dict = Depends(admin_required)):
+    """Enable a user account (admin-only)."""
+    try:
+        # Find user by username
+        user_id = None
+        for uid, user in user_manager.users.items():
+            if user["username"].lower() == username.lower():
+                user_id = uid
+                break
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Enable user
+        user_manager.enable_user(user_id)
+        
+        log_security_event("USER_ENABLED_ADMIN", {
+            "target_user": username,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"User {username} has been enabled",
+            "username": username,
+            "is_active": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error enabling user: {str(e)}")
+
+
+@app.put("/api/admin/user/{username}/disable")
+@limiter.limit("10/minute")
+def disable_user_account(request: Request, username: str, current_user: dict = Depends(admin_required)):
+    """Disable a user account (admin-only)."""
+    try:
+        # Find user by username
+        user_id = None
+        for uid, user in user_manager.users.items():
+            if user["username"].lower() == username.lower():
+                user_id = uid
+                break
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Disable user
+        user_manager.disable_user(user_id)
+        
+        log_security_event("USER_DISABLED_ADMIN", {
+            "target_user": username,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"User {username} has been disabled",
+            "username": username,
+            "is_active": False
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error disabling user: {str(e)}")
+
+
 # Batch prediction endpoints (admin-only)
 @app.post("/api/admin/batch/predict")
 @limiter.limit("10/minute")
@@ -448,7 +646,7 @@ def material_from_url(request: Request, body: MaterialIn):
 
     auto = combined = None
     if body.combine:
-        auto = _auto_signal(symbol)
+        auto = _auto_signal(sanitize_symbol(symbol))
         combined = predict.combine(auto, analysis)
     return {
         "symbol": symbol,
@@ -484,7 +682,7 @@ def material_from_file(request: Request, symbol: str, file_bytes: bytes, file_ty
 
     auto = combined = None
     if combine:
-        auto = _auto_signal(symbol)
+        auto = _auto_signal(sanitize_symbol(symbol))
         combined = predict.combine(auto, analysis)
     return {
         "symbol": symbol,
@@ -515,7 +713,8 @@ def bulk_signals(request: Request, symbols: list[str]):
     results = []
     for s in symbols:
         try:
-            results.append(_auto_signal(s, news=True))
+            sanitized_symbol = sanitize_symbol(s)
+            results.append(_auto_signal(sanitized_symbol, news=True))
         except HTTPException:
             results.append({"symbol": s, "error": "Could not fetch"})
     return results
@@ -592,8 +791,9 @@ class RiskRequest(BaseModel):
 def calculate_risk(request: Request, body: RiskRequest):
     """Calculate risk metrics for a trading position."""
     try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
         risk_analysis = risk.calculate_position_risk(
-            symbol=body.symbol,
+            symbol=sanitized_symbol,
             entry_price=body.entry_price,
             stop_loss=body.stop_loss,
             take_profit=body.take_profit,
@@ -619,8 +819,9 @@ class StrategyRequest(BaseModel):
 def optimize_strategy(request: Request, body: StrategyRequest):
     """Optimize trading strategy parameters."""
     try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
         # Get historical data
-        signal_data = _auto_signal(body.symbol, news=True, refresh=False)
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
         candles = signal_data.get('candles', [])
         
         if not candles:
@@ -633,7 +834,7 @@ def optimize_strategy(request: Request, body: StrategyRequest):
         
         # Optimize strategy
         result = strategy.optimize_strategy_for_symbol(
-            symbol=body.symbol,
+            symbol=sanitized_symbol,
             data=df,
             strategy_type=body.strategy_type
         )
@@ -656,7 +857,8 @@ class NewsRequest(BaseModel):
 def get_news(request: Request, symbol: str, asset_class: str = "stock", max_articles: int = 20):
     """Get news with sentiment analysis for a symbol."""
     try:
-        news_data = news.get_news_with_sentiment(symbol, asset_class)
+        sanitized_symbol = sanitize_symbol(symbol)
+        news_data = news.get_news_with_sentiment(sanitized_symbol, asset_class)
         return news_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching news: {str(e)}")
@@ -671,9 +873,12 @@ class CorrelationRequest(BaseModel):
 def analyze_correlation(request: Request, body: CorrelationRequest):
     """Analyze correlations between multiple assets."""
     try:
+        # Sanitize all symbols
+        sanitized_symbols = [sanitize_symbol(s) for s in body.symbols]
+        
         # Fetch data for all symbols
         data = {}
-        for symbol in body.symbols:
+        for symbol in sanitized_symbols:
             try:
                 signal_data = _auto_signal(symbol, news=True, refresh=False)
                 candles = signal_data.get('candles', [])
@@ -691,7 +896,7 @@ def analyze_correlation(request: Request, body: CorrelationRequest):
             raise HTTPException(status_code=400, detail="Need at least 2 assets with valid data")
         
         # Generate correlation data
-        correlation_data = correlation.generate_correlation_data(body.symbols, data)
+        correlation_data = correlation.generate_correlation_data(sanitized_symbols, data)
         
         return correlation_data
     except Exception as e:
@@ -1031,6 +1236,74 @@ def protected_route(request: Request, current_user: dict = Depends(get_current_a
         "user": current_user["username"],
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+# Health check and status endpoints
+@app.get("/api/health")
+@limiter.limit("60/minute")
+def health_check(request: Request):
+    """Basic health check endpoint."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "market-predictor-api"
+    }
+
+
+@app.get("/api/status")
+@limiter.limit("30/minute")
+def system_status(request: Request):
+    """Comprehensive system status endpoint."""
+    import psutil
+    import time
+    
+    try:
+        # Get system metrics
+        cpu_usage = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        # Get service health (simulated - in production, check actual services)
+        services = {
+            "api": {"status": "up", "response_time": 45, "last_check": datetime.utcnow().isoformat()},
+            "database": {"status": "up", "response_time": 12, "last_check": datetime.utcnow().isoformat()},
+            "cache": {"status": "up", "response_time": 3, "last_check": datetime.utcnow().isoformat()},
+            "ml_model": {"status": "up", "response_time": 234, "last_check": datetime.utcnow().isoformat()},
+            "data_feed": {"status": "up", "response_time": 89, "last_check": datetime.utcnow().isoformat()},
+        }
+        
+        # Calculate overall status
+        all_up = all(s["status"] == "up" for s in services.values())
+        overall = "healthy" if all_up else "degraded"
+        
+        return {
+            "overall": overall,
+            "uptime": 99.95,  # In production, calculate actual uptime
+            "last_check": datetime.utcnow().isoformat(),
+            "services": services,
+            "metrics": {
+                "cpu_usage": cpu_usage,
+                "memory_usage": memory.percent,
+                "disk_usage": disk.percent,
+                "network_in": 1024,  # Simulated - use psutil.net_io_counters() in production
+                "network_out": 512,
+                "active_connections": 127,  # Track actual connections in production
+                "requests_per_minute": 1450,  # Track actual requests in production
+                "error_rate": 0.02,  # Track actual error rate in production
+            },
+            "incidents": [],  # Populate from incident tracking system
+            "system_info": {
+                "version": "1.0.0",
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                "platform": sys.platform,
+            }
+        }
+    except Exception as e:
+        return {
+            "overall": "degraded",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 
 # Static files last so they cannot shadow /api routes.

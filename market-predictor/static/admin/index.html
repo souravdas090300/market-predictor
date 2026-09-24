@@ -331,7 +331,8 @@
                 <a href="#" class="active" data-section="overview">Overview</a>
                 <a href="#" data-section="rate-limiting">Rate Limiting</a>
                 <a href="#" data-section="batch">Batch Predictions</a>
-                <a href="#" data-section="users">Users</a>
+                <a href="#" data-section="users">User Management</a>
+                <a href="#" data-section="subscriptions">Subscriptions</a>
                 <a href="/index.html">Back to Main App</a>
             </div>
 
@@ -433,21 +434,61 @@
             <div class="control-row">
                 <div class="input-group">
                     <input type="text" id="admin-username" placeholder="Username">
-                    <button class="btn btn-primary" onclick="addAdminUser()">Add Admin</button>
+                    <button class="btn btn-primary" onclick="addAdminUser()">Grant Admin</button>
                 </div>
             </div>
 
-            <h3>Admin Users</h3>
+            <h3>All Users</h3>
             <table class="table">
                 <thead>
                     <tr>
                         <th>Username</th>
-                        <th>Action</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="admin-users-table">
+                <tbody id="users-table">
                     <tr>
-                        <td colspan="2" class="loading">Loading...</td>
+                        <td colspan="5" class="loading">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Subscriptions Section -->
+        <div id="subscriptions-section" class="admin-section" style="display: none;">
+            <h2>Subscription Management</h2>
+            
+            <div class="control-row">
+                <div class="input-group">
+                    <input type="text" id="sub-username" placeholder="Username">
+                    <select id="sub-plan" style="padding: 0.5rem; border: 1px solid #2D3748; border-radius: 6px; background: #111827; color: #F9FAFB;">
+                        <option value="free">Free</option>
+                        <option value="basic">Basic</option>
+                        <option value="pro">Pro</option>
+                        <option value="enterprise">Enterprise</option>
+                    </select>
+                    <input type="number" id="sub-duration" placeholder="Days" value="30" style="padding: 0.5rem; border: 1px solid #2D3748; border-radius: 6px; background: #111827; color: #F9FAFB; width: 80px;">
+                    <button class="btn btn-primary" onclick="updateUserSubscription()">Update Subscription</button>
+                </div>
+            </div>
+
+            <h3>User Subscriptions</h3>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Plan</th>
+                        <th>Status</th>
+                        <th>Expiry Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="subscriptions-table">
+                    <tr>
+                        <td colspan="5" class="loading">Loading...</td>
                     </tr>
                 </tbody>
             </table>
@@ -473,12 +514,13 @@
                 if (section === 'overview') loadOverview();
                 if (section === 'rate-limiting') loadRateLimiting();
                 if (section === 'batch') loadBatchStatus();
-                if (section === 'users') loadAdminUsers();
+                if (section === 'users') loadUsers();
+                if (section === 'subscriptions') loadSubscriptions();
             });
         });
 
         // API helpers
-        const ADMIN_API_BASE = '/api/admin'; // Admin API now on same port under /api/admin path
+        const ADMIN_API_BASE = ''; // Admin API is now mounted at root
         
         async function apiCall(endpoint, options = {}) {
             const token = localStorage.getItem('access_token');
@@ -487,7 +529,7 @@
                 ...(token && { 'Authorization': `Bearer ${token}` })
             };
             
-            const response = await fetch(ADMIN_API_BASE + endpoint, {
+            const response = await fetch(endpoint, {
                 ...options,
                 headers: { ...headers, ...options.headers }
             });
@@ -502,7 +544,7 @@
         // Auth helpers
         async function adminLogin(username, password) {
             try {
-                const response = await fetch('/api/admin/auth/login', {
+                const response = await fetch('/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -705,17 +747,145 @@
         }
 
         // Users
-        async function loadAdminUsers() {
+        async function loadUsers() {
             try {
-                const config = await apiCall('/config');
-                const tbody = document.getElementById('admin-users-table');
+                const response = await fetch('/users', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load users');
+                
+                const data = await response.json();
+                const tbody = document.getElementById('users-table');
                 tbody.innerHTML = '';
                 
-                // Note: Admin users are now determined by superuser status in user accounts
-                // This will be updated to fetch actual user list with superuser status
-                tbody.innerHTML = '<tr><td colspan="2">User management now uses superuser status in user accounts</td></tr>';
+                data.users.forEach(user => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${user.email}</td>
+                        <td>${user.roles.join(', ')}</td>
+                        <td><span class="status-badge ${user.is_active ? 'enabled' : 'disabled'}">${user.is_active ? 'Active' : 'Disabled'}</span></td>
+                        <td>
+                            ${user.disabled ? `<button class="btn btn-primary" onclick="enableUser('${user.username.replace(/'/g, "\\'")}')">Enable</button>` : `<button class="btn btn-danger" onclick="disableUser('${user.username.replace(/'/g, "\\'")}')">Disable</button>}
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
             } catch (error) {
-                showMessage('Error loading admin users: ' + error.message, 'error');
+                showMessage('Error loading users: ' + error.message, 'error');
+            }
+        }
+
+        async function loadSubscriptions() {
+            try {
+                const response = await fetch('/users', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to load users');
+                
+                const data = await response.json();
+                const tbody = document.getElementById('subscriptions-table');
+                tbody.innerHTML = '';
+                
+                data.users.forEach(user => {
+                    const subscription = user.subscription || { plan: 'free', status: 'active', expiry_date: null };
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}</td>
+                        <td><span class="status-badge ${subscription.status === 'active' ? 'enabled' : 'disabled'}">${subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}</span></td>
+                        <td>${subscription.expiry_date ? new Date(subscription.expiry_date).toLocaleDateString() : 'N/A'}</td>
+                        <td>
+                            <button class="btn btn-primary" onclick="editSubscription('${user.username}')">Edit</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                showMessage('Error loading subscriptions: ' + error.message, 'error');
+            }
+        }
+
+        async function updateUserSubscription() {
+            const username = document.getElementById('sub-username').value;
+            const plan = document.getElementById('sub-plan').value;
+            const duration = parseInt(document.getElementById('sub-duration').value);
+            
+            if (!username) {
+                showMessage('Please enter a username', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/user/${username}/subscription?plan=${plan}&duration_days=${duration}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to update subscription');
+                
+                const data = await response.json();
+                showMessage(data.message);
+                document.getElementById('sub-username').value = '';
+                loadSubscriptions();
+            } catch (error) {
+                showMessage('Error updating subscription: ' + error.message, 'error');
+            }
+        }
+
+        function editSubscription(username) {
+            document.getElementById('sub-username').value = username;
+            document.getElementById('sub-username').focus();
+        }
+
+        async function enableUser(username) {
+            try {
+                const response = await fetch(`/user/${username}/enable`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to enable user');
+                
+                const data = await response.json();
+                showMessage(data.message);
+                loadUsers();
+            } catch (error) {
+                showMessage('Error enabling user: ' + error.message, 'error');
+            }
+        }
+
+        async function disableUser(username) {
+            try {
+                const response = await fetch(`/user/${username}/disable`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Failed to disable user');
+                
+                const data = await response.json();
+                showMessage(data.message);
+                loadUsers();
+            } catch (error) {
+                showMessage('Error disabling user: ' + error.message, 'error');
             }
         }
 
@@ -794,12 +964,6 @@
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');
             checkAuthentication();
-        }
-    </script>
-</body>
-</html>
-        if (localStorage.getItem('access_token')) {
-            loadOverview();
         }
     </script>
 </body>

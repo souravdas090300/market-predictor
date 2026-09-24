@@ -12,7 +12,7 @@ This document describes the security features implemented in the Market Predicto
 - **Access Tokens**: 30-minute expiration
 - **Refresh Tokens**: 7-day expiration
 - **Secure Storage**: Tokens are signed with HS256 algorithm
-- **Demo Account**: `demo` / `demo123` for testing
+- **Demo Account**: `demo` / `demo12345` for testing
 
 #### User Management
 - User registration with email validation
@@ -163,7 +163,7 @@ curl -X POST http://localhost:8000/api/auth/register \
 ```bash
 curl -X POST http://localhost:8000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"demo","password":"demo123"}'
+  -d '{"username":"demo","password":"demo12345"}'
 ```
 
 #### Refresh Token

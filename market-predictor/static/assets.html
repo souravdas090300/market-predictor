@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Predictor – Live Assets</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --color-bullish: #10B981;
+            --color-bearish: #EF4444;
+            --color-navy: #0F172A;
+            --color-gold: #FBBF24;
+            --color-slate: #1F2937;
+            --color-gray-dark: #111827;
+            --color-border: #2D3748;
+            --color-text-primary: #F9FAFB;
+            --color-text-secondary: #D1D5DB;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --spacing-xs: 0.5rem;
+            --spacing-sm: 1rem;
+            --spacing-md: 1.5rem;
+            --spacing-lg: 2rem;
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        .chart-tooltip {
+            position: absolute;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            pointer-events: none;
+            z-index: 100;
+            min-width: 200px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: none;
+        }
+        .tooltip-date { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 8px; }
+        .tooltip-price { font-family: var(--font-mono); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+        .tooltip-details { font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; }
+        .tooltip-trend {
+            margin-top: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .tooltip-trend.bullish { background: rgba(16, 185, 129, 0.2); color: var(--color-bullish); }
+        .tooltip-trend.bearish { background: rgba(239, 68, 68, 0.2); color: var(--color-bearish); }
+        .tooltip-trend.neutral { background: rgba(251, 191, 36, 0.2); color: var(--color-gold); }
+        body {
+            background: linear-gradient(135deg, var(--color-navy) 0%, #1a2a4a 100%);
+            color: var(--color-text-primary);
+            font-family: var(--font-body);
+            font-size: 14px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--color-border);
+        }
+        .header-title { display: flex; align-items: center; gap: var(--spacing-sm); }
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--color-gold), var(--color-bullish));
+            border-radius: var(--radius-md);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 14px;
+        }
+        .header-controls { display: flex; gap: var(--spacing-sm); align-items: center; }
+        .live-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+            color: var(--color-bullish);
+        }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-bullish); animation: pulse 1.6s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .refresh-btn {
+            padding: 8px 16px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--color-bullish);
+            color: var(--color-bullish);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .refresh-btn:hover { background: rgba(16, 185, 129, 0.25); }
+        .nav-link {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            text-decoration: none;
+        }
+        .nav-link:hover { background: rgba(255, 255, 255, 0.1); color: var(--color-text-primary); }
+        
+        .filters {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-secondary);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover { background: rgba(255, 255, 255, 0.1); }
+        .filter-btn.active {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--color-bullish);
+            color: var(--color-bullish);
+        }
+        .search-input {
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-primary);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            min-width: 200px;
+        }
+        .search-input:focus { outline: none; border-color: var(--color-bullish); }
+        
+        .assets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: var(--spacing-md);
+        }
+        .asset-card {
+            background: rgba(31, 41, 55, 0.55);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md);
+            transition: all 0.2s;
+        }
+        .asset-card:hover {
+            border-color: var(--color-bullish);
+            transform: translateY(-2px);
+        }
+        .asset-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-sm);
+        }
+        .asset-symbol { font-size: 18px; font-weight: 700; }
+        .asset-name { font-size: 12px; color: var(--color-text-secondary); }
+        .asset-class {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--color-text-secondary);
+        }
+        .asset-class.stock { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+        .asset-class.crypto { background: rgba(251, 191, 36, 0.2); color: #FBBF24; }
+        .asset-class.forex { background: rgba(168, 85, 247, 0.2); color: #A78BFA; }
+        .asset-class.commodity { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        
+        .asset-price {
+            font-family: var(--font-mono);
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+        }
+        .asset-price.up { color: var(--color-bullish); }
+        .asset-price.down { color: var(--color-bearish); }
+        
+        .asset-change {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            margin-bottom: var(--spacing-md);
+        }
+        .asset-change.up { color: var(--color-bullish); }
+        .asset-change.down { color: var(--color-bearish); }
+        
+        .asset-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-sm);
+            font-size: 11px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .detail-label { color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; }
+        .detail-value { font-family: var(--font-mono); font-weight: 600; }
+        
+        .loading {
+            text-align: center;
+            padding: var(--spacing-lg);
+            color: var(--color-text-secondary);
+        }
+        .error {
+            text-align: center;
+            padding: var(--spacing-lg);
+            color: var(--color-bearish);
+        }
+        .last-updated {
+            text-align: center;
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            margin-top: var(--spacing-lg);
+        }
+        
+        @media (max-width: 768px) {
+            .assets-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: var(--spacing-sm); align-items: flex-start; }
+            .header-controls { flex-wrap: wrap; }
+            .filters { flex-direction: column; }
+            .search-input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-title">
+                <div class="logo-icon">MP</div>
+                <div>
+                    <h1 style="font-size: 20px; font-weight: 700;">Live Assets</h1>
+                    <p style="font-size: 12px; color: var(--color-text-secondary);">Real-time prices and market data</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <span class="live-pill"><span class="live-dot"></span> LIVE</span>
+                <button class="refresh-btn" id="refreshBtn" type="button">Refresh</button>
+                <a class="nav-link" href="/index.html">Dashboard</a>
+                <a class="nav-link" href="/profile.html">Account</a>
+            </div>
+        </header>
+        
+        <div class="filters">
+            <button class="filter-btn active" data-filter="all">All Assets</button>
+            <button class="filter-btn" data-filter="stock">Stocks</button>
+            <button class="filter-btn" data-filter="crypto">Crypto</button>
+            <button class="filter-btn" data-filter="forex">Forex</button>
+            <button class="filter-btn" data-filter="commodity">Commodities</button>
+            <input class="search-input" id="searchInput" placeholder="Search assets..." />
+        </div>
+        
+        <div class="assets-grid" id="assetsGrid">
+            <div class="loading">Loading assets...</div>
+        </div>
+        
+        <div class="last-updated" id="lastUpdated"></div>
+    </div>
+    
+    <script>
+        let allAssets = [];
+        let currentFilter = 'all';
+        let searchQuery = '';
+        let eventSource = null;
+        
+        const $ = (id) => document.getElementById(id);
+        
+        function fmt(n, d=2) {
+            if (n == null || Number.isNaN(n)) return '—';
+            return Number(n).toLocaleString(undefined, { maximumFractionDigits: d });
+        }
+        
+        function fmtLargeNumber(n) {
+            if (n == null || Number.isNaN(n)) return '—';
+            if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+            if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+            return fmt(n, 2);
+        }
+        
+        function pct(n) {
+            if (n == null) return '—';
+            const s = (n * 100).toFixed(2);
+            return (n >= 0 ? '+' : '') + s + '%';
+        }
+        
+        function renderAssets(assets) {
+            const grid = $('assetsGrid');
+            
+            if (assets.length === 0) {
+                grid.innerHTML = '<div class="error">No assets found matching your criteria.</div>';
+                return;
+            }
+            
+            grid.innerHTML = assets.map(asset => {
+                const quote = asset.quote;
+                if (!quote) {
+                    return `
+                        <div class="asset-card">
+                            <div class="asset-header">
+                                <div>
+                                    <div class="asset-symbol">${asset.symbol}</div>
+                                    <div class="asset-name">${asset.name}</div>
+                                </div>
+                                <span class="asset-class ${asset.class}">${asset.class}</span>
+                            </div>
+                            <div class="asset-price">Loading...</div>
+                            <div class="asset-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Status</span>
+                                    <span class="detail-value">No data</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                const priceClass = quote.change_pct >= 0 ? 'up' : 'down';
+                const changeClass = quote.change_pct >= 0 ? 'up' : 'down';
+                
+                return `
+                    <div class="asset-card" onclick="loadSymbol('${asset.symbol}')">
+                        <div class="asset-header">
+                            <div>
+                                <div class="asset-symbol">${asset.symbol}</div>
+                                <div class="asset-name">${asset.name}</div>
+                            </div>
+                            <span class="asset-class ${asset.class}">${asset.class}</span>
+                        </div>
+                        <div class="asset-price ${priceClass}">${fmt(quote.price, 4)}</div>
+                        <div class="asset-change ${changeClass}">
+                            ${fmt(quote.change, 4)} (${pct(quote.change_pct)})
+                        </div>
+                        <div class="asset-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Volume</span>
+                                <span class="detail-value">${quote.volume ? fmtLargeNumber(quote.volume) : '—'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Market Cap</span>
+                                <span class="detail-value">${quote.market_cap ? fmtLargeNumber(quote.market_cap) : '—'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Day High</span>
+                                <span class="detail-value">${quote.day_high ? fmt(quote.day_high, 4) : '—'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Day Low</span>
+                                <span class="detail-value">${quote.day_low ? fmt(quote.day_low, 4) : '—'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Open</span>
+                                <span class="detail-value">${quote.open ? fmt(quote.open, 4) : '—'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Prev Close</span>
+                                <span class="detail-value">${fmt(quote.previous_close, 4)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function filterAssets() {
+            let filtered = allAssets;
+            
+            // Apply class filter
+            if (currentFilter !== 'all') {
+                filtered = filtered.filter(asset => asset.class === currentFilter);
+            }
+            
+            // Apply search filter
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                filtered = filtered.filter(asset => 
+                    asset.symbol.toLowerCase().includes(query) ||
+                    asset.name.toLowerCase().includes(query)
+                );
+            }
+            
+            renderAssets(filtered);
+        }
+        
+        function updateQuotes(quotes) {
+            // Update the quotes in allAssets
+            for (const [symbol, quote] of Object.entries(quotes)) {
+                const asset = allAssets.find(a => a.symbol === symbol);
+                if (asset && quote) {
+                    asset.quote = quote;
+                }
+            }
+            
+            // Re-render with updated data
+            filterAssets();
+            $('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+        
+        async function loadAssets() {
+            try {
+                const response = await fetch('/api/assets/all');
+                if (!response.ok) throw new Error('Failed to fetch assets');
+                
+                const data = await response.json();
+                allAssets = data.assets || [];
+                
+                filterAssets();
+                
+                $('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                
+                // Start real-time updates after initial load
+                startRealTimeUpdates();
+            } catch (error) {
+                console.error('Error loading assets:', error);
+                $('assetsGrid').innerHTML = '<div class="error">Failed to load assets. Please try again.</div>';
+            }
+        }
+        
+        function loadSymbol(symbol) {
+            // Store the selected symbol in localStorage
+            localStorage.setItem('selectedSymbol', symbol);
+            // Navigate to the main dashboard
+            window.location.href = '/index.html';
+        }
+        
+        function startRealTimeUpdates() {
+            // Close existing connection if any
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            // Get all symbols from current filtered view
+            const symbols = allAssets.map(a => a.symbol).join(',');
+            
+            if (!symbols) return;
+            
+            try {
+                eventSource = new EventSource(`/api/live/quotes?symbols=${symbols}`);
+                
+                eventSource.onmessage = (event) => {
+                    try {
+                        const quotes = JSON.parse(event.data);
+                        updateQuotes(quotes);
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                };
+                
+                eventSource.onerror = (error) => {
+                    console.error('SSE error:', error);
+                    eventSource.close();
+                    eventSource = null;
+                    // Fallback to polling if SSE fails
+                    startPolling();
+                };
+            } catch (error) {
+                console.error('Error starting SSE:', error);
+                // Fallback to polling
+                startPolling();
+            }
+        }
+        
+        let pollingInterval = null;
+        
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // Poll every 15 seconds as fallback
+            pollingInterval = setInterval(() => {
+                if (!document.hidden) {
+                    loadAssets();
+                }
+            }, 15000);
+        }
+        
+        // Event listeners
+        $('refreshBtn').addEventListener('click', () => {
+            loadAssets();
+        });
+        
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                filterAssets();
+                // Clear existing polling
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+                // Restart SSE with new filtered symbols
+                startRealTimeUpdates();
+            });
+        });
+        
+        $('searchInput').addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            filterAssets();
+        });
+        
+        // Handle page visibility - pause updates when tab is not visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+            } else {
+                startRealTimeUpdates();
+            }
+        });
+        
+        // Initial load
+        loadAssets();
+    </script>
+</body>
+</html>

@@ -315,6 +315,123 @@ def get_asset_batch_prediction(request: Request, symbol: str, current_user: dict
         raise HTTPException(status_code=500, detail=f"Error getting asset prediction: {str(e)}")
 
 
+@admin_app.get("/users")
+@admin_limiter.limit("30/minute")
+def list_all_users(request: Request, current_user: dict = Depends(admin_required)):
+    """List all users (admin-only)."""
+    try:
+        users = user_manager.list_users()
+        return {
+            "users": users,
+            "total": len(users)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing users: {str(e)}")
+
+
+@admin_app.put("/user/{username}/subscription")
+@admin_limiter.limit("10/minute")
+def update_user_subscription_admin(request: Request, username: str, plan: str, duration_days: int = 30, current_user: dict = Depends(admin_required)):
+    """Update user subscription (admin-only)."""
+    try:
+        # Find user by username
+        user_id = None
+        for uid, user in user_manager.users.items():
+            if user["username"].lower() == username.lower():
+                user_id = uid
+                break
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update subscription
+        subscription = user_manager.update_subscription(user_id, plan, duration_days)
+        
+        log_security_event("SUBSCRIPTION_UPDATED_ADMIN", {
+            "target_user": username,
+            "new_plan": plan,
+            "duration_days": duration_days,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"Subscription updated for {username}",
+            "subscription": subscription
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating subscription: {str(e)}")
+
+
+@admin_app.put("/user/{username}/enable")
+@admin_limiter.limit("10/minute")
+def enable_user_account(request: Request, username: str, current_user: dict = Depends(admin_required)):
+    """Enable a user account (admin-only)."""
+    try:
+        # Find user by username
+        user_id = None
+        for uid, user in user_manager.users.items():
+            if user["username"].lower() == username.lower():
+                user_id = uid
+                break
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Enable user
+        user_manager.enable_user(user_id)
+        
+        log_security_event("USER_ENABLED_ADMIN", {
+            "target_user": username,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"User {username} has been enabled",
+            "username": username,
+            "is_active": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error enabling user: {str(e)}")
+
+
+@admin_app.put("/user/{username}/disable")
+@admin_limiter.limit("10/minute")
+def disable_user_account(request: Request, username: str, current_user: dict = Depends(admin_required)):
+    """Disable a user account (admin-only)."""
+    try:
+        # Find user by username
+        user_id = None
+        for uid, user in user_manager.users.items():
+            if user["username"].lower() == username.lower():
+                user_id = uid
+                break
+        
+        if not user_id:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Disable user
+        user_manager.disable_user(user_id)
+        
+        log_security_event("USER_DISABLED_ADMIN", {
+            "target_user": username,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"User {username} has been disabled",
+            "username": username,
+            "is_active": False
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error disabling user: {str(e)}")
+
+
 # Health check endpoint
 @admin_app.get("/health")
 def health_check():

@@ -497,7 +497,8 @@ class UserManager:
                 "created_at": user["created_at"],
                 "is_active": user["is_active"],
                 "disabled": user["disabled"],
-                "roles": user["roles"]
+                "roles": user["roles"],
+                "subscription": user.get("subscription", {})
             }
             for user in self.users.values()
         ]
@@ -514,7 +515,7 @@ def ensure_demo_user():
         user_manager.create_user(
             username="demo",
             email="demo@marketpredictor.com",
-            password="demo123"  # This is fine, it's short enough
+            password="demo12345"  # Meets minimum 8 character requirement
         )
     except ValueError:
         # User already exists

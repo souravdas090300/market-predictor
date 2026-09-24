@@ -187,7 +187,7 @@ This serves:
 
 ### Demo User
 - **Username**: `demo`
-- **Password**: `demo123`
+- **Password**: `demo12345`
 - **Access**: Main dashboard only (not superuser by default)
 
 ## Security Best Practices

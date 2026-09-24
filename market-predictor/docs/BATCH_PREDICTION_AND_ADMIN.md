@@ -321,7 +321,7 @@ open http://localhost:8000/admin.html
 
 # Login with admin credentials
 # Username: admin or demo
-# Password: demo123 (for demo user)
+# Password: demo12345 (for demo user)
 
 # Or use API directly
 curl http://localhost:8000/api/admin/stats \
@@ -375,7 +375,7 @@ uvicorn app.admin_api:admin_app --reload --port 8001
 
 #### Main Dashboard
 - Optional authentication for regular users
-- Demo user: `demo` / `demo123`
+- Demo user: `demo` / `demo12345`
 - Public access to prediction endpoints
 
 #### Admin Dashboard

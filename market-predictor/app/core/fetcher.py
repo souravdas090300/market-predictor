@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import tempfile
-from io import StringIO
+from io import StringIO, BytesIO
 
 from . import config
 from ..services import material
@@ -33,7 +33,7 @@ def extract_pdf(data: bytes) -> dict:
     try:
         from pypdf import PdfReader
 
-        reader = PdfReader(StringIO(data.decode("latin-1")))
+        reader = PdfReader(BytesIO(data))
         text = "\n".join(page.extract_text() or "" for page in reader.pages)[
             : config.FETCH_MAX_CHARS
         ]

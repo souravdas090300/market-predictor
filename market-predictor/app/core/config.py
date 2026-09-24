@@ -71,8 +71,22 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG" if ENV == "development" else "INFO")
 SECURITY_LOG_LEVEL = os.getenv("SECURITY_LOG_LEVEL", "DEBUG" if ENV == "development" else "INFO")
 
 # CORS Settings
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000" if ENV == "development" else "https://yourdomain.com,https://www.yourdomain.com").split(",")
-ADMIN_CORS_ORIGINS = os.getenv("ADMIN_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000" if ENV == "development" else "https://yourdomain.com,https://www.yourdomain.com").split(",")
+def get_cors_origins():
+    """Get CORS origins from environment, handling Railway/Vercel URLs dynamically."""
+    default_dev = "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000"
+    default_prod = "https://*.vercel.app,https://*.railway.app"
+    
+    cors_env = os.getenv("CORS_ORIGINS", default_dev if ENV == "development" else default_prod)
+    origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+    
+    # Add Railway and Vercel wildcard support for production
+    if ENV == "production":
+        origins.extend(["https://*.vercel.app", "https://*.railway.app"])
+    
+    return origins
+
+CORS_ORIGINS = get_cors_origins()
+ADMIN_CORS_ORIGINS = os.getenv("ADMIN_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000" if ENV == "development" else "https://*.vercel.app,https://*.railway.app").split(",")
 
 # Feature Flags
 ENABLE_DEBUG_MODE = os.getenv("ENABLE_DEBUG_MODE", "true" if ENV == "development" else "false").lower() == "true"

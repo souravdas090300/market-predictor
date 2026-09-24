@@ -74,7 +74,7 @@ This serves:
 
 ### Main Dashboard
 - Optional authentication for regular users
-- Demo user: `demo` / `demo123`
+- Demo user: `demo` / `demo12345`
 - Public access to prediction endpoints
 - Authentication via `POST /api/auth/login`
 

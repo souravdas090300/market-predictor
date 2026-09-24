@@ -61,14 +61,27 @@ def get_live_quote(symbol: str) -> dict | None:
 
         ticker = yf.Ticker(symbol)
         price = prev = None
+        volume = None
+        market_cap = None
+        day_high = None
+        day_low = None
+        open_price = None
+        
         try:
             fi = ticker.fast_info
             last = fi.get("last_price") if hasattr(fi, "get") else getattr(fi, "last_price", None)
             prev_c = fi.get("previous_close") if hasattr(fi, "get") else getattr(fi, "previous_close", None)
+            vol = fi.get("last_volume") if hasattr(fi, "get") else getattr(fi, "last_volume", None)
+            mcap = fi.get("market_cap") if hasattr(fi, "get") else getattr(fi, "market_cap", None)
+            
             if last is not None:
                 price = float(last)
             if prev_c is not None:
                 prev = float(prev_c)
+            if vol is not None:
+                volume = float(vol)
+            if mcap is not None:
+                market_cap = float(mcap)
         except Exception:
             pass
 
@@ -78,6 +91,10 @@ def get_live_quote(symbol: str) -> dict | None:
                 hist = _normalize_ohlcv(hist)
                 price = float(hist["close"].iloc[-1])
                 prev = float(hist["close"].iloc[-2]) if len(hist) > 1 else price
+                volume = float(hist["volume"].iloc[-1]) if "volume" in hist.columns else None
+                day_high = float(hist["high"].iloc[-1]) if "high" in hist.columns else None
+                day_low = float(hist["low"].iloc[-1]) if "low" in hist.columns else None
+                open_price = float(hist["open"].iloc[-1]) if "open" in hist.columns else None
 
         if price is not None:
             prev = prev if prev is not None else price
@@ -87,6 +104,11 @@ def get_live_quote(symbol: str) -> dict | None:
                 "previous_close": round(prev, 6),
                 "change": round(price - prev, 6),
                 "change_pct": round((price - prev) / prev, 6) if prev else 0.0,
+                "volume": round(volume, 2) if volume else None,
+                "market_cap": round(market_cap, 2) if market_cap else None,
+                "day_high": round(day_high, 6) if day_high else None,
+                "day_low": round(day_low, 6) if day_low else None,
+                "open": round(open_price, 6) if open_price else None,
                 "as_of": datetime.now(timezone.utc).isoformat(),
                 "source": "yahoo",
             }
