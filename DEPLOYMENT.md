@@ -34,7 +34,7 @@ This guide explains how to deploy your Market Predictor application to productio
    - **Start Command**: Railway will use `Procfile` or `start.sh`
    - **Health Check**: `/api/health`
 
-**Note**: Your repository structure has the application code in a `market-predictor/` subdirectory. The `Procfile` and `start.sh` handle the navigation into the subdirectory automatically.
+**Note**: The application code is at the repository root level. The `nixpacks.toml` and `Procfile` are configured to work with this structure.
 
 ### 1.3 Add Redis Service
 
@@ -101,11 +101,11 @@ ENABLE_TESTING_MODE=false
 3. Select your market-predictor repository
 4. Configure the project settings:
    - **Framework Preset**: Next.js
-   - **Root Directory**: `market-predictor/frontend`
+   - **Root Directory**: `frontend`
    - **Build Command**: `npm run build`
    - **Output Directory**: `.next`
 
-**Note**: Vercel needs to point to the `market-predictor/frontend` subdirectory since that's where the Next.js app is located.
+**Note**: Vercel needs to point to the `frontend` subdirectory since that's where the Next.js app is located.
 
 ### 2.2 Set Environment Variables
 
