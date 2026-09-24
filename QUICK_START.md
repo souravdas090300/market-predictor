@@ -1,4 +1,4 @@
-# Quick Start Guide - Vercel + Railway Deployment
+# Quick Start Guide - Vercel + Railway Deployment (Docker-less)
 
 This is a condensed version of the full deployment guide. For detailed instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
@@ -13,11 +13,12 @@ This is a condensed version of the full deployment guide. For detailed instructi
 
 1. Go to [railway.app](https://railway.app) → "New Project" → "Deploy from GitHub"
 2. Select your repository
-3. Add Redis service ("New Service" → "Database" → "Add Redis")
-4. Set environment variables (see below)
-5. Click "Deploy" and copy the backend URL
+3. Railway will auto-detect Python from `requirements.txt` at root
+4. Add Redis service ("New Service" → "Database" → "Add Redis")
+5. Set environment variables (see below)
+6. Click "Deploy" and copy the backend URL
 
-**Important**: Your repository has the application code in a `market-predictor/` subdirectory. The configuration files have been moved to the repository root and updated to handle this structure automatically.
+**Important**: Your repository has the application code in a `market-predictor/` subdirectory. The `requirements.txt` at the root helps Railway detect the Python project, while build/start commands navigate into the subdirectory.
 
 ### Step 2: Deploy Frontend to Vercel (2 minutes)
 

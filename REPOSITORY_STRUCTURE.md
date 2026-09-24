@@ -40,11 +40,13 @@ market-predictor/                    # Repository root
 
 ## Deployment Considerations
 
-### Railway (Backend)
-- Configuration files are at the repository root
+### Railway (Backend - Docker-less)
+- `requirements.txt` and `setup.py` at root for Python detection
+- `nixpacks.toml` configures build/start commands
 - Build/start commands navigate into `market-predictor/` directory
 - Environment variables are set at the service level
-- The Railway build system automatically handles the subdirectory structure
+- Railway's Nixpacks automatically handles the subdirectory structure
+- No Dockerfile needed - uses Railway's native build system
 
 ### Vercel (Frontend)
 - Must be configured to use `market-predictor/frontend` as root directory

@@ -1,11 +1,11 @@
-# Deployment Guide - Vercel + Railway
+# Deployment Guide - Vercel + Railway (Docker-less)
 
-This guide explains how to deploy your Market Predictor application to production using **Vercel** (frontend) and **Railway** (backend).
+This guide explains how to deploy your Market Predictor application to production using **Vercel** (frontend) and **Railway** (backend) without Docker, using Railway's native Nixpacks build system.
 
 ## Architecture
 
 - **Frontend**: Next.js 16 deployed on Vercel
-- **Backend**: Python FastAPI deployed on Railway
+- **Backend**: Python FastAPI deployed on Railway (using Nixpacks, no Docker)
 - **Database**: SQLite (local file storage) + Redis (Railway for rate limiting)
 - **Storage**: Railway provides persistent storage for the backend
 
@@ -14,7 +14,6 @@ This guide explains how to deploy your Market Predictor application to productio
 1. GitHub account with your code pushed to a repository
 2. Vercel account (free)
 3. Railway account (free tier with $5 credits)
-4. Railway CLI (optional but recommended)
 
 ## Step 1: Deploy Backend to Railway
 
@@ -23,21 +22,19 @@ This guide explains how to deploy your Market Predictor application to productio
 1. Go to [railway.app](https://railway.app) and sign in
 2. Click "New Project" → "Deploy from GitHub repo"
 3. Select your market-predictor repository
-4. Railway will detect the Python project and suggest settings
+4. Railway will detect the Python project (requirements.txt at root) and suggest settings
 
 ### 1.2 Configure Backend Service
 
-1. In your Railway project, add a new service:
-   - Click "New Service" → "GitHub Repo"
-   - Select the same repository
-   - **Root directory**: Leave empty (Railway will use the repository root)
-
-2. Configure the service settings:
+1. In your Railway project, the service will be created automatically
+2. Click on the service to configure it
+3. Railway's Nixpacks will automatically detect Python from `requirements.txt` at the root
+4. Configure the service settings:
    - **Build Command**: `cd market-predictor && pip install -r requirements.txt`
    - **Start Command**: `cd market-predictor && uvicorn app.api:app --host 0.0.0.0 --port $PORT`
    - **Health Check**: `/api/health`
 
-**Note**: Your repository structure has the application code in a `market-predictor/` subdirectory, so commands need to navigate into that directory.
+**Note**: Your repository structure has the application code in a `market-predictor/` subdirectory. The `requirements.txt` and `setup.py` at the root help Railway detect the Python project, while commands navigate into the subdirectory.
 
 ### 1.3 Add Redis Service
 
@@ -85,6 +82,8 @@ ENABLE_DEBUG_MODE=false
 ENABLE_PROFILING=false
 ENABLE_TESTING_MODE=false
 ```
+
+**Note**: Railway automatically provides `REDIS_URL` when you add a Redis service to your project.
 
 ### 1.5 Deploy Backend
 

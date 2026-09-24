@@ -149,9 +149,9 @@ Multi-word phrases are matched first: "rate cut" (positive), "rate hike" (negati
 
 ## Deployment
 
-### Production Deployment (Vercel + Railway)
+### Production Deployment (Vercel + Railway - Docker-less)
 
-The recommended production setup uses **Vercel** for the Next.js frontend and **Railway** for the Python FastAPI backend.
+The recommended production setup uses **Vercel** for the Next.js frontend and **Railway** for the Python FastAPI backend without Docker, using Railway's native Nixpacks build system.
 
 **Quick Start:**
 - See [QUICK_START.md](QUICK_START.md) for a 5-minute deployment guide
@@ -161,7 +161,7 @@ The recommended production setup uses **Vercel** for the Next.js frontend and **
 
 **Architecture:**
 - Frontend: Next.js 16 on Vercel (free tier)
-- Backend: Python FastAPI on Railway (free tier with credits)
+- Backend: Python FastAPI on Railway using Nixpacks (no Docker, free tier with credits)
 - Database: SQLite (persistent storage on Railway)
 - Caching: Redis on Railway for rate limiting and sessions
 
@@ -182,13 +182,11 @@ python scripts/run_dev.py
 python scripts/run_prod.py
 ```
 
-### Docker
-```dockerfile
-FROM python:3.12-slim
-WORKDIR /app
-COPY . .
-RUN pip install -r requirements.txt
-CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
+### Alternative: Docker Deployment
+If you prefer Docker deployment, a `Dockerfile` is included in the repository root:
+```bash
+docker build -t market-predictor .
+docker run -p 8000:8000 market-predictor
 ```
 
 ### Development
