@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Menu, Search, RefreshCw, User, LogOut, Settings, Moon, Sun, Activity, LayoutGrid } from 'lucide-react';
+import { Menu, Search, RefreshCw, User, LogOut, Settings, Moon, Sun, Activity, LayoutGrid, BarChart3 } from 'lucide-react';
 
 export default function Header() {
   const { 
@@ -98,6 +98,14 @@ export default function Header() {
           title="All Assets Live Status"
         >
           <LayoutGrid className="w-5 h-5 text-slate-300" />
+        </button>
+
+        <button
+          onClick={() => window.location.href = '/asset-comparison'}
+          className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          title="Asset Comparison"
+        >
+          <BarChart3 className="w-5 h-5 text-slate-300" />
         </button>
 
         <button

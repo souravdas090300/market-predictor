@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Menu, X, Home, Settings, BarChart3, Newspaper, Calculator, Zap, Grid3x3, TrendingUp, Activity, LayoutGrid } from 'lucide-react';
+import { Menu, X, Home, Settings, BarChart3, Newspaper, Calculator, Zap, Grid3x3, TrendingUp, Activity, LayoutGrid, Scale } from 'lucide-react';
 
 export default function MobileNav() {
   const { sidebarOpen, setSidebarOpen, setCurrentSymbol } = useStore();
@@ -11,13 +11,14 @@ export default function MobileNav() {
   const navItems = [
     { icon: Home, label: 'Dashboard', path: '/' },
     { icon: LayoutGrid, label: 'All Assets', path: '/assets' },
+    { icon: Scale, label: 'Asset Comparison', path: '/asset-comparison' },
     { icon: BarChart3, label: 'Model Training', path: '/model-training' },
     { icon: Calculator, label: 'Risk Calculator', path: '/risk-calculator' },
     { icon: Zap, label: 'Strategy Optimizer', path: '/strategy-optimizer' },
     { icon: Grid3x3, label: 'Correlation', path: '/correlation' },
     { icon: Newspaper, label: 'News Feed', path: '/news' },
-    { icon: TrendingUp, label: 'Model Performance', path: '/model-performance' },
-    { icon: Activity, label: 'System Status', path: '/status' },
+    { icon: Activity, label: 'Model Performance', path: '/model-performance' },
+    { icon: Zap, label: 'System Status', path: '/status' },
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
