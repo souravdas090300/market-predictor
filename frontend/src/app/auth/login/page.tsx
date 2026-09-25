@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import OAuthManager from '@/lib/oauth';
 import { useStore } from '@/store/useStore';
-import { LogIn, Mail, Lock, User, Chrome, Github } from 'lucide-react';
+import { LogIn, Mail, Lock, User, Globe, GitCommit } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -138,7 +138,7 @@ export default function LoginPage() {
                 disabled={!OAuthManager.isConfigured('google')}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Chrome className="w-5 h-5" />
+                <Globe className="w-5 h-5" />
                 <span className="text-white">Google</span>
               </button>
               <button
@@ -146,7 +146,7 @@ export default function LoginPage() {
                 disabled={!OAuthManager.isConfigured('github')}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Github className="w-5 h-5" />
+                <GitCommit className="w-5 h-5" />
                 <span className="text-white">GitHub</span>
               </button>
             </div>

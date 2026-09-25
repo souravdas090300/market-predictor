@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { authAPI } from '@/lib/api';
 import OAuthManager from '@/lib/oauth';
 import { useStore } from '@/store/useStore';
-import { UserPlus, Mail, Lock, User, Chrome, Github } from 'lucide-react';
+import { UserPlus, Mail, Lock, User, Globe, GitCommit } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -189,10 +189,21 @@ export default function RegisterPage() {
                 disabled={!OAuthManager.isConfigured('google')}
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Chrome className="w-5 h-5" />
+                <Globe className="w-5 h-5" />
                 <span className="text-white">Google</span>
               </button>
               <button
                 onClick={handleGitHubOAuth}
                 disabled={!OAuthManager.isConfigured('github')}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:c
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <GitCommit className="w-5 h-5" />
+                <span className="text-white">GitHub</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

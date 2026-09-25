@@ -249,4 +249,66 @@ export default function AssetsLiveStatusPage() {
               type="text"
               placeholder="Search assets..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery
+              onChange={(e) => setSearchQuery(e.target.value)} />
+          </div>
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+            >
+              {viewMode === "grid" ? <List className="w-4 h-4 text-slate-300" /> : <Grid3x3 className="w-4 h-4 text-slate-300" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filteredAssets.length === 0 ? (
+        <div className="text-center py-12">
+          <AlertTriangle className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+          <p className="text-slate-400">No assets found matching your criteria</p>
+        </div>
+      ) : (
+        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
+          {filteredAssets.map((asset) => (
+            <div key={asset.symbol} className="bg-slate-800/50 rounded-lg border border-slate-700 p-4 hover:border-slate-600 transition-colors">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  {getClassIcon(asset.class)}
+                  <div>
+                    <h3 className="text-white font-semibold">{asset.symbol}</h3>
+                    <p className="text-slate-400 text-sm">{asset.name}</p>
+                  </div>
+                </div>
+                {getSignalIcon(asset.signal)}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <p className="text-slate-400 text-sm">Price</p>
+                  <p className="text-white font-semibold">${asset.live_price.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400 text-sm">Change</p>
+                  <p className={asset.change_pct >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
+                    {asset.change_pct >= 0 ? "+" : ""}{asset.change_pct.toFixed(2)}%
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className={getSignalColor(asset.signal) + " px-2 py-1 rounded text-xs font-medium"}>
+                  {asset.signal.toUpperCase()}
+                </span>
+                <span className="text-slate-500 text-xs">{new Date(asset.last_update).toLocaleTimeString()}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

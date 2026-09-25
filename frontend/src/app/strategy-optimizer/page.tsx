@@ -176,4 +176,19 @@ export default function StrategyOptimizerPage() {
                   </div>
                   <div>
                     <p className="text-slate-400 text-sm">Win Rate</p>
-                    <p className="text-green-400 font-semibold text-xl">{(results.performance.win_rate * 100).toFixed(1)}%</p
+                    <p className="text-green-400 font-semibold text-xl">{(results.performance.win_rate * 100).toFixed(1)}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-slate-400">Configure and optimize strategy</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

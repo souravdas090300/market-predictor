@@ -181,4 +181,22 @@ export default function NewsPage() {
                       {item.sentiment.toFixed(2)}
                     </span>
                     <span className="text-slate-400 text-sm">•</span>
-           
+                    <span className="text-slate-400 text-sm">{new Date(item.published_date).toLocaleDateString()}</span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-2">{item.title}</h3>
+                  <p className="text-slate-400 text-sm mb-3">{item.summary}</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-slate-500">{item.source}</span>
+                    <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-green-400 hover:text-green-300 flex items-center gap-1">
+                      Read more <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

@@ -176,4 +176,20 @@ export default function RiskCalculatorPage() {
                   <span className="text-slate-300">Potential Loss</span>
                   <span className="text-red-400 font-semibold">${results.potential_loss.toFixed(2)}</span>
                 </div>
-                <di
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-slate-300">Risk/Reward Ratio</span>
+                  <span className="text-white font-semibold">{results.risk_reward_ratio.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-slate-400">Enter parameters to calculate risk</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

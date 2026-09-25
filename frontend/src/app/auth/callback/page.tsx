@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import OAuthManager from '@/lib/oauth';
 import { useStore } from '@/store/useStore';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser, setAuthTokens } = useStore();
@@ -84,5 +84,22 @@ export default function OAuthCallbackPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-8 text-center">
+            <Loader2 className="w-16 h-16 text-green-500 mx-auto animate-spin" />
+            <h2 className="text-xl font-semibold text-white">Loading...</h2>
+          </div>
+        </div>
+      </div>
+    }>
+      <OAuthCallbackContent />
+    </Suspense>
   );
 }

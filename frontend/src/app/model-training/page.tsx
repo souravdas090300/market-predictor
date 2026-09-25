@@ -193,4 +193,16 @@ export default function ModelTrainingPage() {
                   />
                 </div>
               </div>
-              <p className="text-slate-400 text-sm">Training model on {config.symbol} with {config.features.le
+              <p className="text-slate-400 text-sm">Training model on {config.symbol} with learning rate {config.features.learning_rate}</p>
+            </div>
+          
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-slate-400">Start training to see results</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

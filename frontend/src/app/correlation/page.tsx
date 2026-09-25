@@ -184,7 +184,7 @@ export default function CorrelationPage() {
       {/* High Correlations */}
       {correlationData && (
         <div className="mt-6 bg-slate-800/50 rounded-lg border border-slate-700 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">High Correlations (|r| > 0.7)</h2>
+          <h2 className="text-xl font-semibold text-white mb-4">High Correlations (|r| &gt; 0.7)</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {correlationData.heatmap_data
               .filter((item: any) => Math.abs(item.correlation) > 0.7)
@@ -205,3 +205,4 @@ export default function CorrelationPage() {
       )}
     </div>
   );
+}

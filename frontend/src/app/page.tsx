@@ -227,4 +227,35 @@ export default function DashboardPage() {
               <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
                 <p className="text-slate-400 text-sm mb-1">P(up) 5 days</p>
                 <p className="text-2xl font-bold text-white font-mono">
-                  {(currentSignal
+                  {(currentSignal?.probability_up * 100).toFixed(1)}%
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                <p className="text-slate-400 text-sm mb-1">Conviction</p>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {(currentSignal?.conviction * 100).toFixed(0)}%
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                <p className="text-slate-400 text-sm mb-1">RSI (14)</p>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {currentSignal?.indicators?.rsi_14?.toFixed(1) || '—'}
+                </p>
+              </div>
+              <div className="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
+                <p className="text-slate-400 text-sm mb-1">Volatility</p>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {currentSignal?.indicators?.volatility_24h ? (currentSignal.indicators.volatility_24h * 100).toFixed(2) + '%' : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-slate-400">Select an asset to view market data</p>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
