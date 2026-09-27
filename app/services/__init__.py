@@ -11,6 +11,7 @@ from . import correlation
 from . import batch_prediction
 from . import backtesting
 from . import advanced_sentiment
+from . import trading_automation
 
 __all__ = [
     'material',
@@ -24,5 +25,6 @@ __all__ = [
     'correlation',
     'batch_prediction',
     'backtesting',
-    'advanced_sentiment'
+    'advanced_sentiment',
+    'trading_automation'
 ]

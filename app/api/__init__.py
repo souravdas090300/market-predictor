@@ -37,6 +37,7 @@ from ..services import correlation
 from ..services import batch_prediction
 from ..services import backtesting
 from ..services import advanced_sentiment
+from ..services import trading_automation
 from ..admin import admin_manager
 
 # Initialize security components
@@ -1481,6 +1482,1126 @@ async def get_earnings_sentiment(request: Request, body: EarningsSentimentReques
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error analyzing earnings sentiment: {str(e)}")
+
+
+# ============================================================================
+# PHASES 11-18: ADVANCED API ROUTES
+# Backtesting, Trading Automation, Portfolio, ML, Social, Broker, Risk
+# ============================================================================
+
+# Request Models for Phase 11-18
+
+class BacktestRunRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    strategy_name: str = Field(default="momentum")
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    initial_capital: float = Field(default=100000, gt=0)
+    commission: float = Field(default=0.001, ge=0, le=0.1)
+
+
+class MonteCarloRequest(BaseModel):
+    iterations: int = Field(default=1000, ge=100, le=10000)
+
+
+class WalkForwardRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    strategy_name: str = Field(default="momentum")
+    window_size: int = Field(default=100, ge=50, le=500)
+    step_size: int = Field(default=20, ge=10, le=100)
+
+
+class ParameterOptimizationRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    strategy_name: str = Field(default="momentum")
+    param_ranges: Dict[str, List[float]]
+
+
+class CreateAlertRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    alert_type: str = Field(default="price")
+    price: float = Field(gt=0)
+    condition: str = Field(default="above")
+    notification_method: str = Field(default="email")
+
+
+class ExecuteOrderRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    side: str = Field(default="buy")
+    quantity: float = Field(gt=0)
+    price: float = Field(gt=0)
+    order_type: str = Field(default="market")
+
+
+class LimitOrderRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    side: str = Field(default="buy")
+    quantity: float = Field(gt=0)
+    limit_price: float = Field(gt=0)
+    stop_price: Optional[float] = Field(default=None)
+
+
+class PortfolioAnalyzeRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+
+
+class PortfolioRebalanceRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+    target_allocation: Dict[str, float]
+
+
+class EfficientFrontierRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+    returns: List[float]
+    covariance: List[List[float]]
+
+
+class TaxLossHarvestingRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+
+
+class MLPredictionRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    timeframe: str = Field(default="1d")
+
+
+class AnomalyDetectionRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+
+
+class PatternRecognitionRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+
+
+class PublishStrategyRequest(BaseModel):
+    author: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(min_length=10, max_length=500)
+    rules: Dict[str, Any]
+    performance: Dict[str, Any]
+
+
+class FollowStrategyRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=50)
+    strategy_id: str = Field(min_length=1, max_length=50)
+    allocation: float = Field(gt=0, le=1)
+
+
+class RateStrategyRequest(BaseModel):
+    strategy_id: str = Field(min_length=1, max_length=50)
+    rating: float = Field(ge=1, le=5)
+    review: str = Field(min_length=10, max_length=500)
+
+
+class BrokerConnectRequest(BaseModel):
+    broker_name: str = Field(default="alpaca")
+    api_key: str = Field(min_length=10, max_length=100)
+    api_secret: Optional[str] = Field(default=None)
+    account_id: Optional[str] = Field(default=None)
+
+
+class BrokerOrderRequest(BaseModel):
+    broker_name: str = Field(default="alpaca")
+    symbol: str = Field(min_length=1, max_length=32)
+    side: str = Field(default="buy")
+    quantity: float = Field(gt=0)
+    price: float = Field(gt=0)
+    order_type: str = Field(default="limit")
+
+
+class BrokerSyncRequest(BaseModel):
+    broker_name: str = Field(default="alpaca")
+
+
+class RiskLimitsRequest(BaseModel):
+    max_position_size: float = Field(default=0.1, gt=0, le=1)
+    max_daily_loss: float = Field(default=-0.05, ge=-1, le=0)
+    max_drawdown: float = Field(default=-0.20, ge=-1, le=0)
+    max_correlation: float = Field(default=0.8, gt=0, le=1)
+    max_leverage: float = Field(default=2.0, gt=0, le=10)
+    stop_loss_percent: float = Field(default=0.05, gt=0, le=1)
+
+
+class VaRRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+    confidence: float = Field(default=0.95, ge=0.9, le=0.99)
+
+
+class CVaRRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+    confidence: float = Field(default=0.95, ge=0.9, le=0.99)
+
+
+class StressTestRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+
+
+class RiskMonitorRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+    market_prices: Dict[str, float]
+    daily_pnl: float
+
+
+class PositionCheckRequest(BaseModel):
+    holdings: List[Dict[str, Any]]
+
+
+# ============================================================================
+# PHASE 11: BACKTESTING ROUTES
+# ============================================================================
+
+@app.post("/api/v2/backtest/run")
+@limiter.limit("10/minute")
+async def run_backtest_v2(request: Request, body: BacktestRunRequest):
+    """Run backtest with given strategy."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Get historical data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No historical data available")
+        
+        # Convert to DataFrame
+        import pandas as pd
+        df = pd.DataFrame(candles)
+        df = df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close', 'v': 'volume'})
+        
+        # Convert to list of dicts
+        historical_data = [
+            {
+                'timestamp': row['d'],
+                'open': row['open'],
+                'high': row['high'],
+                'low': row['low'],
+                'close': row['close'],
+                'volume': row.get('volume', 0)
+            }
+            for _, row in df.iterrows()
+        ]
+        
+        # Create strategy based on name
+        if body.strategy_name == "momentum":
+            strategy = backtesting.SimpleMomentumStrategy(lookback=10, threshold=0.02)
+        elif body.strategy_name == "mean_reversion":
+            strategy = backtesting.MeanReversionStrategy(lookback=20, threshold=0.02)
+        else:
+            strategy = backtesting.SimpleMomentumStrategy()
+        
+        # Run backtest
+        engine = backtesting.BacktestingEngine()
+        results = await engine.run_backtest(
+            historical_data,
+            strategy,
+            initial_capital=body.initial_capital,
+            commission=body.commission
+        )
+        
+        return {
+            "success": True,
+            "results": {
+                "total_return": results.total_return,
+                "total_return_percent": results.total_return_percent,
+                "sharpe_ratio": results.sharpe_ratio,
+                "sortino_ratio": results.sortino_ratio,
+                "max_drawdown": results.max_drawdown,
+                "win_rate": results.win_rate,
+                "profit_factor": results.profit_factor,
+                "trades": results.trades,
+                "avg_return": results.avg_return,
+                "recovery_factor": results.recovery_factor
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running backtest: {str(e)}")
+
+
+@app.post("/api/v2/backtest/monte-carlo")
+@limiter.limit("5/minute")
+def monte_carlo_simulation(request: Request, body: MonteCarloRequest):
+    """Run Monte Carlo simulation."""
+    try:
+        engine = backtesting.BacktestingEngine()
+        # Create sample trades for simulation
+        engine.trades = [
+            backtesting.Trade(
+                entry_date=datetime.now(tz.utc) - timedelta(days=i),
+                exit_date=datetime.now(tz.utc) - timedelta(days=i-1),
+                entry_price=100 + random.uniform(-5, 5),
+                exit_price=100 + random.uniform(-5, 5),
+                quantity=10,
+                pnl=random.uniform(-100, 100),
+                pnl_percent=random.uniform(-10, 10),
+                type="LONG"
+            )
+            for i in range(50)
+        ]
+        
+        results = engine.monte_carlo_simulation(iterations=body.iterations)
+        
+        return {
+            "success": True,
+            "results": {
+                "avg_final_equity": results.avg_final_equity,
+                "avg_max_drawdown": results.avg_max_drawdown,
+                "avg_return": results.avg_return,
+                "worst_case": results.worst_case,
+                "best_case": results.best_case,
+                "simulations": results.simulations
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running Monte Carlo: {str(e)}")
+
+
+@app.post("/api/v2/backtest/walk-forward")
+@limiter.limit("5/minute")
+async def walk_forward_analysis(request: Request, body: WalkForwardRequest):
+    """Run walk-forward analysis."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Get historical data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No historical data available")
+        
+        # Convert to DataFrame
+        import pandas as pd
+        df = pd.DataFrame(candles)
+        df = df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close', 'v': 'volume'})
+        
+        historical_data = [
+            {
+                'timestamp': row['d'],
+                'open': row['open'],
+                'high': row['high'],
+                'low': row['low'],
+                'close': row['close'],
+                'volume': row.get('volume', 0)
+            }
+            for _, row in df.iterrows()
+        ]
+        
+        # Create strategy
+        strategy = backtesting.SimpleMomentumStrategy()
+        
+        # Run walk-forward
+        engine = backtesting.BacktestingEngine()
+        results = await engine.walk_forward_analysis(
+            historical_data,
+            strategy,
+            window_size=body.window_size,
+            step_size=body.step_size
+        )
+        
+        return {
+            "success": True,
+            "results": {
+                "periods": results.periods,
+                "avg_sharpe_ratio": results.avg_sharpe_ratio,
+                "avg_return": results.avg_return,
+                "consistency": results.consistency
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running walk-forward: {str(e)}")
+
+
+@app.post("/api/v2/backtest/optimize")
+@limiter.limit("5/minute")
+async def optimize_parameters(request: Request, body: ParameterOptimizationRequest):
+    """Optimize strategy parameters."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Get historical data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No historical data available")
+        
+        # Convert to DataFrame
+        import pandas as pd
+        df = pd.DataFrame(candles)
+        df = df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close', 'v': 'volume'})
+        
+        historical_data = [
+            {
+                'timestamp': row['d'],
+                'open': row['open'],
+                'high': row['high'],
+                'low': row['low'],
+                'close': row['close'],
+                'volume': row.get('volume', 0)
+            }
+            for _, row in df.iterrows()
+        ]
+        
+        # Create strategy
+        strategy = backtesting.SimpleMomentumStrategy()
+        
+        # Optimize parameters
+        engine = backtesting.BacktestingEngine()
+        results = await engine.optimize_parameters(
+            historical_data,
+            strategy,
+            body.param_ranges
+        )
+        
+        return {
+            "success": True,
+            "results": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error optimizing parameters: {str(e)}")
+
+
+# ============================================================================
+# PHASE 12: SENTIMENT ANALYSIS ROUTES (v2)
+# ============================================================================
+
+@app.get("/api/v2/sentiment/news/{symbol}")
+@limiter.limit("20/minute")
+async def get_news_sentiment_v2(request: Request, symbol: str):
+    """Get news sentiment for symbol."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol)
+        sentiment = await advanced_sentiment.get_news_sentiment(sanitized_symbol)
+        return {"success": True, "sentiment": sentiment}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting news sentiment: {str(e)}")
+
+
+@app.get("/api/v2/sentiment/social/{symbol}/{platform}")
+@limiter.limit("20/minute")
+async def get_social_sentiment_v2(request: Request, symbol: str, platform: str):
+    """Get social media sentiment."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol)
+        sentiment = await advanced_sentiment.get_social_sentiment(sanitized_symbol, platform)
+        return {"success": True, "sentiment": sentiment}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting social sentiment: {str(e)}")
+
+
+@app.get("/api/v2/sentiment/fear-greed")
+@limiter.limit("10/minute")
+async def get_fear_greed_v2(request: Request):
+    """Get fear and greed index."""
+    try:
+        index = await advanced_sentiment.get_fear_greed_index()
+        return {"success": True, "index": index}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting fear/greed index: {str(e)}")
+
+
+@app.post("/api/v2/sentiment/earnings")
+@limiter.limit("10/minute")
+async def analyze_earnings_v2(request: Request, body: dict):
+    """Analyze earnings transcript sentiment."""
+    try:
+        symbol = sanitize_symbol(body.get("symbol", ""))
+        transcript = body.get("transcript", "")
+        sentiment = await advanced_sentiment.analyze_earnings_sentiment(symbol, transcript)
+        return {"success": True, "sentiment": sentiment}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing earnings: {str(e)}")
+
+
+# ============================================================================
+# PHASE 13: ALERTS & AUTOMATION ROUTES
+# ============================================================================
+
+@app.post("/api/v2/alerts")
+@limiter.limit("20/minute")
+async def create_alert_v2(request: Request, body: CreateAlertRequest):
+    """Create price/sentiment alert."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        alert = await trading_automation.trade_executor.create_alert(
+            symbol=sanitized_symbol,
+            alert_type=body.alert_type,
+            price=body.price,
+            condition=body.condition,
+            notification_method=body.notification_method
+        )
+        return {
+            "success": True,
+            "alert": {
+                "id": alert.id,
+                "symbol": alert.symbol,
+                "type": alert.type,
+                "price": alert.price,
+                "condition": alert.condition,
+                "status": alert.status,
+                "created_at": alert.created_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating alert: {str(e)}")
+
+
+@app.post("/api/v2/orders/market")
+@limiter.limit("30/minute")
+async def execute_market_order_v2(request: Request, body: ExecuteOrderRequest):
+    """Execute market order."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        result = await trading_automation.trade_executor.execute_market_order(
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            price=body.price
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing order: {str(e)}")
+
+
+@app.post("/api/v2/orders/limit")
+@limiter.limit("20/minute")
+async def execute_limit_order_v2(request: Request, body: LimitOrderRequest):
+    """Execute limit order."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        order = await trading_automation.trade_executor.execute_limit_order(
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            limit_price=body.limit_price,
+            stop_price=body.stop_price
+        )
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "symbol": order.symbol,
+                "side": order.side,
+                "type": order.type,
+                "quantity": order.quantity,
+                "limit_price": order.limit_price,
+                "stop_price": order.stop_price,
+                "status": order.status,
+                "created_at": order.created_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing limit order: {str(e)}")
+
+
+@app.delete("/api/v2/orders/{order_id}")
+@limiter.limit("20/minute")
+async def cancel_order_v2(request: Request, order_id: str):
+    """Cancel order."""
+    try:
+        result = await trading_automation.trade_executor.cancel_order(order_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error cancelling order: {str(e)}")
+
+
+@app.get("/api/v2/execution-history")
+@limiter.limit("30/minute")
+def get_execution_history_v2(request: Request, symbol: Optional[str] = None, days: int = 30):
+    """Get execution history."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol) if symbol else None
+        history = trading_automation.trade_executor.get_execution_history(
+            symbol=sanitized_symbol,
+            days=days
+        )
+        return {"success": True, "history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting history: {str(e)}")
+
+
+# ============================================================================
+# PHASE 14: PORTFOLIO OPTIMIZATION ROUTES
+# ============================================================================
+
+@app.post("/api/v2/portfolio/analyze")
+@limiter.limit("20/minute")
+def analyze_portfolio_v2(request: Request, body: PortfolioAnalyzeRequest):
+    """Analyze portfolio risk."""
+    try:
+        # Convert to Holding objects
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"],
+                beta=h.get("beta", 1.0),
+                hedged=h.get("hedged", False)
+            )
+            for h in body.holdings
+        ]
+        
+        # Mock historical data
+        historical_data = []
+        for holding in holdings:
+            for i in range(50):
+                historical_data.append({
+                    "symbol": holding.symbol,
+                    "close": holding.current_price * (1 + random.uniform(-0.02, 0.02)),
+                    "timestamp": (datetime.now(tz.utc) - timedelta(days=i)).isoformat()
+                })
+        
+        risk_metrics = trading_automation.portfolio_optimizer.calculate_portfolio_risk(
+            holdings, historical_data
+        )
+        
+        return {
+            "success": True,
+            "risk_metrics": {
+                "total_value": risk_metrics.total_value,
+                "portfolio_volatility": risk_metrics.portfolio_volatility,
+                "diversification_ratio": risk_metrics.diversification_ratio,
+                "var95": risk_metrics.var95,
+                "var99": risk_metrics.var99,
+                "cvar95": risk_metrics.cvar95,
+                "beta": risk_metrics.beta,
+                "hedge_ratio": risk_metrics.hedge_ratio,
+                "risk_assessment": risk_metrics.risk_assessment,
+                "recommendations": risk_metrics.recommendations
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing portfolio: {str(e)}")
+
+
+@app.post("/api/v2/portfolio/rebalance")
+@limiter.limit("10/minute")
+def rebalance_portfolio_v2(request: Request, body: PortfolioRebalanceRequest):
+    """Get rebalancing recommendations."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        rebalancing = trading_automation.portfolio_optimizer.rebalance_portfolio(
+            holdings, body.target_allocation
+        )
+        return {"success": True, "rebalancing": rebalancing}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error rebalancing portfolio: {str(e)}")
+
+
+@app.post("/api/v2/portfolio/efficient-frontier")
+@limiter.limit("5/minute")
+def efficient_frontier_v2(request: Request, body: EfficientFrontierRequest):
+    """Calculate efficient frontier."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        import numpy as np
+        covariance_array = np.array(body.covariance)
+        frontier = trading_automation.portfolio_optimizer.calculate_efficient_frontier(
+            holdings, body.returns, covariance_array
+        )
+        return {"success": True, "frontier": frontier}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating efficient frontier: {str(e)}")
+
+
+@app.post("/api/v2/portfolio/tax-loss-harvesting")
+@limiter.limit("10/minute")
+def tax_loss_harvesting_v2(request: Request, body: TaxLossHarvestingRequest):
+    """Get tax loss harvesting opportunities."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        opportunities = trading_automation.portfolio_optimizer.calculate_tax_loss_harvesting(holdings)
+        return {"success": True, "opportunities": opportunities}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating tax-loss harvesting: {str(e)}")
+
+
+# ============================================================================
+# PHASE 15: ML PREDICTIONS ROUTES
+# ============================================================================
+
+@app.post("/api/v2/predictions/ensemble")
+@limiter.limit("15/minute")
+async def ensemble_prediction_v2(request: Request, body: MLPredictionRequest):
+    """Get ensemble ML prediction."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Mock historical data
+        data = []
+        for i in range(100):
+            data.append({
+                "close": 100 + random.uniform(-10, 10),
+                "volume": random.randint(1000, 10000),
+                "timestamp": (datetime.now(tz.utc) - timedelta(days=i)).isoformat()
+            })
+        
+        prediction = await trading_automation.ml_prediction_engine.get_ensemble_prediction(
+            sanitized_symbol, data, body.timeframe
+        )
+        
+        return {
+            "success": True,
+            "prediction": {
+                "ensemble_prediction": prediction.ensemble_prediction,
+                "confidence": prediction.confidence,
+                "model_predictions": {
+                    model: {
+                        "model": pred.model,
+                        "price": pred.price,
+                        "confidence": pred.confidence,
+                        "reasoning": pred.reasoning
+                    }
+                    for model, pred in prediction.model_predictions.items()
+                },
+                "timestamp": prediction.timestamp.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting ML prediction: {str(e)}")
+
+
+@app.post("/api/v2/predictions/anomalies")
+@limiter.limit("10/minute")
+def detect_anomalies_v2(request: Request, body: AnomalyDetectionRequest):
+    """Detect anomalies in price data."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Mock historical data
+        data = []
+        for i in range(100):
+            data.append({
+                "close": 100 + random.uniform(-10, 10),
+                "timestamp": (datetime.now(tz.utc) - timedelta(days=i)).isoformat()
+            })
+        
+        anomalies = trading_automation.ml_prediction_engine.detect_anomalies(data)
+        
+        return {
+            "success": True,
+            "anomalies": [
+                {
+                    "date": a.date,
+                    "price": a.price,
+                    "z_score": a.z_score,
+                    "daily_return": a.daily_return,
+                    "severity": a.severity
+                }
+                for a in anomalies
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error detecting anomalies: {str(e)}")
+
+
+@app.post("/api/v2/predictions/patterns")
+@limiter.limit("10/minute")
+def recognize_patterns_v2(request: Request, body: PatternRecognitionRequest):
+    """Recognize chart patterns."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Mock historical data
+        data = []
+        for i in range(100):
+            data.append({
+                "close": 100 + random.uniform(-10, 10),
+                "timestamp": (datetime.now(tz.utc) - timedelta(days=i)).isoformat()
+            })
+        
+        patterns = trading_automation.ml_prediction_engine.recognize_patterns(data)
+        
+        return {
+            "success": True,
+            "patterns": [
+                {
+                    "pattern": p.pattern,
+                    "bullish": p.bullish,
+                    "confidence": p.confidence
+                }
+                for p in patterns
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error recognizing patterns: {str(e)}")
+
+
+# ============================================================================
+# PHASE 16: SOCIAL TRADING ROUTES
+# ============================================================================
+
+@app.post("/api/v2/social/strategies")
+@limiter.limit("5/minute")
+def publish_strategy_v2(request: Request, body: PublishStrategyRequest):
+    """Publish strategy."""
+    try:
+        strategy = trading_automation.social_trading_platform.publish_strategy(
+            author=body.author,
+            name=body.name,
+            description=body.description,
+            rules=body.rules,
+            performance=body.performance
+        )
+        
+        return {
+            "success": True,
+            "strategy": {
+                "id": strategy.id,
+                "author": strategy.author,
+                "name": strategy.name,
+                "description": strategy.description,
+                "followers": strategy.followers,
+                "rating": strategy.rating,
+                "created_at": strategy.created_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error publishing strategy: {str(e)}")
+
+
+@app.post("/api/v2/social/follow")
+@limiter.limit("10/minute")
+async def follow_strategy_v2(request: Request, body: FollowStrategyRequest):
+    """Follow/copy strategy."""
+    try:
+        result = await trading_automation.social_trading_platform.follow_strategy(
+            body.user_id, body.strategy_id, body.allocation
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error following strategy: {str(e)}")
+
+
+@app.get("/api/v2/social/leaderboard")
+@limiter.limit("30/minute")
+def get_leaderboard_v2(request: Request):
+    """Get strategy leaderboard."""
+    try:
+        leaderboard = trading_automation.social_trading_platform.generate_leaderboard()
+        return {"success": True, "leaderboard": leaderboard}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting leaderboard: {str(e)}")
+
+
+@app.post("/api/v2/social/rate")
+@limiter.limit("10/minute")
+def rate_strategy_v2(request: Request, body: RateStrategyRequest):
+    """Rate strategy."""
+    try:
+        result = trading_automation.social_trading_platform.rate_strategy(
+            body.strategy_id, body.rating, body.review
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error rating strategy: {str(e)}")
+
+
+# ============================================================================
+# PHASE 17: BROKER INTEGRATION ROUTES
+# ============================================================================
+
+@app.post("/api/v2/brokers/connect")
+@limiter.limit("5/minute")
+async def connect_broker_v2(request: Request, body: BrokerConnectRequest):
+    """Connect to broker."""
+    try:
+        if body.broker_name.lower() == "alpaca":
+            broker = await trading_automation.broker_integration.connect_alpaca(
+                body.api_key, body.api_secret or ""
+            )
+        elif body.broker_name.lower() == "interactive brokers" or body.broker_name.lower() == "ib":
+            broker = await trading_automation.broker_integration.connect_ib(
+                body.account_id or "", body.api_key
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported broker")
+        
+        return {
+            "success": True,
+            "broker": {
+                "name": broker.name,
+                "connected": broker.connected,
+                "assets": broker.assets,
+                "features": broker.features
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error connecting to broker: {str(e)}")
+
+
+@app.post("/api/v2/brokers/orders")
+@limiter.limit("20/minute")
+async def place_broker_order_v2(request: Request, body: BrokerOrderRequest):
+    """Place order with broker."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        result = await trading_automation.broker_integration.place_order(
+            broker_name=body.broker_name,
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            price=body.price,
+            order_type=body.order_type
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error placing broker order: {str(e)}")
+
+
+@app.post("/api/v2/brokers/sync")
+@limiter.limit("10/minute")
+async def sync_broker_v2(request: Request, body: BrokerSyncRequest):
+    """Sync broker account."""
+    try:
+        account = await trading_automation.broker_integration.sync_broker_account(body.broker_name)
+        return {
+            "success": True,
+            "account": {
+                "account_id": account.account_id,
+                "broker": account.broker,
+                "equity": round(account.equity, 2),
+                "cash": round(account.cash, 2),
+                "buying_power": round(account.buying_power, 2),
+                "portfolio": account.portfolio,
+                "synced_at": account.synced_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error syncing broker account: {str(e)}")
+
+
+@app.get("/api/v2/brokers/positions/{broker_name}")
+@limiter.limit("10/minute")
+def get_broker_positions_v2(request: Request, broker_name: str):
+    """Get broker account positions."""
+    try:
+        positions = trading_automation.broker_integration.get_positions(broker_name)
+        return positions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting positions: {str(e)}")
+
+
+# ============================================================================
+# PHASE 18: RISK MANAGEMENT ROUTES
+# ============================================================================
+
+@app.post("/api/v2/risk/limits")
+@limiter.limit("10/minute")
+def set_risk_limits_v2(request: Request, body: RiskLimitsRequest):
+    """Set risk limits."""
+    try:
+        limits = trading_automation.risk_management.set_risk_limits(body.model_dump())
+        return {
+            "success": True,
+            "limits": {
+                "max_position_size": limits.max_position_size,
+                "max_daily_loss": limits.max_daily_loss,
+                "max_drawdown": limits.max_drawdown,
+                "max_correlation": limits.max_correlation,
+                "max_leverage": limits.max_leverage,
+                "stop_loss_percent": limits.stop_loss_percent
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error setting risk limits: {str(e)}")
+
+
+@app.post("/api/v2/risk/var")
+@limiter.limit("20/minute")
+def calculate_var_v2(request: Request, body: VaRRequest):
+    """Calculate Value at Risk."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        # Mock returns
+        returns = [random.uniform(-0.05, 0.05) for _ in range(100)]
+        
+        var_result = trading_automation.risk_management.calculate_var(holdings, returns, body.confidence)
+        
+        return {
+            "success": True,
+            "var": {
+                "confidence": var_result.confidence,
+                "var_percent": var_result.var_percent,
+                "var_amount": var_result.var_amount,
+                "interpretation": var_result.interpretation
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating VaR: {str(e)}")
+
+
+@app.post("/api/v2/risk/cvar")
+@limiter.limit("20/minute")
+def calculate_cvar_v2(request: Request, body: CVaRRequest):
+    """Calculate Conditional Value at Risk."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        # Mock returns
+        returns = [random.uniform(-0.05, 0.05) for _ in range(100)]
+        
+        cvar_result = trading_automation.risk_management.calculate_cvar(holdings, returns, body.confidence)
+        
+        return {
+            "success": True,
+            "cvar": {
+                "confidence": cvar_result.confidence,
+                "cvar_percent": cvar_result.cvar_percent,
+                "cvar_amount": cvar_result.cvar_amount,
+                "worse_than_var": cvar_result.worse_than_var
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating CVaR: {str(e)}")
+
+
+@app.post("/api/v2/risk/stress-test")
+@limiter.limit("10/minute")
+def stress_test_v2(request: Request, body: StressTestRequest):
+    """Run stress test scenarios."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        results = trading_automation.risk_management.stress_test_scenarios(holdings)
+        
+        return {
+            "success": True,
+            "scenarios": [
+                {
+                    "scenario": r.scenario,
+                    "market_change": r.market_change,
+                    "portfolio_value": r.portfolio_value,
+                    "loss": r.loss,
+                    "loss_percent": r.loss_percent
+                }
+                for r in results
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running stress test: {str(e)}")
+
+
+@app.post("/api/v2/risk/monitor")
+@limiter.limit("30/minute")
+def risk_monitor_v2(request: Request, body: RiskMonitorRequest):
+    """Real-time risk monitoring."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        status = trading_automation.risk_management.monitor_real_time(
+            holdings, body.market_prices, body.daily_pnl
+        )
+        
+        return {
+            "success": True,
+            "status": {
+                "risk_status": status["status"],
+                "alerts": [
+                    {
+                        "type": alert.type,
+                        "message": alert.message,
+                        "action": alert.action
+                    }
+                    for alert in status["alerts"]
+                ],
+                "timestamp": status["timestamp"]
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error monitoring risk: {str(e)}")
+
+
+@app.post("/api/v2/risk/position-check")
+@limiter.limit("20/minute")
+def position_check_v2(request: Request, body: PositionCheckRequest):
+    """Check position sizing violations."""
+    try:
+        holdings = [
+            trading_automation.Holding(
+                symbol=h["symbol"],
+                quantity=h["quantity"],
+                value=h["value"],
+                purchase_price=h.get("purchase_price", h["current_price"]),
+                current_price=h["current_price"]
+            )
+            for h in body.holdings
+        ]
+        
+        violations = trading_automation.risk_management.check_position_sizing(holdings)
+        return {"success": True, "violations": violations}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking positions: {str(e)}")
 
 
 class CorrelationRequest(BaseModel):
