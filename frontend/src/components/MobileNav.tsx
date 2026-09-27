@@ -32,7 +32,7 @@ export default function MobileNav() {
   };
 
   const navItems = [...baseNavItems];
-  if (user?.role === 'admin' || user?.role === 'superuser') {
+  if (user?.roles?.includes('admin') || user?.roles?.includes('superuser')) {
     navItems.push({ icon: <Shield className="w-5 h-5 text-slate-400" />, label: 'Admin Panel', path: '/admin' });
   }
 

@@ -10,7 +10,7 @@ interface User {
   id: string;
   username: string;
   email: string;
-  role: 'user' | 'admin' | 'superuser';
+  roles: string[];
   subscription: 'free' | 'pro' | 'enterprise';
   status: 'active' | 'suspended' | 'banned';
   created_at: string;
@@ -38,7 +38,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'settings' | 'api' | 'audit' | 'billing' | 'features' | '2fa' | 'activity'>('users');
 
   useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'superuser') {
+    if (user?.roles?.includes('admin') || user?.roles?.includes('superuser')) {
       loadAdminData();
     }
   }, [user]);
@@ -51,7 +51,7 @@ export default function AdminPage() {
           id: '1',
           username: 'john_doe',
           email: 'john@example.com',
-          role: 'user',
+          roles: ['user'],
           subscription: 'pro',
           status: 'active',
           created_at: '2024-01-15T10:30:00Z',
@@ -61,7 +61,7 @@ export default function AdminPage() {
           id: '2',
           username: 'jane_smith',
           email: 'jane@example.com',
-          role: 'user',
+          roles: ['user'],
           subscription: 'free',
           status: 'active',
           created_at: '2024-02-20T14:45:00Z',
@@ -71,7 +71,7 @@ export default function AdminPage() {
           id: '3',
           username: 'admin_user',
           email: 'admin@example.com',
-          role: 'admin',
+          roles: ['admin'],
           subscription: 'enterprise',
           status: 'active',
           created_at: '2024-01-01T09:00:00Z',
@@ -99,9 +99,9 @@ export default function AdminPage() {
   };
 
   const handleUpdateRole = (userId: string, newRole: string) => {
-    setUsers(users.map(u => 
-      u.id === userId 
-        ? { ...u, role: newRole as 'user' | 'admin' | 'superuser' }
+    setUsers(users.map(u =>
+      u.id === userId
+        ? { ...u, roles: [newRole] }
         : u
     ));
   };
@@ -123,7 +123,7 @@ export default function AdminPage() {
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!user || (user.role !== 'admin' && user.role !== 'superuser')) {
+  if (!user || (!user.roles?.includes('admin') && !user.roles?.includes('superuser'))) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
@@ -286,7 +286,7 @@ export default function AdminPage() {
                             </td>
                             <td className="px-4 py-3">
                               <select
-                                value={user.role}
+                                value={user.roles[0] || 'user'}
                                 onChange={(e) => handleUpdateRole(user.id, e.target.value)}
                                 className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none"
                               >

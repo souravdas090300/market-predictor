@@ -148,7 +148,7 @@ export default function Header() {
           <Server className="w-5 h-5 text-slate-300" />
         </button>
 
-        {(user?.role === 'admin' || user?.role === 'superuser') && (
+        {(user?.roles?.includes('admin') || user?.roles?.includes('superuser')) && (
           <button
             onClick={() => window.location.href = '/admin'}
             className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
