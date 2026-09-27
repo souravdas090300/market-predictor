@@ -2701,9 +2701,12 @@ def register(request: Request, body: RegisterRequest):
 
 
 @app.post("/api/auth/login")
-@limiter.limit("10/minute")
+# @limiter.limit("10/minute")  # Temporarily disabled for debugging
 def login(request: Request, body: LoginRequest):
     """Authenticate user and return tokens."""
+    # Debug logging
+    print(f"Login attempt: username={body.username}, password_length={len(body.password)}")
+    
     # Authenticate user
     user_data = user_manager.authenticate_user(body.username, body.password)
     

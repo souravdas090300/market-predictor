@@ -23,7 +23,9 @@ export default function LoginPage() {
     setError('');
 
     try {
+      console.log('Attempting login with:', { username: formData.username, passwordLength: formData.password.length });
       const response = await authAPI.login(formData.username, formData.password);
+      console.log('Login response:', response);
       
       // Store tokens
       localStorage.setItem('access_token', response.access_token);
@@ -36,7 +38,9 @@ export default function LoginPage() {
       // Redirect to dashboard
       router.push('/');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+      console.error('Login error:', err);
+      console.error('Error response:', err.response);
+      setError(err.response?.data?.detail || err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
