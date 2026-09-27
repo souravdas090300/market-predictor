@@ -24,7 +24,7 @@ class BatchPredictionService:
             try:
                 with open(self.batch_results_file) as f:
                     self.batch_results = json.load(f)
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, IOError):
                 self.batch_results = {}
         else:
             self.batch_results = {}

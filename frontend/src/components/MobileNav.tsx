@@ -2,24 +2,28 @@
 
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Menu, X, Home, Settings, BarChart3, Newspaper, Calculator, Zap, Grid3x3, TrendingUp, Activity, LayoutGrid, Scale } from 'lucide-react';
+import { Menu, X, Home, Settings, BarChart3, Newspaper, Calculator, Zap, Grid3x3, TrendingUp, Activity, LayoutGrid, Scale, Bell, Wallet, Shield, Gauge, Server } from 'lucide-react';
 
 export default function MobileNav() {
-  const { sidebarOpen, setSidebarOpen, setCurrentSymbol } = useStore();
+  const { sidebarOpen, setSidebarOpen, setCurrentSymbol, user } = useStore();
   const [isOpen, setIsOpen] = useState(false);
 
-  const navItems = [
-    { icon: Home, label: 'Dashboard', path: '/' },
-    { icon: LayoutGrid, label: 'All Assets', path: '/assets' },
-    { icon: Scale, label: 'Asset Comparison', path: '/asset-comparison' },
-    { icon: BarChart3, label: 'Model Training', path: '/model-training' },
-    { icon: Calculator, label: 'Risk Calculator', path: '/risk-calculator' },
-    { icon: Zap, label: 'Strategy Optimizer', path: '/strategy-optimizer' },
-    { icon: Grid3x3, label: 'Correlation', path: '/correlation' },
-    { icon: Newspaper, label: 'News Feed', path: '/news' },
-    { icon: Activity, label: 'Model Performance', path: '/model-performance' },
-    { icon: Zap, label: 'System Status', path: '/status' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+  const baseNavItems = [
+    { icon: <Home className="w-5 h-5 text-slate-400" />, label: 'Dashboard', path: '/' },
+    { icon: <LayoutGrid className="w-5 h-5 text-slate-400" />, label: 'All Assets', path: '/assets' },
+    { icon: <Scale className="w-5 h-5 text-slate-400" />, label: 'Asset Comparison', path: '/asset-comparison' },
+    { icon: <BarChart3 className="w-5 h-5 text-slate-400" />, label: 'Model Training', path: '/model-training' },
+    { icon: <Calculator className="w-5 h-5 text-slate-400" />, label: 'Risk Calculator', path: '/risk-calculator' },
+    { icon: <Zap className="w-5 h-5 text-slate-400" />, label: 'Strategy Optimizer', path: '/strategy-optimizer' },
+    { icon: <Grid3x3 className="w-5 h-5 text-slate-400" />, label: 'Correlation', path: '/correlation' },
+    { icon: <Newspaper className="w-5 h-5 text-slate-400" />, label: 'News Feed', path: '/news' },
+    { icon: <Activity className="w-5 h-5 text-slate-400" />, label: 'Model Performance', path: '/model-performance' },
+    { icon: <Bell className="w-5 h-5 text-slate-400" />, label: 'Alerts', path: '/alerts' },
+    { icon: <TrendingUp className="w-5 h-5 text-slate-400" />, label: 'Backtest', path: '/backtest' },
+    { icon: <Wallet className="w-5 h-5 text-slate-400" />, label: 'Portfolio', path: '/portfolio' },
+    { icon: <Gauge className="w-5 h-5 text-slate-400" />, label: 'Rate Limits', path: '/rate-limits' },
+    { icon: <Server className="w-5 h-5 text-slate-400" />, label: 'System Status', path: '/status' },
+    { icon: <Settings className="w-5 h-5 text-slate-400" />, label: 'Settings', path: '/settings' },
   ];
 
   const handleNav = (path: string) => {
@@ -27,9 +31,13 @@ export default function MobileNav() {
     setIsOpen(false);
   };
 
+  const navItems = [...baseNavItems];
+  if (user?.role === 'admin' || user?.role === 'superuser') {
+    navItems.push({ icon: <Shield className="w-5 h-5 text-slate-400" />, label: 'Admin Panel', path: '/admin' });
+  }
+
   return (
     <>
-      {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
         className="lg:hidden fixed bottom-4 right-4 z-50 p-3 bg-green-600 rounded-full shadow-lg"
@@ -37,7 +45,6 @@ export default function MobileNav() {
         <Menu className="w-6 h-6 text-white" />
       </button>
 
-      {/* Mobile menu overlay */}
       {isOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsOpen(false)} />
@@ -62,7 +69,7 @@ export default function MobileNav() {
                   onClick={() => handleNav(item.path)}
                   className="w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-slate-800 transition-colors"
                 >
-                  <item.icon className="w-5 h-5 text-slate-400" />
+                  {item.icon}
                   <span className="text-white">{item.label}</span>
                 </button>
               ))}

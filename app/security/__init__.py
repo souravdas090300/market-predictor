@@ -4,7 +4,7 @@ import secrets
 import hashlib
 import hmac
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from pathlib import Path
 import jwt
@@ -33,7 +33,7 @@ try:
     redis_client = redis.from_url(REDIS_URL, decode_responses=True)
     redis_client.ping()
     USE_REDIS = True
-except:
+except (redis.ConnectionError, redis.TimeoutError, Exception):
     redis_client = None
     USE_REDIS = False
     # Fallback to in-memory storage
@@ -83,7 +83,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.UTC),
         "type": "access"
     })
     
@@ -98,7 +98,7 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     
     to_encode.update({
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.UTC),
         "type": "refresh",
         "jti": secrets.token_urlsafe(16)  # Unique identifier for refresh token
     })
@@ -210,7 +210,7 @@ def rate_limit_decorator(max_requests: int = 100, window: int = 60):
     """Decorator for rate limiting endpoints."""
     def decorator(func):
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def async_wrapper(*args, **kwargs):
             # Get client identifier (IP or user)
             # This is a simplified version - in production you'd get this from request headers
             client_id = "default"  # In production, use request.client.host or user ID
@@ -241,7 +241,46 @@ def rate_limit_decorator(max_requests: int = 100, window: int = 60):
                 result.headers["X-RateLimit-Reset"] = str(int(time.time()) + window)
             
             return result
-        return wrapper
+        
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            # Get client identifier (IP or user)
+            # This is a simplified version - in production you'd get this from request headers
+            client_id = "default"  # In production, use request.client.host or user ID
+            
+            rate_limiter.max_requests = max_requests
+            rate_limiter.window = window
+            
+            if not rate_limiter.is_allowed(client_id):
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Rate limit exceeded. Max {max_requests} requests per {window} seconds.",
+                    headers={
+                        "X-RateLimit-Limit": str(max_requests),
+                        "X-RateLimit-Remaining": "0",
+                        "X-RateLimit-Reset": str(int(time.time()) + window)
+                    }
+                )
+            
+            remaining = rate_limiter.get_remaining(client_id)
+            
+            # Continue with the function
+            result = func(*args, **kwargs)
+            
+            # Add rate limit headers to response
+            if hasattr(result, 'headers'):
+                result.headers["X-RateLimit-Limit"] = str(max_requests)
+                result.headers["X-RateLimit-Remaining"] = str(remaining)
+                result.headers["X-RateLimit-Reset"] = str(int(time.time()) + window)
+            
+            return result
+        
+        # Return appropriate wrapper based on whether the function is async
+        import asyncio
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        else:
+            return sync_wrapper
     return decorator
 
 
@@ -262,7 +301,7 @@ class APIKeyManager:
             try:
                 with open(api_keys_file) as f:
                     self.api_keys = json.load(f)
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, IOError):
                 self.api_keys = {}
     
     def _save_api_keys(self):
@@ -288,7 +327,7 @@ class APIKeyManager:
             "user_id": user_id,
             "name": name,
             "scopes": scopes,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.UTC).isoformat(),
             "last_used": None,
             "is_active": True
         }
@@ -305,7 +344,7 @@ class APIKeyManager:
         
         if key_hash in self.api_keys and self.api_keys[key_hash]["is_active"]:
             # Update last used
-            self.api_keys[key_hash]["last_used"] = datetime.utcnow().isoformat()
+            self.api_keys[key_hash]["last_used"] = datetime.now(timezone.UTC).isoformat()
             self._save_api_keys()
             return self.api_keys[key_hash]
         
@@ -381,7 +420,7 @@ def validate_url(url: str) -> bool:
             return False
         
         return True
-    except:
+    except (ValueError, IndexError, AttributeError):
         return False
 
 
@@ -428,9 +467,9 @@ class SessionManager:
         session_data = {
             "user_id": user_id,
             "user_data": user_data,
-            "created_at": datetime.utcnow().isoformat(),
-            "last_activity": datetime.utcnow().isoformat(),
-            "expires_at": (datetime.utcnow() + timedelta(hours=24)).isoformat()
+            "created_at": datetime.now(timezone.UTC).isoformat(),
+            "last_activity": datetime.now(timezone.UTC).isoformat(),
+            "expires_at": (datetime.now(timezone.UTC) + timedelta(hours=24)).isoformat()
         }
         
         self.sessions[session_id] = session_data
@@ -445,15 +484,15 @@ class SessionManager:
         # Check if expired
         try:
             expires_at = datetime.fromisoformat(session["expires_at"])
-            if datetime.utcnow() > expires_at:
+            if datetime.now(timezone.UTC) > expires_at:
                 del self.sessions[session_id]
                 return None
-        except:
+        except (ValueError, KeyError, TypeError):
             del self.sessions[session_id]
             return None
         
         # Update last activity
-        session["last_activity"] = datetime.utcnow().isoformat()
+        session["last_activity"] = datetime.now(timezone.UTC).isoformat()
         return session
     
     def delete_session(self, session_id: str) -> bool:
@@ -465,7 +504,7 @@ class SessionManager:
     
     def cleanup_expired_sessions(self):
         """Clean up expired sessions."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.UTC)
         expired_sessions = [
             session_id for session_id, session in self.sessions.items()
             if datetime.fromisoformat(session["expires_at"]) < now

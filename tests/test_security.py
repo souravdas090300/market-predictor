@@ -1,8 +1,23 @@
 """Security tests for authentication, rate limiting, and input validation."""
 import pytest
 import secrets
-from app.security import get_current_active_user
+from app.security import get_current_active_user, verify_password as sec_verify_password, get_password_hash as sec_get_password_hash, create_access_token as sec_create_access_token, decode_token as sec_decode_token, AuthenticationError as sec_AuthenticationError, sanitize_symbol as sec_sanitize_symbol, validate_url as sec_validate_url, sanitize_text as sec_sanitize_text, RateLimiter as sec_RateLimiter, APIKeyManager as sec_APIKeyManager, SessionManager as sec_SessionManager, get_security_headers as sec_get_security_headers
 from app.auth import UserManager, user_manager
+
+# Create a convenience namespace for backward compatibility
+class sec:
+    verify_password = staticmethod(sec_verify_password)
+    get_password_hash = staticmethod(sec_get_password_hash)
+    create_access_token = staticmethod(sec_create_access_token)
+    decode_token = staticmethod(sec_decode_token)
+    AuthenticationError = sec_AuthenticationError
+    sanitize_symbol = staticmethod(sec_sanitize_symbol)
+    validate_url = staticmethod(sec_validate_url)
+    sanitize_text = staticmethod(sec_sanitize_text)
+    RateLimiter = sec_RateLimiter
+    APIKeyManager = sec_APIKeyManager
+    SessionManager = sec_SessionManager
+    get_security_headers = staticmethod(sec_get_security_headers)
 
 
 class TestPasswordHashing:

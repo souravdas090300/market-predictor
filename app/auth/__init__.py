@@ -2,7 +2,7 @@
 import os
 import secrets
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import json
 import hashlib
@@ -47,7 +47,7 @@ class UserManager:
             try:
                 with open(USERS_FILE) as f:
                     self.users = json.load(f)
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, IOError):
                 self.users = {}
     
     def _save_users(self):
@@ -81,8 +81,8 @@ class UserManager:
             "username": username,
             "email": email,
             "hashed_password": hashed_password,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.UTC).isoformat(),
+            "updated_at": datetime.now(timezone.UTC).isoformat(),
             "is_active": True,
             "disabled": False,
             "roles": ["user"],
@@ -97,7 +97,7 @@ class UserManager:
             "subscription": {
                 "plan": "free",
                 "status": "active",
-                "start_date": datetime.utcnow().isoformat(),
+                "start_date": datetime.now(timezone.UTC).isoformat(),
                 "expiry_date": None,
                 "auto_renew": False
             },
@@ -147,7 +147,7 @@ class UserManager:
             return None
         
         # Update last login
-        user["last_login"] = datetime.utcnow().isoformat()
+        user["last_login"] = datetime.now(timezone.UTC).isoformat()
         self._save_users()
         
         # Log security event
@@ -163,7 +163,7 @@ class UserManager:
                 user["is_admin"] = True
             else:
                 user["is_admin"] = False
-        except:
+        except (ImportError, AttributeError, Exception):
             user["is_admin"] = False
         
         return user
@@ -198,7 +198,7 @@ class UserManager:
             return False
         
         user["disabled"] = True
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.UTC).isoformat()
         self._save_users()
         
         # Log security event
@@ -509,17 +509,24 @@ user_manager = UserManager()
 
 
 # Create demo user for testing
+_demo_user_initialized = False
+
 def ensure_demo_user():
     """Ensure demo user exists for testing."""
+    global _demo_user_initialized
+    if _demo_user_initialized:
+        return
+    
     try:
         user_manager.create_user(
             username="demo",
             email="demo@marketpredictor.com",
             password="demo12345"  # Meets minimum 8 character requirement
         )
+        _demo_user_initialized = True
     except ValueError:
         # User already exists
-        pass
+        _demo_user_initialized = True
 
 
 # Initialize demo user on import

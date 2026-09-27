@@ -30,7 +30,7 @@ class AdminManager:
             try:
                 with open(ADMIN_CONFIG_FILE) as f:
                     return json.load(f)
-            except:
+            except (FileNotFoundError, json.JSONDecodeError, IOError):
                 pass
         
         # Default configuration

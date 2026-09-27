@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from typing import Optional, Dict, Any
 
 from .core import config
 from .services import batch_prediction
@@ -430,6 +431,561 @@ def disable_user_account(request: Request, username: str, current_user: dict = D
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error disabling user: {str(e)}")
+
+
+# Phase 9: Audit Logs endpoints
+@admin_app.get("/audit/logs")
+@admin_limiter.limit("30/minute")
+def get_audit_logs(
+    request: Request,
+    limit: int = 100,
+    offset: int = 0,
+    action_type: Optional[str] = None,
+    admin_user: Optional[str] = None,
+    target_user: Optional[str] = None,
+    severity: Optional[str] = None,
+    current_user: dict = Depends(admin_required)
+):
+    """Get audit logs with filtering."""
+    try:
+        from .admin.audit import audit_logger, AuditActionType, AuditSeverity
+        
+        # Convert string parameters to enums if provided
+        action_enum = AuditActionType(action_type) if action_type else None
+        severity_enum = AuditSeverity(severity) if severity else None
+        
+        logs = audit_logger.get_logs(
+            limit=limit,
+            offset=offset,
+            action_type=action_enum,
+            admin_user=admin_user,
+            target_user=target_user,
+            severity=severity_enum
+        )
+        
+        return {
+            "logs": logs,
+            "total": audit_logger.get_log_count(
+                action_type=action_enum,
+                admin_user=admin_user,
+                target_user=target_user,
+                severity=severity_enum
+            )
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting audit logs: {str(e)}")
+
+
+@admin_app.get("/audit/statistics")
+@admin_limiter.limit("30/minute")
+def get_audit_statistics(
+    request: Request,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get audit log statistics."""
+    try:
+        from .admin.audit import audit_logger
+        stats = audit_logger.get_statistics(days=days)
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting audit statistics: {str(e)}")
+
+
+@admin_app.post("/audit/export")
+@admin_limiter.limit("10/minute")
+def export_audit_logs(
+    request: Request,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    format: str = "json",
+    current_user: dict = Depends(admin_required)
+):
+    """Export audit logs."""
+    try:
+        from .admin.audit import audit_logger
+        export_file = audit_logger.export_logs(
+            start_date=start_date,
+            end_date=end_date,
+            format=format
+        )
+        
+        log_security_event("AUDIT_LOGS_EXPORTED", {
+            "admin": current_user["username"],
+            "format": format,
+            "start_date": start_date,
+            "end_date": end_date
+        })
+        
+        return {
+            "message": "Audit logs exported successfully",
+            "file": export_file
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting audit logs: {str(e)}")
+
+
+# Phase 9: Billing Analytics endpoints
+@admin_app.get("/billing/metrics")
+@admin_limiter.limit("30/minute")
+def get_billing_metrics(
+    request: Request,
+    current_user: dict = Depends(admin_required)
+):
+    """Get current billing metrics."""
+    try:
+        from .admin.billing import billing_analytics
+        metrics = billing_analytics.calculate_daily_metrics()
+        return metrics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting billing metrics: {str(e)}")
+
+
+@admin_app.get("/billing/churn")
+@admin_limiter.limit("30/minute")
+def get_churn_rate(
+    request: Request,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get churn rate analysis."""
+    try:
+        from .admin.billing import billing_analytics
+        churn = billing_analytics.calculate_churn_rate(days=days)
+        return churn
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting churn rate: {str(e)}")
+
+
+@admin_app.get("/billing/ltv")
+@admin_limiter.limit("30/minute")
+def get_ltv(
+    request: Request,
+    current_user: dict = Depends(admin_required)
+):
+    """Get Lifetime Value analysis."""
+    try:
+        from .admin.billing import billing_analytics
+        ltv = billing_analytics.calculate_ltv()
+        return ltv
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting LTV: {str(e)}")
+
+
+@admin_app.get("/billing/trend")
+@admin_limiter.limit("30/minute")
+def get_revenue_trend(
+    request: Request,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get revenue trend."""
+    try:
+        from .admin.billing import billing_analytics
+        trend = billing_analytics.get_revenue_trend(days=days)
+        return trend
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting revenue trend: {str(e)}")
+
+
+@admin_app.get("/billing/funnel")
+@admin_limiter.limit("30/minute")
+def get_subscription_funnel(
+    request: Request,
+    current_user: dict = Depends(admin_required)
+):
+    """Get subscription conversion funnel."""
+    try:
+        from .admin.billing import billing_analytics
+        funnel = billing_analytics.get_subscription_funnel()
+        return funnel
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting subscription funnel: {str(e)}")
+
+
+@admin_app.get("/billing/report")
+@admin_limiter.limit("10/minute")
+def get_billing_report(
+    request: Request,
+    period: str = "monthly",
+    current_user: dict = Depends(admin_required)
+):
+    """Generate comprehensive billing report."""
+    try:
+        from .admin.billing import billing_analytics, BillingPeriod
+        report = billing_analytics.generate_billing_report(BillingPeriod(period))
+        return report
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating billing report: {str(e)}")
+
+
+# Phase 9: Feature Limits endpoints
+@admin_app.get("/features/limits")
+@admin_limiter.limit("30/minute")
+def get_feature_limits(
+    request: Request,
+    plan: Optional[str] = None,
+    current_user: dict = Depends(admin_required)
+):
+    """Get feature limits by plan or comparison."""
+    try:
+        from .admin.feature_limits import feature_limits_manager, SubscriptionPlan
+        
+        if plan:
+            limits = feature_limits_manager.get_user_limits(SubscriptionPlan(plan))
+        else:
+            limits = feature_limits_manager.get_feature_comparison()
+        
+        return limits
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting feature limits: {str(e)}")
+
+
+@admin_app.put("/features/limit")
+@admin_limiter.limit("10/minute")
+def update_feature_limit(
+    request: Request,
+    feature: str,
+    plan: str,
+    new_limit: int,
+    current_user: dict = Depends(admin_required)
+):
+    """Update feature limit for a plan."""
+    try:
+        from .admin.feature_limits import feature_limits_manager, FeatureType, SubscriptionPlan
+        
+        success = feature_limits_manager.update_limit(
+            FeatureType(feature),
+            SubscriptionPlan(plan),
+            new_limit
+        )
+        
+        if not success:
+            raise HTTPException(status_code=400, detail="Failed to update feature limit")
+        
+        log_security_event("FEATURE_LIMIT_UPDATED", {
+            "feature": feature,
+            "plan": plan,
+            "new_limit": new_limit,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"Feature limit updated for {feature} in {plan} plan",
+            "feature": feature,
+            "plan": plan,
+            "new_limit": new_limit
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating feature limit: {str(e)}")
+
+
+@admin_app.get("/features/check")
+@admin_limiter.limit("60/minute")
+def check_feature_access(
+    request: Request,
+    feature: str,
+    plan: str,
+    current_usage: int = 0,
+    current_user: dict = Depends(admin_required)
+):
+    """Check if a plan has access to a feature and within limits."""
+    try:
+        from .admin.feature_limits import feature_limits_manager, FeatureType, SubscriptionPlan
+        
+        result = feature_limits_manager.check_limit(
+            FeatureType(feature),
+            SubscriptionPlan(plan),
+            current_usage
+        )
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking feature access: {str(e)}")
+
+
+# Phase 9: Two-Factor Authentication endpoints
+@admin_app.post("/2fa/setup")
+@admin_limiter.limit("10/minute")
+def setup_2fa(
+    request: Request,
+    user_id: str,
+    method: str = "totp",
+    current_user: dict = Depends(admin_required)
+):
+    """Setup 2FA for a user."""
+    try:
+        from .admin.two_factor import two_factor_manager, TwoFactorMethod
+        
+        result = two_factor_manager.setup_2fa(
+            user_id=user_id,
+            method=TwoFactorMethod(method)
+        )
+        
+        log_security_event("2FA_SETUP", {
+            "target_user": user_id,
+            "method": method,
+            "admin": current_user["username"]
+        })
+        
+        return result
+    except ImportError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error setting up 2FA: {str(e)}")
+
+
+@admin_app.post("/2fa/verify")
+@admin_limiter.limit("30/minute")
+def verify_2fa_setup(
+    request: Request,
+    user_id: str,
+    code: str,
+    current_user: dict = Depends(admin_required)
+):
+    """Verify 2FA setup and enable it."""
+    try:
+        from .admin.two_factor import two_factor_manager
+        result = two_factor_manager.verify_2fa_setup(user_id, code)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error verifying 2FA: {str(e)}")
+
+
+@admin_app.post("/2fa/login")
+@admin_limiter.limit("30/minute")
+def verify_2fa_login(
+    request: Request,
+    user_id: str,
+    code: str,
+    current_user: dict = Depends(admin_required)
+):
+    """Verify 2FA during login."""
+    try:
+        from .admin.two_factor import two_factor_manager
+        result = two_factor_manager.verify_2fa_login(user_id, code)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error verifying 2FA login: {str(e)}")
+
+
+@admin_app.delete("/2fa/disable")
+@admin_limiter.limit("10/minute")
+def disable_2fa(
+    request: Request,
+    user_id: str,
+    code: str,
+    current_user: dict = Depends(admin_required)
+):
+    """Disable 2FA for a user."""
+    try:
+        from .admin.two_factor import two_factor_manager
+        result = two_factor_manager.disable_2fa(user_id, code)
+        
+        log_security_event("2FA_DISABLED", {
+            "target_user": user_id,
+            "admin": current_user["username"]
+        })
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error disabling 2FA: {str(e)}")
+
+
+@admin_app.get("/2fa/status")
+@admin_limiter.limit("30/minute")
+def get_2fa_status(
+    request: Request,
+    user_id: str,
+    current_user: dict = Depends(admin_required)
+):
+    """Get 2FA status for a user."""
+    try:
+        from .admin.two_factor import two_factor_manager
+        status = two_factor_manager.get_2fa_status(user_id)
+        
+        if not status:
+            raise HTTPException(status_code=404, detail="2FA not configured for this user")
+        
+        return status
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting 2FA status: {str(e)}")
+
+
+@admin_app.post("/2fa/backup-codes/regenerate")
+@admin_limiter.limit("10/minute")
+def regenerate_backup_codes(
+    request: Request,
+    user_id: str,
+    code: str,
+    current_user: dict = Depends(admin_required)
+):
+    """Regenerate backup codes for 2FA."""
+    try:
+        from .admin.two_factor import two_factor_manager
+        result = two_factor_manager.regenerate_backup_codes(user_id, code)
+        
+        log_security_event("2FA_BACKUP_CODES_REGENERATED", {
+            "target_user": user_id,
+            "admin": current_user["username"]
+        })
+        
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error regenerating backup codes: {str(e)}")
+
+
+# Phase 9: Activity Analytics endpoints
+@admin_app.get("/activity/summary")
+@admin_limiter.limit("30/minute")
+def get_activity_summary(
+    request: Request,
+    days: int = 30,
+    user_id: Optional[str] = None,
+    current_user: dict = Depends(admin_required)
+):
+    """Get activity summary."""
+    try:
+        from .admin.activity import activity_analytics
+        summary = activity_analytics.get_activity_summary(days=days, user_id=user_id)
+        return summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting activity summary: {str(e)}")
+
+
+@admin_app.get("/activity/engagement")
+@admin_limiter.limit("30/minute")
+def get_engagement_metrics(
+    request: Request,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get user engagement metrics."""
+    try:
+        from .admin.activity import activity_analytics
+        metrics = activity_analytics.get_engagement_metrics(days=days)
+        return metrics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting engagement metrics: {str(e)}")
+
+
+@admin_app.get("/activity/features")
+@admin_limiter.limit("30/minute")
+def get_feature_usage(
+    request: Request,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get feature usage statistics."""
+    try:
+        from .admin.activity import activity_analytics
+        usage = activity_analytics.get_feature_usage(days=days)
+        return usage
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting feature usage: {str(e)}")
+
+
+@admin_app.get("/activity/user/{user_id}")
+@admin_limiter.limit("30/minute")
+def get_user_activity(
+    request: Request,
+    user_id: str,
+    limit: int = 100,
+    current_user: dict = Depends(admin_required)
+):
+    """Get activity for a specific user."""
+    try:
+        from .admin.activity import activity_analytics
+        activity = activity_analytics.get_user_activity(user_id, limit=limit)
+        return {
+            "user_id": user_id,
+            "activity": activity,
+            "total": len(activity)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting user activity: {str(e)}")
+
+
+@admin_app.get("/activity/sessions/{user_id}")
+@admin_limiter.limit("30/minute")
+def get_user_sessions(
+    request: Request,
+    user_id: str,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get user sessions."""
+    try:
+        from .admin.activity import activity_analytics
+        sessions = activity_analytics.get_user_sessions(user_id, days=days)
+        return {
+            "user_id": user_id,
+            "sessions": sessions,
+            "total": len(sessions)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting user sessions: {str(e)}")
+
+
+@admin_app.get("/activity/top-users")
+@admin_limiter.limit("30/minute")
+def get_top_users(
+    request: Request,
+    days: int = 30,
+    limit: int = 10,
+    current_user: dict = Depends(admin_required)
+):
+    """Get top users by activity."""
+    try:
+        from .admin.activity import activity_analytics
+        top_users = activity_analytics.get_top_users(days=days, limit=limit)
+        return top_users
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting top users: {str(e)}")
+
+
+@admin_app.get("/activity/time-distribution")
+@admin_limiter.limit("30/minute")
+def get_time_distribution(
+    request: Request,
+    days: int = 30,
+    current_user: dict = Depends(admin_required)
+):
+    """Get activity time distribution."""
+    try:
+        from .admin.activity import activity_analytics
+        distribution = activity_analytics.get_time_distribution(days=days)
+        return distribution
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting time distribution: {str(e)}")
+
+
+@admin_app.post("/activity/track")
+@admin_limiter.limit("60/minute")
+def track_activity(
+    request: Request,
+    user_id: str,
+    activity_type: str,
+    details: Optional[Dict[str, Any]] = None,
+    current_user: dict = Depends(admin_required)
+):
+    """Track a user activity event."""
+    try:
+        from .admin.activity import activity_analytics, ActivityType
+        event = activity_analytics.track_activity(
+            user_id=user_id,
+            activity_type=ActivityType(activity_type),
+            details=details,
+            ip_address=request.client.host
+        )
+        return {
+            "message": "Activity tracked successfully",
+            "event_id": event.id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error tracking activity: {str(e)}")
 
 
 # Health check endpoint

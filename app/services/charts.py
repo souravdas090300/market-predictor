@@ -196,8 +196,13 @@ class TechnicalIndicators:
         delta = data.diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        rs = gain / loss
-        return 100 - (100 / (1 + rs))
+        
+        # Handle division by zero
+        rs = gain / loss.replace(0, np.nan)
+        rsi = 100 - (100 / (1 + rs))
+        
+        # Replace NaN values with 50 (neutral RSI)
+        return rsi.fillna(50)
     
     @staticmethod
     def calculate_macd(data: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> Dict[str, pd.Series]:
@@ -257,60 +262,119 @@ def generate_chart_data(symbol: str, ohlc_data: pd.DataFrame, patterns: List[Dic
     if not isinstance(ohlc_data.index, pd.DatetimeIndex):
         ohlc_data.index = pd.to_datetime(ohlc_data.index)
     
-    # Create chart object
-    chart = CandlestickChart(symbol, ohlc_data)
-    
-    # Generate Plotly chart JSON
-    chart_json = chart.to_json(indicators=['ma', 'bollinger'])
-    
-    # Calculate indicators
-    indicators = {
-        'rsi': TechnicalIndicators.calculate_rsi(ohlc_data['close']).iloc[-1],
-        'macd': TechnicalIndicators.calculate_macd(ohlc_data['close']),
-        'bollinger': TechnicalIndicators.calculate_bollinger_bands(ohlc_data['close']),
-        'atr': TechnicalIndicators.calculate_atr(ohlc_data).iloc[-1]
-    }
-    
-    # Format data for frontend
-    ohlc_array = []
-    for idx, row in ohlc_data.tail(60).iterrows():
-        ohlc_array.append({
-            'date': idx.strftime('%Y-%m-%d'),
-            'open': float(row['open']),
-            'high': float(row['high']),
-            'low': float(row['low']),
-            'close': float(row['close']),
-            'volume': float(row.get('volume', 0))
-        })
-    
-    # Format patterns
-    formatted_patterns = []
-    if patterns:
-        for pattern in patterns[-10:]:  # Last 10 patterns
-            formatted_patterns.append({
-                'date': pattern.get('date'),
-                'pattern': pattern.get('pattern'),
-                'bias': pattern.get('bias'),
-                'meaning': pattern.get('meaning')
-            })
-    
-    return {
-        'symbol': symbol,
-        'chart_json': chart_json,
-        'ohlc_data': ohlc_array,
-        'patterns': formatted_patterns,
-        'indicators': {
-            'rsi': float(indicators['rsi']),
-            'macd': {
-                'value': float(indicators['macd']['macd'].iloc[-1]),
-                'signal': float(indicators['macd']['signal'].iloc[-1]),
-                'histogram': float(indicators['macd']['histogram'].iloc[-1])
-            },
-            'bollinger': {
-                'upper': float(indicators['bollinger']['upper'].iloc[-1]),
-                'middle': float(indicators['bollinger']['middle'].iloc[-1]),
-                'lower': float(indicators['bollinger']['lower'].iloc[-1])
-            },
-            'atr': float(indicators['atr'])
+    # Check if data is empty
+    if ohlc_data.empty:
+        return {
+            'symbol': symbol,
+            'error': 'No data available',
+            'ohlc_data': [],
+            'patterns': [],
+            'indicators': {
+                'rsi': 50.0,
+                'macd': {'value': 0.0, 'signal': 0.0, 'histogram': 0.0},
+                'bollinger': {'upper': 0.0, 'middle': 0.0, 'lower': 0.0},
+                'atr': 0.0
+            }
         }
-    }
+    
+    try:
+        # Create chart object
+        chart = CandlestickChart(symbol, ohlc_data)
+        
+        # Generate Plotly chart JSON
+        chart_json = chart.to_json(indicators=['ma', 'bollinger'])
+        
+        # Calculate indicators with error handling
+        indicators = {
+            'rsi': 50.0,
+            'macd': {'macd': pd.Series([0.0]), 'signal': pd.Series([0.0]), 'histogram': pd.Series([0.0])},
+            'bollinger': {'upper': pd.Series([0.0]), 'middle': pd.Series([0.0]), 'lower': pd.Series([0.0])},
+            'atr': 0.0
+        }
+        
+        try:
+            rsi_series = TechnicalIndicators.calculate_rsi(ohlc_data['close'])
+            indicators['rsi'] = float(rsi_series.iloc[-1]) if len(rsi_series) > 0 else 50.0
+        except Exception:
+            pass
+        
+        try:
+            macd_data = TechnicalIndicators.calculate_macd(ohlc_data['close'])
+            indicators['macd'] = {
+                'value': float(macd_data['macd'].iloc[-1]) if len(macd_data['macd']) > 0 else 0.0,
+                'signal': float(macd_data['signal'].iloc[-1]) if len(macd_data['signal']) > 0 else 0.0,
+                'histogram': float(macd_data['histogram'].iloc[-1]) if len(macd_data['histogram']) > 0 else 0.0
+            }
+        except Exception:
+            pass
+        
+        try:
+            bollinger_data = TechnicalIndicators.calculate_bollinger_bands(ohlc_data['close'])
+            indicators['bollinger'] = {
+                'upper': float(bollinger_data['upper'].iloc[-1]) if len(bollinger_data['upper']) > 0 else 0.0,
+                'middle': float(bollinger_data['middle'].iloc[-1]) if len(bollinger_data['middle']) > 0 else 0.0,
+                'lower': float(bollinger_data['lower'].iloc[-1]) if len(bollinger_data['lower']) > 0 else 0.0
+            }
+        except Exception:
+            pass
+        
+        try:
+            atr_series = TechnicalIndicators.calculate_atr(ohlc_data)
+            indicators['atr'] = float(atr_series.iloc[-1]) if len(atr_series) > 0 else 0.0
+        except Exception:
+            pass
+        
+        # Format data for frontend
+        ohlc_array = []
+        for idx, row in ohlc_data.tail(60).iterrows():
+            try:
+                ohlc_array.append({
+                    'date': idx.strftime('%Y-%m-%d'),
+                    'open': float(row['open']),
+                    'high': float(row['high']),
+                    'low': float(row['low']),
+                    'close': float(row['close']),
+                    'volume': float(row.get('volume', 0))
+                })
+            except (KeyError, ValueError, TypeError):
+                continue
+        
+        # Format patterns
+        formatted_patterns = []
+        if patterns:
+            for pattern in patterns[-10:]:  # Last 10 patterns
+                try:
+                    formatted_patterns.append({
+                        'date': pattern.get('date'),
+                        'pattern': pattern.get('pattern'),
+                        'bias': pattern.get('bias'),
+                        'meaning': pattern.get('meaning')
+                    })
+                except (KeyError, AttributeError):
+                    continue
+        
+        return {
+            'symbol': symbol,
+            'chart_json': chart_json,
+            'ohlc_data': ohlc_array,
+            'patterns': formatted_patterns,
+            'indicators': {
+                'rsi': indicators['rsi'],
+                'macd': indicators['macd'],
+                'bollinger': indicators['bollinger'],
+                'atr': indicators['atr']
+            }
+        }
+    except Exception as e:
+        return {
+            'symbol': symbol,
+            'error': f'Error generating chart data: {str(e)}',
+            'ohlc_data': [],
+            'patterns': [],
+            'indicators': {
+                'rsi': 50.0,
+                'macd': {'value': 0.0, 'signal': 0.0, 'histogram': 0.0},
+                'bollinger': {'upper': 0.0, 'middle': 0.0, 'lower': 0.0},
+                'atr': 0.0
+            }
+        }

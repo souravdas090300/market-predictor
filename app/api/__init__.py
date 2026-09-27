@@ -577,6 +577,256 @@ def disable_user_account(request: Request, username: str, current_user: dict = D
         raise HTTPException(status_code=500, detail=f"Error disabling user: {str(e)}")
 
 
+# Phase 10: Asset Predictions endpoints
+@app.get("/api/predictions/assets")
+@limiter.limit("30/minute")
+def get_assets_list(request: Request):
+    """Get list of all assets with current prices and changes."""
+    try:
+        watchlist = config.WATCHLIST
+        symbols = [asset["symbol"] for asset in watchlist]
+        
+        # Get live quotes for all symbols
+        quotes = data.get_quotes(symbols)
+        
+        # Combine watchlist info with live quotes
+        assets_data = []
+        for asset in watchlist:
+            symbol = asset["symbol"]
+            quote = quotes.get(symbol)
+            
+            if quote:
+                assets_data.append({
+                    "symbol": symbol,
+                    "name": asset["name"],
+                    "class": asset["class"],
+                    "price": quote.get("price", 0),
+                    "change_pct": quote.get("change_pct", 0),
+                    "volume": quote.get("volume", 0),
+                    "high_24h": quote.get("high_24h", 0),
+                    "low_24h": quote.get("low_24h", 0),
+                    "market_cap": quote.get("market_cap"),
+                    "last_update": quote.get("timestamp", datetime.utcnow().isoformat())
+                })
+        
+        return {
+            "assets": assets_data,
+            "total": len(assets_data),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching assets list: {str(e)}")
+
+
+@app.get("/api/predictions/assets/{symbol:path}")
+@limiter.limit("30/minute")
+def get_asset_details(request: Request, symbol: str):
+    """Get detailed information for a specific asset."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol)
+        
+        # Find asset in watchlist
+        asset_info = None
+        for asset in config.WATCHLIST:
+            if asset["symbol"] == sanitized_symbol:
+                asset_info = asset
+                break
+        
+        if not asset_info:
+            raise HTTPException(status_code=404, detail=f"Asset {symbol} not found")
+        
+        # Get live quote
+        quote = data.get_live_quote(sanitized_symbol)
+        
+        if not quote:
+            raise HTTPException(status_code=502, detail=f"No live quote for {symbol}")
+        
+        return {
+            "symbol": asset_info["symbol"],
+            "name": asset_info["name"],
+            "class": asset_info["class"],
+            "price": quote.get("price", 0),
+            "change_pct": quote.get("change_pct", 0),
+            "volume": quote.get("volume", 0),
+            "high_24h": quote.get("high_24h", 0),
+            "low_24h": quote.get("low_24h", 0),
+            "market_cap": quote.get("market_cap"),
+            "last_update": quote.get("timestamp", datetime.utcnow().isoformat())
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching asset details: {str(e)}")
+
+
+@app.get("/api/predictions/assets/{symbol:path}/predictions")
+@limiter.limit("30/minute")
+def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
+    """Get AI price predictions for a specific asset."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol)
+        
+        # Validate timeframe
+        valid_timeframes = ["1h", "4h", "1d", "1w", "1m", "3m"]
+        if timeframe not in valid_timeframes:
+            raise HTTPException(status_code=400, detail=f"Invalid timeframe. Must be one of: {valid_timeframes}")
+        
+        # Get current signal data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        
+        # Get current price
+        quote = data.get_live_quote(sanitized_symbol)
+        current_price = quote.get("price", 0) if quote else signal_data.get("candles", [{}])[-1].get("c", 0)
+        
+        # Generate prediction based on signal and timeframe
+        # This is a simplified prediction logic - in production, use your ML model
+        timeframe_multiplier = {
+            "1h": 0.001,
+            "4h": 0.003,
+            "1d": 0.01,
+            "1w": 0.03,
+            "1m": 0.08,
+            "3m": 0.15
+        }.get(timeframe, 0.01)
+        
+        # Use signal probability to determine trend
+        probability_up = signal_data.get("probability_up", 0.5)
+        signal_bias = (probability_up - 0.5) * 2  # -1 to 1
+        
+        predicted_change = signal_bias * timeframe_multiplier
+        predicted_price = current_price * (1 + predicted_change)
+        
+        confidence = int(75 + abs(signal_bias) * 20)  # 75-95% confidence based on signal strength
+        trend = "bullish" if predicted_change > 0.005 else "bearish" if predicted_change < -0.005 else "neutral"
+        
+        confidence_range = current_price * timeframe_multiplier * 0.5
+        
+        return {
+            "symbol": sanitized_symbol,
+            "timeframe": timeframe,
+            "current_price": current_price,
+            "predicted_price": predicted_price,
+            "predicted_change_pct": predicted_change * 100,
+            "confidence": confidence,
+            "confidence_interval": {
+                "low": predicted_price - confidence_range,
+                "high": predicted_price + confidence_range
+            },
+            "expected_high": predicted_price + confidence_range * 0.7,
+            "expected_low": predicted_price - confidence_range * 0.7,
+            "expected_average": predicted_price,
+            "trend": trend,
+            "timestamp": datetime.utcnow().isoformat(),
+            "signal_data": {
+                "signal": signal_data.get("signal"),
+                "probability_up": signal_data.get("probability_up"),
+                "conviction": signal_data.get("conviction")
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating prediction: {str(e)}")
+
+
+@app.get("/api/predictions/assets/{symbol:path}/historical")
+@limiter.limit("30/minute")
+def get_asset_historical(request: Request, symbol: str, timeframe: str = "1d", days: int = 30):
+    """Get historical price data for a specific asset."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol)
+        
+        # Validate timeframe
+        valid_timeframes = ["1h", "4h", "1d", "1w", "1m"]
+        if timeframe not in valid_timeframes:
+            raise HTTPException(status_code=400, detail=f"Invalid timeframe. Must be one of: {valid_timeframes}")
+        
+        # Validate days
+        if days < 1 or days > 365:
+            raise HTTPException(status_code=400, detail="Days must be between 1 and 365")
+        
+        # Get signal data which includes candlestick data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get("candles", [])
+        
+        # Process candlestick data into historical format
+        historical_data = []
+        for candle in candles[-days:]:  # Get last N days of data
+            historical_data.append({
+                "timestamp": candle.get("t", ""),
+                "price": candle.get("c", 0),
+                "volume": candle.get("v", 0),
+                "open": candle.get("o", 0),
+                "high": candle.get("h", 0),
+                "low": candle.get("l", 0)
+            })
+        
+        return {
+            "symbol": sanitized_symbol,
+            "timeframe": timeframe,
+            "data": historical_data,
+            "total": len(historical_data),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching historical data: {str(e)}")
+
+
+@app.get("/api/predictions/compare")
+@limiter.limit("20/minute")
+def compare_assets(request: Request, symbols: str):
+    """Compare predictions for multiple assets."""
+    try:
+        symbol_list = [sanitize_symbol(s) for s in symbols.split(",") if s.strip()][:10]  # Max 10 assets
+        
+        comparison_data = []
+        for symbol in symbol_list:
+            try:
+                # Get asset details
+                quote = data.get_live_quote(symbol)
+                if not quote:
+                    continue
+                
+                # Get predictions for all timeframes
+                predictions = []
+                for timeframe in ["1h", "4h", "1d", "1w", "1m", "3m"]:
+                    try:
+                        pred_response = get_asset_predictions(request, symbol, timeframe)
+                        predictions.append({
+                            "timeframe": timeframe,
+                            "predicted_price": pred_response["predicted_price"],
+                            "change_pct": pred_response["predicted_change_pct"]
+                        })
+                    except (KeyError, HTTPException, Exception):
+                        continue
+                
+                # Find asset name
+                asset_name = symbol
+                for asset in config.WATCHLIST:
+                    if asset["symbol"] == symbol:
+                        asset_name = asset["name"]
+                        break
+                
+                comparison_data.append({
+                    "symbol": symbol,
+                    "name": asset_name,
+                    "current_price": quote.get("price", 0),
+                    "predictions": predictions
+                })
+            except (KeyError, ValueError, Exception):
+                continue
+        
+        return {
+            "comparison": comparison_data,
+            "total": len(comparison_data),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error comparing assets: {str(e)}")
+
+
 # Batch prediction endpoints (admin-only)
 @app.post("/api/admin/batch/predict")
 @limiter.limit("10/minute")
@@ -1250,24 +1500,7 @@ def health_check(request: Request):
     }
 
 
-# Favicon endpoint to prevent 404/502 errors
-@app.get("/favicon.ico")
-async def favicon():
-    """Return favicon to prevent browser errors."""
-    favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
-    if favicon_path.exists():
-        return FileResponse(favicon_path, media_type="image/png")
-    # Return empty response if favicon doesn't exist
-    return Response(status_code=204)
 
-
-@app.get("/market_predictor_favicon_32x32.png")
-async def favicon_png():
-    """Return PNG favicon directly."""
-    favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
-    if favicon_path.exists():
-        return FileResponse(favicon_path, media_type="image/png")
-    return Response(status_code=404)
 
 
 @app.get("/api/status")

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useStore } from '@/store/useStore';
-import { Menu, Search, RefreshCw, User, LogOut, Settings, Moon, Sun, Activity, LayoutGrid, BarChart3 } from 'lucide-react';
+import { Menu, Search, RefreshCw, User, LogOut, Settings, Moon, Sun, Activity, LayoutGrid, BarChart3, Bell, TrendingUp, Wallet, Shield, Gauge, Server } from 'lucide-react';
 
 export default function Header() {
   const { 
@@ -95,7 +95,7 @@ export default function Header() {
         <button
           onClick={() => window.location.href = '/assets'}
           className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-          title="All Assets Live Status"
+          title="All Assets"
         >
           <LayoutGrid className="w-5 h-5 text-slate-300" />
         </button>
@@ -109,12 +109,54 @@ export default function Header() {
         </button>
 
         <button
+          onClick={() => window.location.href = '/alerts'}
+          className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          title="Alerts"
+        >
+          <Bell className="w-5 h-5 text-slate-300" />
+        </button>
+
+        <button
+          onClick={() => window.location.href = '/backtest'}
+          className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          title="Backtest"
+        >
+          <TrendingUp className="w-5 h-5 text-slate-300" />
+        </button>
+
+        <button
+          onClick={() => window.location.href = '/portfolio'}
+          className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          title="Portfolio"
+        >
+          <Wallet className="w-5 h-5 text-slate-300" />
+        </button>
+
+        <button
+          onClick={() => window.location.href = '/rate-limits'}
+          className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+          title="Rate Limits"
+        >
+          <Gauge className="w-5 h-5 text-slate-300" />
+        </button>
+
+        <button
           onClick={() => window.location.href = '/status'}
           className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
           title="System Status"
         >
-          <Activity className="w-5 h-5 text-slate-300" />
+          <Server className="w-5 h-5 text-slate-300" />
         </button>
+
+        {(user?.role === 'admin' || user?.role === 'superuser') && (
+          <button
+            onClick={() => window.location.href = '/admin'}
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            title="Admin Panel"
+          >
+            <Shield className="w-5 h-5 text-slate-300" />
+          </button>
+        )}
 
         {user ? (
           <div className="relative group">

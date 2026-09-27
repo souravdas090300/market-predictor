@@ -145,7 +145,8 @@ class NewsAggregator:
                 'negative': 0,
                 'neutral': 0,
                 'overall_sentiment': 0.0,
-                'sentiment_trend': 'neutral'
+                'sentiment_trend': 'neutral',
+                'confidence': 0.0
             }
         
         positive_words = [
@@ -163,9 +164,12 @@ class NewsAggregator:
         total_words = 0
         
         for article in articles:
-            title = article.get('title', '').lower()
-            summary = article.get('summary', '').lower()
-            text = f"{title} {summary}"
+            if not isinstance(article, dict):
+                continue
+                
+            title = article.get('title', '') or ''
+            summary = article.get('summary', '') or ''
+            text = f"{title} {summary}".lower()
             
             words = text.split()
             total_words += len(words)
@@ -176,11 +180,13 @@ class NewsAggregator:
                 elif word in negative_words:
                     negative_count += 1
         
-        neutral_count = len(articles) - positive_count - negative_count
+        # Ensure neutral count is non-negative
+        total_mentioned = positive_count + negative_count
+        neutral_count = max(0, len(articles) - total_mentioned)
         
         # Calculate sentiment score (-1 to 1)
-        if positive_count + negative_count > 0:
-            sentiment_score = (positive_count - negative_count) / (positive_count + negative_count)
+        if total_mentioned > 0:
+            sentiment_score = (positive_count - negative_count) / total_mentioned
         else:
             sentiment_score = 0
         
