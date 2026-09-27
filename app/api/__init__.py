@@ -35,6 +35,7 @@ from ..services import news
 from ..services import correlation
 from ..services import batch_prediction
 from ..services import backtesting
+from ..services import advanced_sentiment
 from ..admin import admin_manager
 
 # Initialize security components
@@ -1323,6 +1324,162 @@ def get_news(request: Request, symbol: str, asset_class: str = "stock", max_arti
         return news_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching news: {str(e)}")
+
+
+class AdvancedSentimentRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    asset_class: str = Field(default="stock")
+    include_social: bool = Field(default=True)
+    include_fear_greed: bool = Field(default=True)
+
+
+class SocialMediaSentimentRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    platform: str = Field(default="twitter")
+
+
+class EarningsSentimentRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    transcript_text: str = Field(min_length=10, max_length=50000)
+
+
+@app.post("/api/sentiment/advanced")
+@limiter.limit("20/minute")
+async def get_advanced_sentiment(request: Request, body: AdvancedSentimentRequest):
+    """Get comprehensive sentiment analysis including news, social media, and fear/greed index."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        result = await advanced_sentiment.get_comprehensive_sentiment(
+            symbol=sanitized_symbol,
+            asset_class=body.asset_class,
+            include_social=body.include_social,
+            include_fear_greed=body.include_fear_greed
+        )
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing sentiment: {str(e)}")
+
+
+@app.post("/api/sentiment/news")
+@limiter.limit("30/minute")
+async def get_news_sentiment(request: Request, body: AdvancedSentimentRequest):
+    """Get detailed news sentiment analysis."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        analyzer = advanced_sentiment.AdvancedSentimentAnalyzer()
+        result = await analyzer.analyze_news_sentiment(
+            symbol=sanitized_symbol,
+            asset_class=body.asset_class
+        )
+        
+        return {
+            'symbol': result.symbol,
+            'overall_sentiment': result.overall_sentiment,
+            'sentiment_label': result.sentiment_label,
+            'strength': result.strength,
+            'bullish_count': result.bullish_count,
+            'bearish_count': result.bearish_count,
+            'neutral_count': result.neutral_count,
+            'total_articles': result.total_articles,
+            'impact_score': result.impact_score,
+            'articles': [
+                {
+                    'headline': a.headline,
+                    'source': a.source,
+                    'sentiment': a.sentiment,
+                    'relevance_score': a.relevance_score,
+                    'published_at': a.published_at.isoformat() if hasattr(a.published_at, 'isoformat') else str(a.published_at)
+                }
+                for a in result.articles
+            ],
+            'timestamp': result.timestamp.isoformat() if hasattr(result.timestamp, 'isoformat') else str(result.timestamp)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing news sentiment: {str(e)}")
+
+
+@app.post("/api/sentiment/social")
+@limiter.limit("20/minute")
+async def get_social_sentiment(request: Request, body: SocialMediaSentimentRequest):
+    """Get social media sentiment analysis."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        analyzer = advanced_sentiment.AdvancedSentimentAnalyzer()
+        result = await analyzer.analyze_social_media_sentiment(
+            symbol=sanitized_symbol,
+            platform=body.platform
+        )
+        
+        return {
+            'symbol': result.symbol,
+            'platform': result.platform,
+            'overall_sentiment': result.overall_sentiment,
+            'sentiment_label': result.sentiment_label,
+            'total_posts': result.total_posts,
+            'bullish_count': result.bullish_count,
+            'bearish_count': result.bearish_count,
+            'total_engagement': result.total_engagement,
+            'avg_engagement': result.avg_engagement,
+            'top_posts': result.top_posts,
+            'sentiment_trend': result.sentiment_trend,
+            'virality': result.virality,
+            'timestamp': result.timestamp.isoformat() if hasattr(result.timestamp, 'isoformat') else str(result.timestamp)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing social sentiment: {str(e)}")
+
+
+@app.get("/api/sentiment/fear-greed")
+@limiter.limit("10/minute")
+async def get_fear_greed_index(request: Request):
+    """Get current Fear & Greed index with historical data."""
+    try:
+        analyzer = advanced_sentiment.AdvancedSentimentAnalyzer()
+        result = await analyzer.calculate_fear_greed_index()
+        
+        return {
+            'index': result.index,
+            'classification': result.classification,
+            'components': result.components,
+            'history': result.history,
+            'timestamp': result.timestamp.isoformat() if hasattr(result.timestamp, 'isoformat') else str(result.timestamp)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating fear/greed index: {str(e)}")
+
+
+@app.post("/api/sentiment/earnings")
+@limiter.limit("10/minute")
+async def get_earnings_sentiment(request: Request, body: EarningsSentimentRequest):
+    """Analyze sentiment from earnings call transcripts."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        analyzer = advanced_sentiment.AdvancedSentimentAnalyzer()
+        result = await analyzer.analyze_earnings_sentiment(
+            symbol=sanitized_symbol,
+            transcript_text=body.transcript_text
+        )
+        
+        return {
+            'symbol': result.symbol,
+            'overall_sentiment': result.overall_sentiment,
+            'sentiment_label': result.sentiment_label,
+            'key_points': result.key_points,
+            'confidence': result.confidence,
+            'timestamp': result.timestamp.isoformat() if hasattr(result.timestamp, 'isoformat') else str(result.timestamp)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing earnings sentiment: {str(e)}")
 
 
 class CorrelationRequest(BaseModel):

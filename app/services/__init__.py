@@ -10,6 +10,7 @@ from . import news
 from . import correlation
 from . import batch_prediction
 from . import backtesting
+from . import advanced_sentiment
 
 __all__ = [
     'material',
@@ -22,5 +23,6 @@ __all__ = [
     'news',
     'correlation',
     'batch_prediction',
-    'backtesting'
+    'backtesting',
+    'advanced_sentiment'
 ]
