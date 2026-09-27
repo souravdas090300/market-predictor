@@ -43,8 +43,8 @@ class ActivityEvent:
         self.details = details or {}
         self.ip_address = ip_address
         self.user_agent = user_agent
-        self.timestamp = datetime.utcnow().isoformat()
-        self.id = f"{int(datetime.utcnow().timestamp() * 1000)}_{user_id}"
+        self.timestamp = datetime.now(timezone.utc).isoformat()
+        self.id = f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{user_id}"
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -136,7 +136,7 @@ class ActivityAnalytics:
         """Get activity summary for the last N days."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         filtered_events = [event for event in self.events if event["timestamp"] >= cutoff_date]
         
         if user_id:
@@ -173,7 +173,7 @@ class ActivityAnalytics:
         """Calculate user engagement metrics."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         recent_events = [event for event in self.events if event["timestamp"] >= cutoff_date]
         
         # Active users (users with at least one activity)
@@ -219,7 +219,7 @@ class ActivityAnalytics:
         """Get feature usage statistics."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         recent_events = [event for event in self.events if event["timestamp"] >= cutoff_date]
         
         # Count feature usage
@@ -250,7 +250,7 @@ class ActivityAnalytics:
         """Get user sessions (login to logout pairs)."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         user_events = [
             event for event in self.events
             if event["user_id"] == user_id and event["timestamp"] >= cutoff_date
@@ -286,7 +286,7 @@ class ActivityAnalytics:
         # Handle sessions without logout (still active)
         if current_session:
             login = datetime.fromisoformat(current_session["login_time"])
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             duration = (now - login).total_seconds()
             current_session["duration"] = round(duration, 2)
             current_session["is_active"] = True
@@ -298,7 +298,7 @@ class ActivityAnalytics:
         """Get top users by activity."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         recent_events = [event for event in self.events if event["timestamp"] >= cutoff_date]
         
         # Count activity per user
@@ -322,7 +322,7 @@ class ActivityAnalytics:
         """Get activity distribution by time of day and day of week."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         recent_events = [event for event in self.events if event["timestamp"] >= cutoff_date]
         
         # Distribution by hour
@@ -350,7 +350,7 @@ class ActivityAnalytics:
         """Clear activity events older than N days."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         original_count = len(self.events)
         
         self.events = [event for event in self.events if event["timestamp"] >= cutoff_date]

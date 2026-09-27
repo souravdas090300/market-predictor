@@ -48,7 +48,7 @@ class TwoFactorConfig:
         self.secret = secret or pyotp.random_base32()
         self.enabled = enabled
         self.backup_codes = backup_codes or self._generate_backup_codes()
-        self.created_at = datetime.utcnow().isoformat()
+        self.created_at = datetime.now(timezone.utc).isoformat()
         self.last_used = None
     
     def _generate_backup_codes(self) -> list:
@@ -255,7 +255,7 @@ class TwoFactorAuthManager:
         if code in config.backup_codes:
             # Remove used backup code
             config.backup_codes.remove(code)
-            config.last_used = datetime.utcnow().isoformat()
+            config.last_used = datetime.now(timezone.utc).isoformat()
             self._save_configs()
             
             log_security_event("2FA_LOGIN_BACKUP_CODE", {
@@ -279,7 +279,7 @@ class TwoFactorAuthManager:
                 "message": "Invalid verification code"
             }
         
-        config.last_used = datetime.utcnow().isoformat()
+        config.last_used = datetime.now(timezone.utc).isoformat()
         self._save_configs()
         
         log_security_event("2FA_LOGIN_SUCCESS", {

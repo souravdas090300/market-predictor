@@ -995,5 +995,5 @@ def health_check():
     return {
         "status": "healthy",
         "service": "market-predictor-admin",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }

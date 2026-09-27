@@ -81,8 +81,8 @@ class UserManager:
             "username": username,
             "email": email,
             "hashed_password": hashed_password,
-            "created_at": datetime.now(timezone.UTC).isoformat(),
-            "updated_at": datetime.now(timezone.UTC).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "is_active": True,
             "disabled": False,
             "roles": ["user"],
@@ -97,7 +97,7 @@ class UserManager:
             "subscription": {
                 "plan": "free",
                 "status": "active",
-                "start_date": datetime.now(timezone.UTC).isoformat(),
+                "start_date": datetime.now(timezone.utc).isoformat(),
                 "expiry_date": None,
                 "auto_renew": False
             },
@@ -147,7 +147,7 @@ class UserManager:
             return None
         
         # Update last login
-        user["last_login"] = datetime.now(timezone.UTC).isoformat()
+        user["last_login"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         # Log security event
@@ -186,7 +186,7 @@ class UserManager:
             return False
         
         user["preferences"].update(preferences)
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         return True
@@ -198,7 +198,7 @@ class UserManager:
             return False
         
         user["disabled"] = True
-        user["updated_at"] = datetime.now(timezone.UTC).isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         # Log security event
@@ -216,7 +216,7 @@ class UserManager:
             return False
         
         user["disabled"] = False
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         return True
@@ -244,7 +244,7 @@ class UserManager:
             raise ValueError("User not found")
         
         # Calculate expiry date
-        start_date = datetime.utcnow()
+        start_date = datetime.now(timezone.utc)
         expiry_date = start_date + timedelta(days=duration_days)
         
         user["subscription"] = {
@@ -254,7 +254,7 @@ class UserManager:
             "expiry_date": expiry_date.isoformat(),
             "auto_renew": False
         }
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         return user["subscription"]
@@ -271,7 +271,7 @@ class UserManager:
         # Check if subscription is expired
         if expiry_date:
             expiry = datetime.fromisoformat(expiry_date)
-            if datetime.utcnow() > expiry:
+            if datetime.now(timezone.utc) > expiry:
                 subscription["status"] = "expired"
         
         return subscription
@@ -286,7 +286,7 @@ class UserManager:
             user["profile"] = {}
         
         user["profile"].update(profile_data)
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         return True
@@ -298,7 +298,7 @@ class UserManager:
             return False
         
         user["email_verified"] = True
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         return True
@@ -315,9 +315,9 @@ class UserManager:
         user["oauth_providers"][provider] = {
             "provider_user_id": provider_user_id,
             "provider_data": provider_data,
-            "linked_at": datetime.utcnow().isoformat()
+            "linked_at": datetime.now(timezone.utc).isoformat()
         }
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         self._save_users()
         
         return True
@@ -361,8 +361,8 @@ class UserManager:
             "username": username,
             "email": email,
             "hashed_password": None,  # No password for OAuth users
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "is_active": True,
             "disabled": False,
             "roles": ["user"],
@@ -377,7 +377,7 @@ class UserManager:
             "subscription": {
                 "plan": "free",
                 "status": "active",
-                "start_date": datetime.utcnow().isoformat(),
+                "start_date": datetime.now(timezone.utc).isoformat(),
                 "expiry_date": None,
                 "auto_renew": False
             },
@@ -393,7 +393,7 @@ class UserManager:
                 provider: {
                     "provider_user_id": provider_user_id,
                     "provider_data": profile_data,
-                    "linked_at": datetime.utcnow().isoformat()
+                    "linked_at": datetime.now(timezone.utc).isoformat()
                 }
             },
             "email_verified": True,  # OAuth emails are verified
@@ -420,7 +420,7 @@ class UserManager:
             return False
         
         user["is_superuser"] = is_superuser
-        user["updated_at"] = datetime.utcnow().isoformat()
+        user["updated_at"] = datetime.now(timezone.utc).isoformat()
         
         # Update roles based on superuser status
         if is_superuser:
@@ -462,7 +462,7 @@ class UserManager:
         
         if role not in user["roles"]:
             user["roles"].append(role)
-            user["updated_at"] = datetime.utcnow().isoformat()
+            user["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._save_users()
         
         return True
@@ -475,7 +475,7 @@ class UserManager:
         
         if role in user["roles"]:
             user["roles"].remove(role)
-            user["updated_at"] = datetime.utcnow().isoformat()
+            user["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._save_users()
         
         return True

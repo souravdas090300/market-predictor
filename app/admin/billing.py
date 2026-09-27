@@ -80,7 +80,7 @@ class BillingAnalytics:
     def calculate_daily_metrics(self, date: Optional[datetime] = None) -> Dict[str, Any]:
         """Calculate daily billing metrics."""
         if date is None:
-            date = datetime.utcnow()
+            date = datetime.now(timezone.utc)
         
         date_str = date.strftime("%Y-%m-%d")
         
@@ -152,7 +152,7 @@ class BillingAnalytics:
         """Calculate churn rate for the last N days."""
         from datetime import timedelta
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         users = user_manager.list_users()
         
         # Count active users at start of period
@@ -161,7 +161,7 @@ class BillingAnalytics:
         
         for user in users:
             subscription = user.get("subscription", {})
-            created_at = datetime.fromisoformat(user.get("created_at", datetime.utcnow().isoformat()))
+            created_at = datetime.fromisoformat(user.get("created_at", datetime.now(timezone.utc).isoformat()))
             
             if created_at < cutoff_date:
                 # User existed at start of period
@@ -219,7 +219,7 @@ class BillingAnalytics:
         
         trend = []
         for i in range(days):
-            date = datetime.utcnow() - timedelta(days=days - i - 1)
+            date = datetime.now(timezone.utc) - timedelta(days=days - i - 1)
             metrics = self.calculate_daily_metrics(date)
             trend.append(metrics)
         
@@ -300,7 +300,7 @@ class BillingAnalytics:
         
         return {
             "period": period.value,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "metrics": metrics,
             "churn_analysis": churn,
             "ltv_analysis": ltv,

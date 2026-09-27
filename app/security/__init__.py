@@ -77,13 +77,13 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     """Create a JWT access token."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({
         "exp": expire,
-        "iat": datetime.now(timezone.UTC),
+        "iat": datetime.now(timezone.utc),
         "type": "access"
     })
     
@@ -94,11 +94,11 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 def create_refresh_token(data: Dict[str, Any]) -> str:
     """Create a JWT refresh token."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     
     to_encode.update({
         "exp": expire,
-        "iat": datetime.now(timezone.UTC),
+        "iat": datetime.now(timezone.utc),
         "type": "refresh",
         "jti": secrets.token_urlsafe(16)  # Unique identifier for refresh token
     })
@@ -327,7 +327,7 @@ class APIKeyManager:
             "user_id": user_id,
             "name": name,
             "scopes": scopes,
-            "created_at": datetime.now(timezone.UTC).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "last_used": None,
             "is_active": True
         }
@@ -344,7 +344,7 @@ class APIKeyManager:
         
         if key_hash in self.api_keys and self.api_keys[key_hash]["is_active"]:
             # Update last used
-            self.api_keys[key_hash]["last_used"] = datetime.now(timezone.UTC).isoformat()
+            self.api_keys[key_hash]["last_used"] = datetime.now(timezone.utc).isoformat()
             self._save_api_keys()
             return self.api_keys[key_hash]
         
@@ -467,9 +467,9 @@ class SessionManager:
         session_data = {
             "user_id": user_id,
             "user_data": user_data,
-            "created_at": datetime.now(timezone.UTC).isoformat(),
-            "last_activity": datetime.now(timezone.UTC).isoformat(),
-            "expires_at": (datetime.now(timezone.UTC) + timedelta(hours=24)).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_activity": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
         }
         
         self.sessions[session_id] = session_data
@@ -484,7 +484,7 @@ class SessionManager:
         # Check if expired
         try:
             expires_at = datetime.fromisoformat(session["expires_at"])
-            if datetime.now(timezone.UTC) > expires_at:
+            if datetime.now(timezone.utc) > expires_at:
                 del self.sessions[session_id]
                 return None
         except (ValueError, KeyError, TypeError):
@@ -492,7 +492,7 @@ class SessionManager:
             return None
         
         # Update last activity
-        session["last_activity"] = datetime.now(timezone.UTC).isoformat()
+        session["last_activity"] = datetime.now(timezone.utc).isoformat()
         return session
     
     def delete_session(self, session_id: str) -> bool:
@@ -504,7 +504,7 @@ class SessionManager:
     
     def cleanup_expired_sessions(self):
         """Clean up expired sessions."""
-        now = datetime.now(timezone.UTC)
+        now = datetime.now(timezone.utc)
         expired_sessions = [
             session_id for session_id, session in self.sessions.items()
             if datetime.fromisoformat(session["expires_at"]) < now
@@ -564,7 +564,7 @@ security_logger = setup_security_logging()
 def log_security_event(event_type: str, details: Dict[str, Any], user_id: str = None):
     """Log a security event."""
     log_data = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_type": event_type,
         "user_id": user_id,
         "details": details

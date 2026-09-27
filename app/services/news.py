@@ -229,5 +229,5 @@ def get_news_with_sentiment(symbol: str, asset_class: str = 'stock') -> Dict:
         'asset_class': asset_class,
         'articles': articles,
         'sentiment': sentiment,
-        'fetched_at': datetime.utcnow().isoformat()
+        'fetched_at': datetime.now(timezone.utc).isoformat()
     }

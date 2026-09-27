@@ -213,7 +213,7 @@ def get_all_assets(request: Request):
         return {
             "assets": assets_data,
             "total": len(assets_data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching asset data: {str(e)}")
@@ -254,7 +254,7 @@ def get_assets_by_class(request: Request, asset_class: str):
             "class": asset_class,
             "class_label": config.CLASS_LABELS[asset_class],
             "total": len(assets_data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except HTTPException:
         raise
@@ -606,13 +606,13 @@ def get_assets_list(request: Request):
                     "high_24h": quote.get("high_24h", 0),
                     "low_24h": quote.get("low_24h", 0),
                     "market_cap": quote.get("market_cap"),
-                    "last_update": quote.get("timestamp", datetime.utcnow().isoformat())
+                    "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat())
                 })
         
         return {
             "assets": assets_data,
             "total": len(assets_data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching assets list: {str(e)}")
@@ -651,7 +651,7 @@ def get_asset_details(request: Request, symbol: str):
             "high_24h": quote.get("high_24h", 0),
             "low_24h": quote.get("low_24h", 0),
             "market_cap": quote.get("market_cap"),
-            "last_update": quote.get("timestamp", datetime.utcnow().isoformat())
+            "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat())
         }
     except HTTPException:
         raise
@@ -716,7 +716,7 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
             "expected_low": predicted_price - confidence_range * 0.7,
             "expected_average": predicted_price,
             "trend": trend,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "signal_data": {
                 "signal": signal_data.get("signal"),
                 "probability_up": signal_data.get("probability_up"),
@@ -766,7 +766,7 @@ def get_asset_historical(request: Request, symbol: str, timeframe: str = "1d", d
             "timeframe": timeframe,
             "data": historical_data,
             "total": len(historical_data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except HTTPException:
         raise
@@ -821,7 +821,7 @@ def compare_assets(request: Request, symbols: str):
         return {
             "comparison": comparison_data,
             "total": len(comparison_data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error comparing assets: {str(e)}")
@@ -1303,7 +1303,7 @@ def create_api_key(request: Request, body: APIKeyRequest, current_user: dict = D
         "api_key": api_key,
         "name": body.name,
         "scopes": body.scopes,
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -1484,7 +1484,7 @@ def protected_route(request: Request, current_user: dict = Depends(get_current_a
     return {
         "message": "This is a protected endpoint",
         "user": current_user["username"],
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -1495,7 +1495,7 @@ def health_check(request: Request):
     """Basic health check endpoint."""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "service": "market-predictor-api"
     }
 
@@ -1518,11 +1518,11 @@ def system_status(request: Request):
         
         # Get service health (simulated - in production, check actual services)
         services = {
-            "api": {"status": "up", "response_time": 45, "last_check": datetime.utcnow().isoformat()},
-            "database": {"status": "up", "response_time": 12, "last_check": datetime.utcnow().isoformat()},
-            "cache": {"status": "up", "response_time": 3, "last_check": datetime.utcnow().isoformat()},
-            "ml_model": {"status": "up", "response_time": 234, "last_check": datetime.utcnow().isoformat()},
-            "data_feed": {"status": "up", "response_time": 89, "last_check": datetime.utcnow().isoformat()},
+            "api": {"status": "up", "response_time": 45, "last_check": datetime.now(timezone.utc).isoformat()},
+            "database": {"status": "up", "response_time": 12, "last_check": datetime.now(timezone.utc).isoformat()},
+            "cache": {"status": "up", "response_time": 3, "last_check": datetime.now(timezone.utc).isoformat()},
+            "ml_model": {"status": "up", "response_time": 234, "last_check": datetime.now(timezone.utc).isoformat()},
+            "data_feed": {"status": "up", "response_time": 89, "last_check": datetime.now(timezone.utc).isoformat()},
         }
         
         # Calculate overall status
@@ -1532,7 +1532,7 @@ def system_status(request: Request):
         return {
             "overall": overall,
             "uptime": 99.95,  # In production, calculate actual uptime
-            "last_check": datetime.utcnow().isoformat(),
+            "last_check": datetime.now(timezone.utc).isoformat(),
             "services": services,
             "metrics": {
                 "cpu_usage": cpu_usage,
@@ -1555,7 +1555,7 @@ def system_status(request: Request):
         return {
             "overall": "degraded",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 

@@ -2,7 +2,7 @@
 import os
 import json
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..core import config
@@ -49,13 +49,13 @@ class AdminManager:
             },
             "maintenance_mode": False,
             "allowed_ips": [],
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
     
     def _save_config(self):
         """Save admin configuration."""
-        self.config["updated_at"] = datetime.utcnow().isoformat()
+        self.config["updated_at"] = datetime.now(timezone.utc).isoformat()
         with open(ADMIN_CONFIG_FILE, 'w') as f:
             json.dump(self.config, f, indent=2)
     
@@ -178,7 +178,7 @@ class AdminManager:
                 "watchlist_size": len(config.WATCHLIST),
                 "root_path": str(config.ROOT)
             },
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 

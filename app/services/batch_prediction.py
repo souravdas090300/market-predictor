@@ -45,7 +45,7 @@ class BatchPredictionService:
             Dictionary with prediction results for all assets
         """
         results = {}
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         
         for asset in config.WATCHLIST:
             symbol = asset["symbol"]
@@ -55,7 +55,7 @@ class BatchPredictionService:
                 last_prediction = self.batch_results[symbol].get("timestamp")
                 if last_prediction:
                     last_time = datetime.fromisoformat(last_prediction)
-                    if datetime.utcnow() - last_time < timedelta(hours=1):
+                    if datetime.now(timezone.utc) - last_time < timedelta(hours=1):
                         results[symbol] = self.batch_results[symbol]
                         continue
             
@@ -133,7 +133,7 @@ class BatchPredictionService:
                 "bearish_count": 0,
                 "neutral_count": 0,
                 "average_conviction": 0.0,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
         
         bullish_count = 0
@@ -168,7 +168,7 @@ class BatchPredictionService:
             "neutral_count": neutral_count,
             "average_conviction": round(average_conviction, 3),
             "valid_predictions": valid_predictions,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
     def schedule_predictions(self, interval_hours: int = 1):
@@ -182,9 +182,9 @@ class BatchPredictionService:
         import time
         
         def job():
-            print(f"Running batch prediction at {datetime.utcnow()}")
+            print(f"Running batch prediction at {datetime.now(timezone.utc)}")
             self.predict_all_assets(force_refresh=True)
-            print(f"Batch prediction completed at {datetime.utcnow()}")
+            print(f"Batch prediction completed at {datetime.now(timezone.utc)}")
         
         schedule.every(interval_hours).hours.do(job)
         

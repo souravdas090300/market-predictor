@@ -71,8 +71,8 @@ class AuditLog:
         self.severity = severity
         self.ip_address = ip_address
         self.user_agent = user_agent
-        self.timestamp = datetime.utcnow().isoformat()
-        self.id = f"{int(datetime.utcnow().timestamp() * 1000)}_{admin_user}"
+        self.timestamp = datetime.now(timezone.utc).isoformat()
+        self.id = f"{int(datetime.now(timezone.utc).timestamp() * 1000)}_{admin_user}"
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -231,7 +231,7 @@ class AuditLogger:
         """Get audit log statistics for the last N days."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         recent_logs = [log for log in self.logs if log["timestamp"] >= cutoff_date]
         
         # Count by action type
@@ -277,7 +277,7 @@ class AuditLogger:
         export_dir = config.ROOT / "data" / "exports"
         export_dir.mkdir(exist_ok=True)
         
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         
         if format == "json":
             export_file = export_dir / f"audit_logs_{timestamp}.json"
@@ -298,7 +298,7 @@ class AuditLogger:
         """Clear audit logs older than N days."""
         from datetime import timedelta
         
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         original_count = len(self.logs)
         
         self.logs = [log for log in self.logs if log["timestamp"] >= cutoff_date]
