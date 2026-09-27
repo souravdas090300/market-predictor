@@ -203,3 +203,4 @@ docker run -p 8000:8000 market-predictor
 - Train FinBERT on your own market data for better sentiment
 - Port to Next.js for auth, user watchlists and alerts on Vercel with API on Railway
 - Add correlation analysis to compare how assets move together
+# Force Vercel to pick up latest commit
