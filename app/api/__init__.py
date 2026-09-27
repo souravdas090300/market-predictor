@@ -5,7 +5,7 @@ import time
 import os
 import sys
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +34,7 @@ from ..services import strategy
 from ..services import news
 from ..services import correlation
 from ..services import batch_prediction
+from ..services import backtesting
 from ..admin import admin_manager
 
 # Initialize security components
@@ -1094,6 +1095,216 @@ def optimize_strategy(request: Request, body: StrategyRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error optimizing strategy: {str(e)}")
+
+
+class BacktestRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    strategy_type: str = Field(default="momentum")
+    initial_capital: float = Field(default=100000, gt=0)
+    commission: float = Field(default=0.001, ge=0, le=0.1)
+    monte_carlo_iterations: int = Field(default=1000, ge=100, le=10000)
+    run_stress_tests: bool = Field(default=True)
+    run_monte_carlo: bool = Field(default=True)
+
+
+class BacktestParameterOptimizationRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    strategy_type: str = Field(default="momentum")
+    param_ranges: dict = Field(default={
+        "lookback_period": [5, 10, 15, 20],
+        "threshold": [0.01, 0.02, 0.03, 0.05]
+    })
+    initial_capital: float = Field(default=100000, gt=0)
+
+
+class WalkForwardRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=32)
+    strategy_type: str = Field(default="momentum")
+    window_size: int = Field(default=100, ge=50, le=500)
+    step_size: int = Field(default=20, ge=10, le=100)
+    initial_capital: float = Field(default=100000, gt=0)
+
+
+@app.post("/api/backtest/run")
+@limiter.limit("10/minute")
+async def run_backtest(request: Request, body: BacktestRequest):
+    """Run comprehensive backtest with analysis."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Get historical data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No historical data available")
+        
+        import pandas as pd
+        df = pd.DataFrame(candles)
+        df.index = pd.to_datetime(df['d'])
+        df = df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close'})
+        df['timestamp'] = df.index
+        
+        # Select strategy
+        if body.strategy_type == "momentum":
+            strategy = backtesting.SimpleMomentumStrategy()
+        elif body.strategy_type == "mean_reversion":
+            strategy = backtesting.MeanReversionStrategy()
+        else:
+            strategy = backtesting.SimpleMomentumStrategy()
+        
+        # Run main backtest
+        engine = backtesting.BacktestingEngine()
+        main_metrics = await engine.run_backtest(
+            df, strategy, body.initial_capital, body.commission
+        )
+        
+        result = {
+            'symbol': sanitized_symbol,
+            'strategy_type': body.strategy_type,
+            'main_metrics': {
+                'total_return': main_metrics.total_return,
+                'total_return_percent': main_metrics.total_return_percent,
+                'sharpe_ratio': main_metrics.sharpe_ratio,
+                'sortino_ratio': main_metrics.sortino_ratio,
+                'max_drawdown': main_metrics.max_drawdown,
+                'win_rate': main_metrics.win_rate,
+                'profit_factor': main_metrics.profit_factor,
+                'total_trades': main_metrics.total_trades,
+                'avg_return': main_metrics.avg_return,
+                'recovery_factor': main_metrics.recovery_factor,
+                'equity_history': main_metrics.equity_history,
+                'trades': [
+                    {
+                        'entry_date': t.entry_date.isoformat() if hasattr(t.entry_date, 'isoformat') else str(t.entry_date),
+                        'exit_date': t.exit_date.isoformat() if hasattr(t.exit_date, 'isoformat') else str(t.exit_date),
+                        'entry_price': t.entry_price,
+                        'exit_price': t.exit_price,
+                        'quantity': t.quantity,
+                        'pnl': t.pnl,
+                        'pnl_percent': t.pnl_percent,
+                        'trade_type': t.trade_type
+                    }
+                    for t in main_metrics.trades
+                ]
+            }
+        }
+        
+        # Run Monte Carlo simulation if requested
+        if body.run_monte_carlo:
+            monte_carlo_results = engine.monte_carlo_simulation(
+                iterations=body.monte_carlo_iterations,
+                initial_capital=body.initial_capital
+            )
+            result['monte_carlo'] = monte_carlo_results
+        
+        # Run stress tests if requested
+        if body.run_stress_tests:
+            stress_results = engine.stress_test(df, strategy, body.initial_capital)
+            result['stress_tests'] = stress_results
+        
+        result['timestamp'] = datetime.now(timezone.utc).isoformat()
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running backtest: {str(e)}")
+
+
+@app.post("/api/backtest/optimize")
+@limiter.limit("5/minute")
+async def optimize_backtest_parameters(request: Request, body: BacktestParameterOptimizationRequest):
+    """Optimize strategy parameters using grid search."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Get historical data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No historical data available")
+        
+        import pandas as pd
+        df = pd.DataFrame(candles)
+        df.index = pd.to_datetime(df['d'])
+        df = df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close'})
+        df['timestamp'] = df.index
+        
+        # Select strategy
+        if body.strategy_type == "momentum":
+            strategy = backtesting.SimpleMomentumStrategy()
+        elif body.strategy_type == "mean_reversion":
+            strategy = backtesting.MeanReversionStrategy()
+        else:
+            strategy = backtesting.SimpleMomentumStrategy()
+        
+        # Run parameter optimization
+        engine = backtesting.BacktestingEngine()
+        optimization_results = await engine.optimize_parameters(
+            df, strategy, body.param_ranges, body.initial_capital
+        )
+        
+        return {
+            'symbol': sanitized_symbol,
+            'strategy_type': body.strategy_type,
+            'optimization_results': optimization_results,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error optimizing parameters: {str(e)}")
+
+
+@app.post("/api/backtest/walk-forward")
+@limiter.limit("5/minute")
+async def run_walk_forward_analysis(request: Request, body: WalkForwardRequest):
+    """Run walk-forward analysis for robust strategy testing."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        
+        # Get historical data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No historical data available")
+        
+        import pandas as pd
+        df = pd.DataFrame(candles)
+        df.index = pd.to_datetime(df['d'])
+        df = df.rename(columns={'o': 'open', 'h': 'high', 'l': 'low', 'c': 'close'})
+        df['timestamp'] = df.index
+        
+        # Select strategy
+        if body.strategy_type == "momentum":
+            strategy = backtesting.SimpleMomentumStrategy()
+        elif body.strategy_type == "mean_reversion":
+            strategy = backtesting.MeanReversionStrategy()
+        else:
+            strategy = backtesting.SimpleMomentumStrategy()
+        
+        # Run walk-forward analysis
+        engine = backtesting.BacktestingEngine()
+        walk_forward_results = await engine.walk_forward_analysis(
+            df, strategy, body.window_size, body.step_size, body.initial_capital
+        )
+        
+        return {
+            'symbol': sanitized_symbol,
+            'strategy_type': body.strategy_type,
+            'walk_forward': walk_forward_results,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running walk-forward analysis: {str(e)}")
 
 
 class NewsRequest(BaseModel):
