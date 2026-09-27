@@ -29,6 +29,11 @@ dependencies = [
     "mplfinance>=0.12.10b0",
     "matplotlib>=3.11.0",
     "schedule>=1.2.0",
+    "pyotp>=2.9.0",
+    "qrcode>=7.4.0",
+    "pillow>=10.0.0",
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
 ]
 
 [tool.vercel]

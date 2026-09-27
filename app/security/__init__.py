@@ -19,7 +19,7 @@ from fastapi.security.utils import get_authorization_scheme_param
 from ..core import config
 
 # Security configuration
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+SECRET_KEY = os.getenv("SECRET_KEY", config.SECRET_KEY)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7

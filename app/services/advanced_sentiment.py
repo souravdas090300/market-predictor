@@ -810,6 +810,8 @@ class AdvancedSentimentAnalyzer:
             # Calculate price returns
             price_returns = []
             for i in range(1, len(historical_data)):
+                if historical_data['close'].iloc[i-1] == 0:
+                    continue  # Skip division by zero
                 ret = (historical_data['close'].iloc[i] - historical_data['close'].iloc[i-1]) / \
                       historical_data['close'].iloc[i-1]
                 price_returns.append(ret)

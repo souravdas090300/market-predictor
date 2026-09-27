@@ -477,7 +477,7 @@ class BacktestingEngine:
         # Calculate volatility if not present
         if 'volatility' not in historical_data.columns:
             data = historical_data.copy()
-            data['volatility'] = data['close'].pct_change().rolling(window=20).std()
+            data['volatility'] = data['close'].pct_change().rolling(window=20).std().fillna(0)
         else:
             data = historical_data
         
@@ -495,7 +495,7 @@ class BacktestingEngine:
             }
         
         # Test 2: Trending Market (price above 20 SMA)
-        data['sma_20'] = data['close'].rolling(window=20).mean()
+        data['sma_20'] = data['close'].rolling(window=20).mean().bfill()
         trending_data = data[data['close'] > data['sma_20']]
         if len(trending_data) > 20:
             engine = BacktestingEngine()
@@ -509,7 +509,8 @@ class BacktestingEngine:
             }
         
         # Test 3: Mean Reversion (price far from SMA)
-        data['distance_from_sma'] = abs(data['close'] - data['sma_20']) / data['sma_20']
+        data['distance_from_sma'] = abs(data['close'] - data['sma_20']) / data['sma_20'].replace(0, np.nan)
+        data['distance_from_sma'] = data['distance_from_sma'].fillna(0)
         mean_reversion_data = data[data['distance_from_sma'] > 0.05]
         if len(mean_reversion_data) > 20:
             engine = BacktestingEngine()
@@ -670,7 +671,7 @@ class SimpleMomentumStrategy(StrategyBase):
                 
                 # Simple backtest for optimization
                 returns = []
-                for i in range(lookback, len(historical_data)):
+                for i in range(lookback, len(historical_data) - 1):
                     window_data = historical_data.iloc[:i+1]
                     signal = self.get_signal(window_data)
                     
@@ -735,7 +736,7 @@ class MeanReversionStrategy(StrategyBase):
                 
                 # Simple backtest for optimization
                 returns = []
-                for i in range(lookback, len(historical_data)):
+                for i in range(lookback, len(historical_data) - 1):
                     window_data = historical_data.iloc[:i+1]
                     signal = self.get_signal(window_data)
                     
