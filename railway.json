@@ -1,5 +1,12 @@
 {
   "build": {
     "builder": "NIXPACKS"
+  },
+  "services": {
+    "api": {
+      "env": {
+        "CORS_ORIGINS": "https://market-predictor-eta.vercel.app"
+      }
+    }
   }
 }

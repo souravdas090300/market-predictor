@@ -73,15 +73,24 @@ SECURITY_LOG_LEVEL = os.getenv("SECURITY_LOG_LEVEL", "DEBUG" if ENV == "developm
 # CORS Settings
 def get_cors_origins():
     """Get CORS origins from environment, handling Railway/Vercel URLs dynamically."""
-    default_dev = "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000"
-    default_prod = "https://*.vercel.app,https://*.railway.app"
+    default_dev = "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000,http://127.0.0.1:3000"
+    # Note: FastAPI CORSMiddleware doesn't support wildcard subdomains, so we use explicit domains
+    default_prod = "https://market-predictor-eta.vercel.app"
     
     cors_env = os.getenv("CORS_ORIGINS", default_dev if ENV == "development" else default_prod)
     origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
     
-    # Add Railway and Vercel wildcard support for production
+    # Ensure specific domains are included for production
     if ENV == "production":
-        origins.extend(["https://*.vercel.app", "https://*.railway.app"])
+        # Always include the explicit frontend domain
+        if "https://market-predictor-eta.vercel.app" not in origins:
+            origins.append("https://market-predictor-eta.vercel.app")
+        
+        # Allow localhost for development/testing from production
+        origins.extend([
+            "http://localhost:3000",
+            "http://127.0.0.1:3000"
+        ])
     
     return origins
 
