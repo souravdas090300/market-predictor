@@ -39,7 +39,7 @@ export default function Header() {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/login';
+    window.location.href = '/auth/login';
   };
 
   return (
@@ -148,7 +148,7 @@ export default function Header() {
           <Server className="w-5 h-5 text-slate-300" />
         </button>
 
-        {(user?.roles?.includes('admin') || user?.roles?.includes('superuser')) && (
+        {user?.roles?.includes('admin') && (
           <button
             onClick={() => window.location.href = '/admin'}
             className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
@@ -186,7 +186,7 @@ export default function Header() {
           </div>
         ) : (
           <button
-            onClick={() => window.location.href = '/login'}
+            onClick={() => window.location.href = '/auth/login'}
             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium"
           >
             Login

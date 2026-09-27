@@ -38,7 +38,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'settings' | 'api' | 'audit' | 'billing' | 'features' | '2fa' | 'activity'>('users');
 
   useEffect(() => {
-    if (user?.roles?.includes('admin') || user?.roles?.includes('superuser')) {
+    if (user?.roles?.includes('admin')) {
       loadAdminData();
     }
   }, [user]);
@@ -123,7 +123,7 @@ export default function AdminPage() {
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!user || (!user.roles?.includes('admin') && !user.roles?.includes('superuser'))) {
+  if (!user || !user.roles?.includes('admin')) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
