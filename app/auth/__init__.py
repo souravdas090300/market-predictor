@@ -521,6 +521,7 @@ user_manager = UserManager()
 
 # Create demo user for testing
 _demo_user_initialized = False
+_admin_user_initialized = False
 
 def ensure_demo_user():
     """Ensure demo user exists for testing."""
@@ -539,6 +540,32 @@ def ensure_demo_user():
         # User already exists
         _demo_user_initialized = True
 
+def ensure_admin_user():
+    """Ensure admin user exists for testing."""
+    global _admin_user_initialized
+    if _admin_user_initialized:
+        return
+    
+    try:
+        # Create admin user
+        admin_user = user_manager.create_user(
+            username="admin",
+            email="admin@marketpredictor.com",
+            password="admin12345"  # Meets minimum 8 character requirement
+        )
+        # Set as superuser
+        user_manager.set_superuser(admin_user["user_id"], True)
+        _admin_user_initialized = True
+    except ValueError:
+        # User already exists, just ensure it's superuser
+        try:
+            admin_user = user_manager.get_user_by_username("admin")
+            if admin_user:
+                user_manager.set_superuser(admin_user["user_id"], True)
+        except Exception:
+            pass
+        _admin_user_initialized = True
 
-# Initialize demo user on import
+# Initialize demo and admin users on import
 ensure_demo_user()
+ensure_admin_user()

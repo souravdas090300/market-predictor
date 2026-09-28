@@ -129,7 +129,7 @@ export default function LoginPage() {
           fontSize: '0.9rem'
         }}>
           <div style={{ fontWeight: '600', marginBottom: '0.5rem' }}>📝 Demo Credentials:</div>
-          <div>👤 Admin: <code style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', padding: '0.2rem 0.4rem' }}>admin2</code> / <code style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', padding: '0.2rem 0.4rem' }}>admin12345</code></div>
+          <div>👤 Admin: <code style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', padding: '0.2rem 0.4rem' }}>admin</code> / <code style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', padding: '0.2rem 0.4rem' }}>admin12345</code></div>
           <div>👤 User: <code style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', padding: '0.2rem 0.4rem' }}>demo</code> / <code style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)', padding: '0.2rem 0.4rem' }}>demo12345</code></div>
         </div>
 

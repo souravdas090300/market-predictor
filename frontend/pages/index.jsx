@@ -440,34 +440,36 @@ function PricingCard({ name, price, period, features, highlighted }) {
         ))}
       </ul>
 
-      <button style={{
-        width: '100%',
-        padding: '0.75rem',
-        backgroundColor: highlighted ? '#10B981' : 'rgba(59, 130, 246, 0.2)',
-        color: highlighted ? '#0F172A' : '#3B82F6',
-        border: highlighted ? 'none' : '1px solid #3B82F6',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontWeight: '600',
-        transition: 'all 0.3s ease'
-      }}
-      onMouseEnter={(e) => {
-        if (highlighted) {
-          e.target.style.backgroundColor = '#059669';
-        } else {
-          e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (highlighted) {
-          e.target.style.backgroundColor = '#10B981';
-        } else {
-          e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-        }
-      }}
-      >
-        Get Started
-      </button>
+      <Link href="/auth/signup">
+        <button style={{
+          width: '100%',
+          padding: '0.75rem',
+          backgroundColor: highlighted ? '#10B981' : 'rgba(59, 130, 246, 0.2)',
+          color: highlighted ? '#0F172A' : '#3B82F6',
+          border: highlighted ? 'none' : '1px solid #3B82F6',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          fontWeight: '600',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseEnter={(e) => {
+          if (highlighted) {
+            e.target.style.backgroundColor = '#059669';
+          } else {
+            e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.3)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (highlighted) {
+            e.target.style.backgroundColor = '#10B981';
+          } else {
+            e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+          }
+        }}
+        >
+          Get Started
+        </button>
+      </Link>
     </div>
   );
 }
