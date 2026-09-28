@@ -28,13 +28,19 @@ export default function LoginPage() {
       // Store tokens
       localStorage.setItem('access_token', response.access_token);
       localStorage.setItem('refresh_token', response.refresh_token);
+      localStorage.setItem('user-role', response.user.role || 'user');
+      localStorage.setItem('user-data', JSON.stringify(response.user));
       
       // Update store
       setAuthTokens(response.access_token, response.refresh_token);
       setUser(response.user);
       
-      // Redirect to dashboard
-      router.push('/');
+      // Redirect based on role
+      if (response.user.role === 'admin' || response.user.role === 'superuser') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
@@ -67,6 +73,13 @@ export default function LoginPage() {
               <p className="text-red-400 text-sm">{error}</p>
             </div>
           )}
+
+          {/* Demo Credentials */}
+          <div className="mb-6 p-4 bg-blue-600/10 border border-blue-500 rounded-lg">
+            <p className="text-blue-400 text-sm font-semibold mb-2">📝 Demo Credentials:</p>
+            <p className="text-slate-300 text-sm">👤 Admin: <code className="bg-slate-900 px-2 py-1 rounded">admin</code> / <code className="bg-slate-900 px-2 py-1 rounded">admin123</code></p>
+            <p className="text-slate-300 text-sm">👤 User: <code className="bg-slate-900 px-2 py-1 rounded">demo</code> / <code className="bg-slate-900 px-2 py-1 rounded">demo123</code></p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

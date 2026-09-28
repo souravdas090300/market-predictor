@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
 import { signalAPI, quoteAPI } from '@/lib/api';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -10,6 +11,7 @@ import { TrendingUp, TrendingDown, Minus, RefreshCw, Download, FileText } from '
 import { pdfExporter } from '@/lib/pdfExport';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { 
     currentSymbol, 
     setCurrentSymbol, 
@@ -28,9 +30,15 @@ export default function DashboardPage() {
   const [materialResult, setMaterialResult] = useState<any>(null);
 
   useEffect(() => {
+    // Redirect to landing page if not authenticated
+    if (!user) {
+      router.push('/landing');
+      return;
+    }
+
     loadWatchlist();
     startLiveQuotes();
-  }, []);
+  }, [user, router]);
 
   useEffect(() => {
     if (currentSymbol) {
@@ -126,14 +134,8 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">Welcome to Market Predictor</h1>
-          <p className="text-slate-400 mb-6">Please sign in to access the dashboard</p>
-          <a
-            href="/auth/login"
-            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-          >
-            Sign In
-          </a>
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">Redirecting to landing page...</p>
         </div>
       </div>
     );

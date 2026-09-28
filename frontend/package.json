@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:prod": "next dev",
+    "dev": "next dev --webpack",
+    "dev:prod": "next dev --webpack",
     "build": "next build --webpack",
     "build:dev": "next build --webpack",
     "build:prod": "next build --webpack",
