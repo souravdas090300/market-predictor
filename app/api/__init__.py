@@ -324,7 +324,8 @@ def admin_login(request: Request, body: AdminLoginRequest):
         "user": {
             "username": user_data["username"],
             "email": user_data["email"],
-            "is_superuser": True
+            "is_superuser": True,
+            "roles": user_data.get("roles", ["admin"])
         }
     }
 
@@ -2739,7 +2740,8 @@ def login(request: Request, body: LoginRequest):
         "user": {
             "username": user_data["username"],
             "email": user_data["email"],
-            "roles": user_data["roles"]
+            "is_superuser": user_data.get("is_superuser", False),
+            "roles": user_data.get("roles", ["user"])
         }
     }
 
@@ -2942,6 +2944,7 @@ def get_current_user_info(request: Request, current_user: dict = Depends(get_cur
         "email_verified": user.get("email_verified", False),
         "created_at": user["created_at"],
         "last_login": user.get("last_login"),
+        "is_superuser": user.get("is_superuser", False),
         "roles": user.get("roles", []),
         "preferences": user.get("preferences", {}),
         "profile": user.get("profile", {}),
@@ -3158,5 +3161,5 @@ async def favicon_png():
 
 
 # Static files last so they cannot shadow /api routes.
-app.mount("/admin", StaticFiles(directory=str(config.ROOT / "static" / "admin"), html=True), name="admin")
+# Note: /admin is handled by Next.js frontend, not static files
 app.mount("/", StaticFiles(directory=str(config.ROOT / "static"), html=True), name="static")

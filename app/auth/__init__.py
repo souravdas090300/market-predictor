@@ -166,6 +166,13 @@ class UserManager:
         except (ImportError, AttributeError, Exception):
             user["is_admin"] = False
         
+        # Ensure roles array includes 'admin' if user is superuser
+        if user.get("is_superuser", False) and "admin" not in user.get("roles", []):
+            if "roles" not in user:
+                user["roles"] = []
+            user["roles"].append("admin")
+            self._save_users()
+        
         return user
     
     def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
@@ -421,6 +428,10 @@ class UserManager:
         
         user["is_superuser"] = is_superuser
         user["updated_at"] = datetime.now(timezone.utc).isoformat()
+        
+        # Ensure roles array exists
+        if "roles" not in user:
+            user["roles"] = ["user"]
         
         # Update roles based on superuser status
         if is_superuser:

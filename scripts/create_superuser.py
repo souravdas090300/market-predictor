@@ -1,54 +1,69 @@
 """Create a superuser account for admin access."""
+import os
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.auth import UserManager, user_manager
-
+from app.auth import user_manager
 
 def create_superuser():
     """Create a superuser account."""
-    print("=== Create Superuser Account ===\n")
+    print("=== Superuser Creation ===")
+    print("This will create a superuser account for admin access.\n")
     
-    username = input("Username: ").strip()
-    if not username:
-        print("Username is required")
-        return
+    # Get credentials from environment or use defaults
+    username = os.getenv("ADMIN_USERNAME", "admin")
+    email = os.getenv("ADMIN_EMAIL", "admin@marketpredictor.com")
+    password = os.getenv("ADMIN_PASSWORD", "admin12345")
     
-    email = input("Email: ").strip()
-    if not email:
-        print("Email is required")
-        return
-    
-    password = input("Password: ").strip()
-    if len(password) < 8:
-        print("Password must be at least 8 characters")
-        return
-    
-    confirm_password = input("Confirm Password: ").strip()
-    if password != confirm_password:
-        print("Passwords do not match")
-        return
+    print("Creating superuser with:")
+    print(f"  Username: {username}")
+    print(f"  Email: {email}")
+    print(f"  Password: {'*' * len(password)}")
+    print()
     
     try:
-        # Create user
-        user_data = user_manager.create_user(username, email, password)
+        # Check if user already exists
+        existing_user = user_manager.get_user_by_username(username)
         
-        # Set as superuser
-        user_manager.set_superuser(user_data["user_id"], True)
+        if existing_user:
+            print(f"User '{username}' already exists.")
+            
+            # Check if already superuser
+            if existing_user.get("is_superuser", False):
+                print(f"User is already a superuser!")
+                print(f"\nYou can login at: https://market-predictor-eta.vercel.app/admin")
+                print(f"Login credentials:")
+                print(f"  Username: {username}")
+                print(f"  Password: (use your existing password)")
+            else:
+                # Set as superuser
+                user_manager.set_superuser(existing_user["user_id"], True)
+                print(f"User '{username}' granted superuser privileges!")
+                print(f"\nYou can now login at: https://market-predictor-eta.vercel.app/admin")
+                print(f"Login credentials:")
+                print(f"  Username: {username}")
+                print(f"  Password: (use your existing password)")
+        else:
+            # Create user
+            user_data = user_manager.create_user(username, email, password)
+            
+            # Set as superuser
+            user_manager.set_superuser(user_data["user_id"], True)
+            
+            print(f"Superuser '{username}' created successfully!")
+            print(f"  User ID: {user_data['user_id']}")
+            print(f"  Email: {email}")
+            print(f"  Is Superuser: True")
+            print(f"\nYou can now login at: https://market-predictor-eta.vercel.app/admin")
+            print(f"Login credentials:")
+            print(f"  Username: {username}")
+            print(f"  Password: {password}")
         
-        print(f"\n✅ Superuser '{username}' created successfully!")
-        print(f"   User ID: {user_data['user_id']}")
-        print(f"   Email: {email}")
-        print(f"   Roles: {user_data['roles']}")
-        print(f"   Is Superuser: {user_data['is_superuser']}")
-        print("\nYou can now access the admin dashboard at http://localhost:8001")
-        
-    except ValueError as e:
-        print(f"\n❌ Error: {e}")
-
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     create_superuser()
