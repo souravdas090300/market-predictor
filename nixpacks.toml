@@ -2,7 +2,7 @@
 cmds = ["pip install -r requirements.txt"]
 
 [phases.start]
-cmd = "uvicorn app.api:app --host 0.0.0.0 --port $PORT"
+cmd = "python scripts/startup.py && uvicorn app.api:app --host 0.0.0.0 --port $PORT --workers 1"
 
 [static]
 # Create necessary directories
@@ -12,3 +12,4 @@ dirs = ["data", "logs", "models", "static"]
 PYTHONPATH = "/app"
 PYTHONUNBUFFERED = "1"
 CORS_ORIGINS = "https://market-predictor-eta.vercel.app"
+ENV = "production"

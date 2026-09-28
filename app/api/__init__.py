@@ -7,6 +7,7 @@ import sys
 from typing import Optional, List
 from datetime import datetime, timezone
 import random
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.staticfiles import StaticFiles
@@ -41,10 +42,59 @@ from ..services import advanced_sentiment
 from ..services import trading_automation
 
 
+# Initialize admin user on startup (production only)
+def ensure_admin_on_startup():
+    """Ensure admin user exists on application startup."""
+    try:
+        admin_user = user_manager.get_user_by_username("admin")
+        if not admin_user:
+            if config.ENV == "production":
+                # In production, create admin with secure password from env
+                admin_password = os.getenv("ADMIN_PASSWORD", "admin12345")
+                admin_user = user_manager.create_user(
+                    username="admin",
+                    email="admin@marketpredictor.com",
+                    password=admin_password
+                )
+                user_manager.set_superuser(admin_user["user_id"], True)
+                log_security_event("ADMIN_USER_CREATED", {
+                    "user_id": admin_user["user_id"],
+                    "username": "admin",
+                    "setup_method": "startup_script"
+                })
+            else:
+                # In development, create with default password
+                admin_user = user_manager.create_user(
+                    username="admin",
+                    email="admin@marketpredictor.com",
+                    password="admin12345"
+                )
+                user_manager.set_superuser(admin_user["user_id"], True)
+        else:
+            # Ensure existing admin has superuser privileges
+            if not user_manager.is_superuser(admin_user["user_id"]):
+                user_manager.set_superuser(admin_user["user_id"], True)
+    except Exception as e:
+        # Don't fail startup if admin creation fails
+        log_security_event("ADMIN_SETUP_ERROR", {
+            "error": str(e)
+        })
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan context manager."""
+    # Startup
+    ensure_admin_on_startup()
+    yield
+    # Shutdown (cleanup if needed)
+    pass
+
+
 # Initialize security components
 security = HTTPBearer()
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="Market Predictor", version="1.0.0")
+app = FastAPI(title="Market Predictor", version="1.0.0", lifespan=lifespan)
 
 # Security middleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -3212,6 +3262,15 @@ def system_status(request: Request):
 @app.get("/admin")
 async def admin_page():
     """Serve the admin dashboard page."""
+    admin_path = config.ROOT / "static" / "admin" / "index.html"
+    if admin_path.exists():
+        return FileResponse(admin_path, media_type="text/html")
+    return Response(status_code=404, content="Admin page not found")
+
+
+@app.get("/admin/")
+async def admin_page_trailing():
+    """Serve the admin dashboard page with trailing slash."""
     admin_path = config.ROOT / "static" / "admin" / "index.html"
     if admin_path.exists():
         return FileResponse(admin_path, media_type="text/html")

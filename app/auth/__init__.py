@@ -530,7 +530,6 @@ def ensure_demo_user():
         return
     
     # SECURITY: Only create demo user in development
-    from ..core import config
     if config.ENV == "production":
         _demo_user_initialized = True
         return
@@ -553,7 +552,6 @@ def ensure_admin_user():
         return
     
     # SECURITY: Only create admin user in development
-    from ..core import config
     if config.ENV == "production":
         _admin_user_initialized = True
         return
@@ -578,6 +576,6 @@ def ensure_admin_user():
             pass
         _admin_user_initialized = True
 
-# Initialize demo and admin users on import
-ensure_demo_user()
-ensure_admin_user()
+# Initialize demo and admin users on import (DISABLED - use CLI scripts instead)
+# ensure_demo_user()
+# ensure_admin_user()
