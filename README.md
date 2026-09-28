@@ -1,206 +1,325 @@
-#
- Market lean: auto + material signals across all markets
+# 📈 Market Predictor Pro
 
-Estimates the chance that a share, crypto, forex pair or commodity closes higher in 5 trading days, and
-labels it bullish, bearish or neutral. It has two modes that you can use together or separately.
+AI-powered market prediction platform with advanced authentication, role-based access control, and comprehensive market analysis tools.
 
-## Quick start
+## 🚀 Features
 
+### Market Prediction
+- **Automatic Mode**: Combines technical indicators, candlestick patterns, ML models, and news sentiment
+- **Material Mode**: Analyze your own news, reports, or notes about assets
+- **Multi-Market Support**: Stocks, crypto, forex, and commodities
+- **Real-time Analysis**: Live quotes, charts, and predictions
+- **Advanced Analytics**: Backtesting, risk management, strategy optimization
+
+### Authentication & User Management
+- **User Registration & Login**: Secure authentication with JWT tokens
+- **Role-Based Access Control**: Admin, user, and superuser roles
+- **Admin Dashboard**: User management, system stats, configuration
+- **API Key Management**: Generate and manage API keys
+- **OAuth Integration**: Google OAuth support
+
+### Advanced Features
+- **Batch Predictions**: Run predictions for multiple assets
+- **Sentiment Analysis**: News and social media sentiment
+- **Risk Management**: Position sizing, VaR, stress testing
+- **Portfolio Analysis**: Efficient frontier, rebalancing, tax-loss harvesting
+- **Social Features**: Strategy sharing, leaderboards, following
+
+## 🏗️ Architecture
+
+### Frontend (Next.js 16)
+- **Landing Page**: Professional marketing page with features and pricing
+- **Authentication**: Login and signup pages with role-based routing
+- **User Dashboard**: Personalized dashboard for regular users
+- **Admin Dashboard**: Administrative interface with full system control
+- **Deployment**: Vercel (free tier)
+
+### Backend (FastAPI)
+- **API Endpoints**: 50+ RESTful endpoints for market data and user management
+- **Authentication**: JWT-based auth with role verification
+- **Rate Limiting**: Configurable rate limits per endpoint
+- **Security**: CORS, security headers, input sanitization
+- **Deployment**: Railway (Nixpacks, no Docker required)
+
+### Data Storage
+- **User Data**: SQLite with JSON file storage
+- **Signal History**: JSON lines database for 90-day retention
+- **Cache**: Redis for rate limiting and session management
+
+## 🛠️ Installation
+
+### Prerequisites
+- Python 3.8+
+- Node.js 18+
+- npm or yarn
+
+### Backend Setup
 ```bash
+# Clone the repository
+git clone https://github.com/souravdas090300/market-predictor.git
+cd market-predictor
+
+# Install Python dependencies
 pip install -r requirements.txt
-pytest -q
-python -m scripts.cli AAPL BTC-USD GC=F EURUSD=X    # quick check
-```
 
-## Running the application
-
-### Development Mode
-```bash
+# Run development server
 python scripts/run_dev.py
 ```
-This starts the application with:
-- Debug mode enabled
-- Relaxed security settings
-- Verbose logging
-- Auto-reload on code changes
-- Access at http://localhost:8000
 
-### Production Mode
+### Frontend Setup
 ```bash
-python scripts/run_prod.py
+cd frontend
+
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
 ```
-This starts the application with:
-- Strict security settings
-- Multiple workers for performance
-- Standard logging
-- No auto-reload
-- Access at http://localhost:8000
 
-See [docs/ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md) for detailed environment configuration.
+## 🔐 Authentication
 
-## Two modes
+### Default Credentials
 
-**Automatic mode** needs nothing from you. It combines:
-1. Technical indicators: RSI, MACD, moving averages, Bollinger, ATR, volatility, yearly range
-2. Candlestick patterns: hammer, shooting star, engulfing, morning/evening star, harami, three soldiers/crows,
-   marubozu, doji, piercing line, dark cloud (context-aware)
-3. ML model: gradient boosting on those features, calibrated on out-of-sample predictions so it doesn't lie
-4. News tone: recent headlines (Google News RSS) scored for sentiment
+**Admin User:**
+- Username: `admin`
+- Password: `admin12345`
+- Role: `superuser`
 
-**Material mode** lets you paste your own news, report summaries or notes about an asset. Each asset's panel
-suggests what is worth pasting:
-- **Shares**: earnings release, analyst upgrades, market-wide news on rates or jobs
-- **Crypto**: ETF flows, regulation, staking or halving events, macro news on rates or the dollar
-- **Forex**: central bank statements, CPI/jobs/GDP data. Write from the first currency's view.
-- **Commodities**: OPEC decisions, inventory reports, China data, supply disruptions, dollar and rate moves
+**Demo User:**
+- Username: `demo`
+- Password: `demo12345`
+- Role: `user`
 
-You can read the material on its own, or combine it with the automatic signal: your text can move the
-probability by at most +/-0.15 (`MATERIAL_WEIGHT` in `config.py`). Wording is understood per market.
+### User Roles
 
-## Markets
+| Role | Dashboard Access | Admin Access | API Access |
+|------|------------------|--------------|------------|
+| `user` | ✅ | ❌ | Public APIs |
+| `admin` | ✅ | ✅ | Admin APIs |
+| `superuser` | ✅ | ✅ | All APIs |
 
-Out of the box: shares (AAPL, MSFT, NVDA, S&P 500), crypto (BTC, ETH), forex (EUR/USD, GBP/USD)
-and commodities (gold, silver, WTI oil, natural gas, copper). Any Yahoo Finance symbol works:
+## 📡 API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/login` - User login (returns role)
+- `POST /api/auth/refresh` - Refresh access token
+- `GET /api/auth/me` - Get current user info
+- `POST /api/auth/api-key` - Create API key
+- `GET /api/auth/api-keys` - List API keys
+- `DELETE /api/auth/api-key/{key_id}` - Revoke API key
+
+### Market Data
+- `GET /api/watchlist` - Get watchlist
+- `GET /api/signal/{symbol}` - Get signal for symbol
+- `GET /api/quote/{symbol}` - Get live quote
+- `GET /api/quotes` - Get multiple quotes
+- `GET /api/assets/all` - Get all assets
+- `GET /api/predictions/assets` - Get assets list
+- `GET /api/predictions/assets/{symbol}/predictions` - Get predictions
+
+### Material Analysis
+- `POST /api/material` - Analyze text material
+- `POST /api/material-from-url` - Fetch and analyze URL
+- `POST /api/material-from-file` - Upload and analyze file
+
+### Admin (Superuser Required)
+- `POST /api/admin/auth/login` - Admin login
+- `GET /api/admin/users` - List all users
+- `POST /api/admin/add-admin/{username}` - Add admin user
+- `DELETE /api/admin/remove-admin/{username}` - Remove admin
+- `PUT /api/admin/user/{username}/enable` - Enable user
+- `PUT /api/admin/user/{username}/disable` - Disable user
+- `GET /api/admin/stats` - System statistics
+
+### Advanced Features
+- `POST /api/backtest/run` - Run backtest
+- `POST /api/sentiment/advanced` - Advanced sentiment analysis
+- `POST /api/risk/calculate` - Calculate risk metrics
+- `POST /api/strategy/optimize` - Optimize strategy
+- `POST /api/portfolio/analyze` - Analyze portfolio
+
+## 🎯 Frontend Routes
+
+### Public Routes
+- `/` - Landing page
+- `/auth/login` - Login page
+- `/auth/signup` - Registration page
+
+### Protected Routes
+- `/dashboard` - User dashboard (requires login)
+- `/admin` - Admin dashboard (requires admin role)
+
+## 🚀 Deployment
+
+### Production Deployment (Vercel + Railway)
+
+**Frontend (Vercel):**
+```bash
+cd frontend
+npm run build
+vercel deploy
+```
+
+**Backend (Railway):**
+```bash
+# Railway auto-deploys from GitHub
+# Ensure railway.json is configured
+railway up
+```
+
+### Environment Variables
+
+**Frontend (.env.local):**
+```env
+NEXT_PUBLIC_API_URL=https://your-railway-app.up.railway.app
+NEXT_PUBLIC_APP_URL=https://your-vercel-app.vercel.app
+```
+
+**Backend (.env):**
+```env
+SECRET_KEY=your-secret-key-here
+CORS_ORIGINS=https://your-vercel-app.vercel.app,http://localhost:3000
+```
+
+### Docker Deployment (Alternative)
+```bash
+docker build -t market-predictor .
+docker run -p 8000:8000 market-predictor
+```
+
+## 🧪 Testing
+
+### Backend Tests
+```bash
+pytest -q
+```
+
+### Manual Testing
+```bash
+# Test market prediction
+python -m scripts.cli AAPL BTC-USD EURUSD=X
+
+# Test signal history
+python -m scripts.cli history --symbol AAPL
+
+# Test portfolio metrics
+python -m scripts.cli portfolio AAPL,BTC-USD
+```
+
+### API Testing
+```bash
+# Test login
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin12345"}'
+
+# Test market signal
+curl http://localhost:8000/api/signal/AAPL
+```
+
+## 📊 Markets Supported
+
+Out of the box: shares (AAPL, MSFT, NVDA, S&P 500), crypto (BTC, ETH), forex (EUR/USD, GBP/USD) and commodities (gold, silver, WTI oil, natural gas, copper).
+
+Any Yahoo Finance symbol works:
 - `symbol` or `SYMBOL` = share (e.g. TSLA, NVDA, ^GSPC)
 - `symbol-USD` = crypto (e.g. SOL-USD, ETH-USD)
 - `symbol=X` = forex pair (e.g. EURUSD=X, GBPUSD=X)
 - `symbol=F` = commodity futures (e.g. GC=F for gold, CL=F for oil)
 
-## Advanced features
+## 🔧 Configuration
 
-### Dashboard
-- **Filter by market**: All, Shares, Crypto, Forex, Commodities
-- **Material panel**: paste text, URL (fetch & read), or upload a PDF or CSV
-- **Candlestick chart**: 60-day price action with pattern markers
-- **Indicators**: RSI, MACD, moving average distance, volatility
-- **Track record**: out-of-sample accuracy compared to a naive baseline
+Edit `app/core/config.py` to customize:
+- Watchlist symbols
+- Feature weights
+- Date ranges
+- API cache duration
+- Rate limits
+- CORS origins
 
-### API endpoints
-- `GET /api/watchlist` — list of tracked symbols
-- `GET /api/signal/{symbol}` — automatic analysis (prices, candles, ML, news)
-- `POST /api/material` — read text material on its own or combined with auto signal
-- `POST /api/material-from-url` — fetch and read a web page as material
-- `POST /api/material-from-file` — upload and read a PDF or CSV as material
-- `GET /api/signal/{symbol}/history` — logged signals and metrics for a symbol
-- `POST /api/bulk` — analyse up to 50 symbols in one request
-- `GET /api/portfolio` — aggregate metrics across multiple symbols
-- `GET /api/export/{symbol}` — download signal history as CSV or JSON
-- `GET /api/classes` — market types and material hints per class
+## 📈 How It Works
 
-### CLI
-```
-python -m scripts.cli AAPL BTC-USD EURUSD=X    # auto signals
-python -m scripts.cli history --symbol AAPL    # signal history
-python -m scripts.cli portfolio AAPL,BTC-USD   # portfolio metrics
-```
+### Automatic Mode
+Combines:
+1. **Technical Indicators**: RSI, MACD, moving averages, Bollinger, ATR, volatility
+2. **Candlestick Patterns**: Hammer, shooting star, engulfing, morning/evening star, etc.
+3. **ML Model**: Gradient boosting with Platt scaling for calibrated predictions
+4. **News Sentiment**: Recent headlines scored for market sentiment
 
-### Signal history & logging
-Every signal is logged to `signals.db` (JSON lines file). See recent history with the dashboard or API.
-Entries are kept for 90 days; `history.purge_old()` removes older entries.
+### Material Mode
+Lets you analyze your own text material:
+- **Shares**: Earnings releases, analyst upgrades, market news
+- **Crypto**: ETF flows, regulation, staking events, macro news
+- **Forex**: Central bank statements, economic data
+- **Commodities**: OPEC decisions, inventory reports, supply disruptions
 
-### Risk metrics
-`metrics.py` computes aggregate statistics across signals:
-- Average probability across all signals
-- Count of bullish, bearish, neutral leans
-- How many high-confidence calls have been made
-- Portfolio-level aggregates
+## 🛡️ Security
 
-## How honest is it?
+- **JWT Authentication**: Secure token-based authentication
+- **Role-Based Access Control**: Admin/user role separation
+- **Rate Limiting**: Configurable per-endpoint limits
+- **Input Sanitization**: All inputs validated and sanitized
+- **CORS Protection**: Configurable CORS origins
+- **Security Headers**: Standard security headers on all responses
 
-- **No lookahead**: Features only use data up to each day (there's a test for this).
-- **No training leakage**: Evaluation is walk-forward with a gap, so no training row overlaps a test row.
-- **Calibrated**: The model uses Platt scaling to map out-of-sample predictions to actual frequencies, so a model with no edge shows about 50%, not 85%.
-- **Track record shown**: The dashboard shows out-of-sample accuracy next to the "always guess the common outcome" baseline. If those are close, treat the signal as noise.
-- **Expected accuracy**: 51–58% is normal for daily direction prediction. This can still be useful if you combine it with other signals.
+## 📝 Development
 
-## What material does and doesn't do
-
-Material is scored on its **wording**, not checked for truth, and it has no back-tested track record like the model.
-- **Few clear sentences**: if only a few carry a signal, the result is pulled toward zero and has little effect.
-- **Market-aware**: "output cut" and "inventory draw" read as bullish for oil; "inflation" is not counted against
-  commodities.
-- **One person's take**: material wording is weighted at 15 points max, so it nudges but never dominates the auto signal.
-
-## Wording understood per market
-
-### Shares
-Positive: surge, beat, record high, upgrade, growth, profit, strong, boost
-Negative: fall, miss, downgrade, weakness, loss, fear, crash, recession, lawsuit, tariff
-
-### Crypto
-Shares + adoption, accumulation, staking (positive); delisting, liquidation, exploit, rug (negative)
-
-### Forex & commodities
-Commodity-specific: supply cut, inventory draw, OPEC cut (positive); supply glut, inventory build, weak demand (negative)
-
-Forex: write from the first currency's view, e.g. "euro weakens after weak German data"
-
-### All
-Multi-word phrases are matched first: "rate cut" (positive), "rate hike" (negative), "raises guidance" (positive)
-
-## Notes
-
-- **Continuous vs contract futures**: gold and oil come from continuous futures, so contract rolls can show up as
-  small gaps in the candles.
-- **News**: free news sources don't provide history, so headlines only adjust today's probability. To train on
-  historical sentiment, log daily scores for a few months and add them to `features.py`.
-- **No FinBERT by default**: the app uses a small lexicon (no downloads, works offline). Install `transformers`
-  and `torch`, then run with `USE_FINBERT=1` for better headline scoring.
-
-## Deployment
-
-### Production Deployment (Vercel + Railway - Docker-less)
-
-The recommended production setup uses **Vercel** for the Next.js frontend and **Railway** for the Python FastAPI backend without Docker, using Railway's native Nixpacks build system.
-
-**Quick Start:**
-- See [QUICK_START.md](QUICK_START.md) for a 5-minute deployment guide
-- See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions
-- See [CI_CD_SETUP.md](CI_CD_SETUP.md) for CI/CD pipeline configuration
-- See [REPOSITORY_STRUCTURE.md](REPOSITORY_STRUCTURE.md) for repository structure information
-- Run `python market-predictor/scripts/deploy.py` for deployment preparation checklist
-
-**Architecture:**
-- Frontend: Next.js 16 on Vercel (free tier)
-- Backend: Python FastAPI on Railway using Nixpacks (no Docker, free tier with credits)
-- Database: SQLite (persistent storage on Railway)
-- Caching: Redis on Railway for rate limiting and sessions
-
-**Manual Deployment:**
+### Backend Development
 ```bash
-# Generate production secret key
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-
-# Follow the deployment guide for platform-specific setup
-```
-
-### Local Development
-```bash
-# Development mode
+# Development mode with auto-reload
 python scripts/run_dev.py
 
 # Production mode locally
 python scripts/run_prod.py
 ```
 
-### Alternative: Docker Deployment
-If you prefer Docker deployment, a `Dockerfile` is included in the repository root:
+### Frontend Development
 ```bash
-docker build -t market-predictor .
-docker run -p 8000:8000 market-predictor
+cd frontend
+npm run dev
 ```
 
-### Development
-1. Edit `app/core/config.py` to change the watchlist, weights or date range
-2. Run `pytest -q` after changes
-3. Use `python -m scripts.cli` for quick testing
-4. The API caches responses for 5 minutes; use `?refresh=true` to bust the cache
+### Code Quality
+```bash
+# Run tests
+pytest -q
 
-## What's next?
+# Linting (if configured)
+flake8 app/
+```
 
-- Log outcomes and measure live accuracy against historical signals
-- Add macro indicators (VIX, DXY, long-term rates) as market-wide context
-- Train FinBERT on your own market data for better sentiment
-- Port to Next.js for auth, user watchlists and alerts on Vercel with API on Railway
-- Add correlation analysis to compare how assets move together
-# Force Vercel to pick up latest commit
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 🆘 Support
+
+For issues and questions:
+- Check the documentation
+- Review API endpoints
+- Test with demo credentials
+- Check logs for errors
+
+## 🎯 What's Next
+
+- [ ] Add more ML models for ensemble predictions
+- [ ] Implement real-time WebSocket data streams
+- [ ] Add mobile app support
+- [ ] Enhance social features and community
+- [ ] Add more brokers for trading integration
+- [ ] Implement advanced order types
+- [ ] Add paper trading mode
+
+---
+
+**Built with ❤️ using Next.js, FastAPI, and modern ML techniques**
