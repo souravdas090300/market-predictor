@@ -545,7 +545,7 @@
         // Auth helpers
         async function adminLogin(username, password) {
             try {
-                const response = await fetch('/auth/login', {
+                const response = await fetch('/api/admin/auth/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -582,7 +582,7 @@
         // Overview
         async function loadOverview() {
             try {
-                const stats = await apiCall('/stats');
+                const stats = await apiCall('/api/admin/stats');
                 
                 document.getElementById('total-assets').textContent = stats.batch_predictions.total_assets;
                 document.getElementById('bullish-count').textContent = stats.batch_predictions.bullish_count;
@@ -600,7 +600,7 @@
         // Rate Limiting
         async function loadRateLimiting() {
             try {
-                const config = await apiCall('/config');
+                const config = await apiCall('/api/admin/config');
                 
                 document.getElementById('rate-limiting-toggle').checked = config.rate_limiting_enabled;
                 document.getElementById('maintenance-toggle').checked = config.maintenance_mode;
@@ -631,7 +631,7 @@
         async function toggleRateLimiting() {
             const enabled = document.getElementById('rate-limiting-toggle').checked;
             try {
-                await apiCall('/rate-limiting?enabled=' + enabled, { method: 'POST' });
+                await apiCall('/api/admin/rate-limiting?enabled=' + enabled, { method: 'POST' });
                 showMessage(`Rate limiting ${enabled ? 'enabled' : 'disabled'}`);
             } catch (error) {
                 showMessage('Error toggling rate limiting: ' + error.message, 'error');
@@ -641,7 +641,7 @@
         async function toggleMaintenance() {
             const enabled = document.getElementById('maintenance-toggle').checked;
             try {
-                await apiCall('/maintenance?enabled=' + enabled, { method: 'POST' });
+                await apiCall('/api/admin/maintenance?enabled=' + enabled, { method: 'POST' });
                 showMessage(`Maintenance mode ${enabled ? 'enabled' : 'disabled'}`);
             } catch (error) {
                 showMessage('Error toggling maintenance mode: ' + error.message, 'error');
@@ -658,7 +658,7 @@
             }
             
             try {
-                await apiCall(`/rate-limit/${endpoint}?limit=${encodeURIComponent(newLimit)}`, { method: 'POST' });
+                await apiCall(`/api/admin/rate-limit/${endpoint}?limit=${encodeURIComponent(newLimit)}`, { method: 'POST' });
                 showMessage(`Rate limit updated for ${endpoint}`);
                 loadRateLimiting();
             } catch (error) {
@@ -672,7 +672,7 @@
             resultsDiv.innerHTML = '<div class="loading">Running batch prediction...</div>';
             
             try {
-                const results = await apiCall('/batch/predict?force_refresh=true', { method: 'POST' });
+                const results = await apiCall('/api/admin/batch/predict?force_refresh=true', { method: 'POST' });
                 
                 let html = `
                     <div class="success">
@@ -714,7 +714,7 @@
 
         async function loadBatchStatus() {
             try {
-                const status = await apiCall('/batch/status');
+                const status = await apiCall('/api/admin/batch/status');
                 
                 const resultsDiv = document.getElementById('batch-results');
                 resultsDiv.innerHTML = `
@@ -750,7 +750,7 @@
         // Users
         async function loadUsers() {
             try {
-                const response = await fetch('/users', {
+                const response = await fetch('/api/admin/users', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -783,7 +783,7 @@
 
         async function loadSubscriptions() {
             try {
-                const response = await fetch('/users', {
+                const response = await fetch('/api/admin/users', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
                         'Content-Type': 'application/json'
@@ -826,7 +826,7 @@
             }
             
             try {
-                const response = await fetch(`/user/${username}/subscription?plan=${plan}&duration_days=${duration}`, {
+                const response = await fetch(`/api/admin/user/${username}/subscription?plan=${plan}&duration_days=${duration}`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -852,7 +852,7 @@
 
         async function enableUser(username) {
             try {
-                const response = await fetch(`/user/${username}/enable`, {
+                const response = await fetch(`/api/admin/user/${username}/enable`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -872,7 +872,7 @@
 
         async function disableUser(username) {
             try {
-                const response = await fetch(`/user/${username}/disable`, {
+                const response = await fetch(`/api/admin/user/${username}/disable`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -898,10 +898,10 @@
             }
             
             try {
-                await apiCall(`/add-admin/${username}`, { method: 'POST' });
+                await apiCall(`/api/admin/add-admin/${username}`, { method: 'POST' });
                 showMessage(`Granted superuser privileges to ${username}`);
                 document.getElementById('admin-username').value = '';
-                loadAdminUsers();
+                loadUsers();
             } catch (error) {
                 showMessage('Error granting superuser: ' + error.message, 'error');
             }
@@ -909,12 +909,16 @@
 
         async function removeAdminUser(username) {
             try {
-                await apiCall(`/remove-admin/${username}`, { method: 'DELETE' });
+                await apiCall(`/api/admin/remove-admin/${username}`, { method: 'DELETE' });
                 showMessage(`Revoked superuser privileges from ${username}`);
-                loadAdminUsers();
+                loadUsers();
             } catch (error) {
                 showMessage('Error revoking superuser: ' + error.message, 'error');
             }
+        }
+
+        function loadAdminUsers() {
+            loadUsers(); // Reuse the loadUsers function
         }
 
         // Event listeners

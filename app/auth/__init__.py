@@ -529,6 +529,12 @@ def ensure_demo_user():
     if _demo_user_initialized:
         return
     
+    # SECURITY: Only create demo user in development
+    from ..core import config
+    if config.ENV == "production":
+        _demo_user_initialized = True
+        return
+    
     try:
         user_manager.create_user(
             username="demo",
@@ -544,6 +550,12 @@ def ensure_admin_user():
     """Ensure admin user exists for testing."""
     global _admin_user_initialized
     if _admin_user_initialized:
+        return
+    
+    # SECURITY: Only create admin user in development
+    from ..core import config
+    if config.ENV == "production":
+        _admin_user_initialized = True
         return
     
     try:

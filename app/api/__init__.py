@@ -29,6 +29,7 @@ from ..security import (
     AuthenticationError
 )
 from ..auth import UserManager, user_manager
+from ..admin import admin_manager
 from ..services import charts
 from ..services import risk
 from ..services import strategy
@@ -38,7 +39,7 @@ from ..services import batch_prediction
 from ..services import backtesting
 from ..services import advanced_sentiment
 from ..services import trading_automation
-from ..admin import admin_manager
+
 
 # Initialize security components
 security = HTTPBearer()
@@ -268,7 +269,7 @@ def get_assets_by_class(request: Request, asset_class: str):
 
 
 # Admin endpoints
-from ..admin import admin_manager
+
 
 # Admin-only dependency
 def admin_required(current_user: dict = Depends(get_current_active_user)):
@@ -2899,7 +2900,15 @@ def setup_admin_user(request: Request):
                 "email": existing_admin["email"]
             }
         
-        # Create admin user
+        # SECURITY: Don't allow creating admin via API in production
+        # Admin should be created via environment variables or CLI
+        if config.ENV == "production":
+            raise HTTPException(
+                status_code=403,
+                detail="Admin creation via API is disabled in production. Use environment variables or CLI."
+            )
+        
+        # Create admin user (development only)
         admin_data = user_manager.create_user(
             username="admin",
             email="admin@marketpredictor.local",
@@ -2919,7 +2928,6 @@ def setup_admin_user(request: Request):
             "message": "Admin user created successfully",
             "username": "admin",
             "email": "admin@marketpredictor.local",
-            "password": "admin123",
             "user_id": admin_data["user_id"],
             "roles": admin_data["roles"],
             "is_superuser": admin_data["is_superuser"]
@@ -2945,7 +2953,14 @@ def setup_demo_user(request: Request):
                 "email": existing_demo["email"]
             }
         
-        # Create demo user
+        # SECURITY: Don't allow creating demo user via API in production
+        if config.ENV == "production":
+            raise HTTPException(
+                status_code=403,
+                detail="Demo user creation via API is disabled in production."
+            )
+        
+        # Create demo user (development only)
         demo_data = user_manager.create_user(
             username="demo",
             email="demo@marketpredictor.local",
@@ -2962,7 +2977,6 @@ def setup_demo_user(request: Request):
             "message": "Demo user created successfully",
             "username": "demo",
             "email": "demo@marketpredictor.local",
-            "password": "demo123",
             "user_id": demo_data["user_id"],
             "roles": demo_data["roles"],
             "is_superuser": demo_data["is_superuser"]
@@ -3194,6 +3208,16 @@ def system_status(request: Request):
         }
 
 
+# Admin page route (must be before static mount)
+@app.get("/admin")
+async def admin_page():
+    """Serve the admin dashboard page."""
+    admin_path = config.ROOT / "static" / "admin" / "index.html"
+    if admin_path.exists():
+        return FileResponse(admin_path, media_type="text/html")
+    return Response(status_code=404, content="Admin page not found")
+
+
 # Favicon endpoint to prevent 404/502 errors (must be before static mount)
 @app.get("/favicon.ico")
 async def favicon():
@@ -3215,5 +3239,5 @@ async def favicon_png():
 
 
 # Static files last so they cannot shadow /api routes.
-# Note: /admin is handled by Next.js frontend, not static files
+# Note: /admin is now handled by the specific route above
 app.mount("/", StaticFiles(directory=str(config.ROOT / "static"), html=True), name="static")
