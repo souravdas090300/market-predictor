@@ -2773,14 +2773,25 @@ def login(request: Request, body: LoginRequest):
         "success": True
     })
     
+    # Determine primary role for frontend compatibility
+    primary_role = "user"
+    if user_data.get("is_superuser", False):
+        primary_role = "superuser"
+    elif "admin" in user_data.get("roles", []):
+        primary_role = "admin"
+    else:
+        primary_role = user_data.get("roles", ["user"])[0] if user_data.get("roles") else "user"
+    
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         "user": {
+            "id": user_data["user_id"],
             "username": user_data["username"],
             "email": user_data["email"],
+            "role": primary_role,  # CRITICAL: Single role field for frontend
             "is_superuser": user_data.get("is_superuser", False),
             "roles": user_data.get("roles", ["user"])
         }
@@ -2918,47 +2929,49 @@ def setup_admin_user(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error creating admin user: {str(e)}")
-    
+
+
+@app.post("/api/auth/setup-demo")
+@limiter.limit("1/hour")
+def setup_demo_user(request: Request):
+    """Setup demo user for testing (one-time setup)."""
     try:
-        # Check if admin already exists
-        existing_admin = user_manager.get_user_by_username("admin")
-        if existing_admin:
+        # Check if demo already exists
+        existing_demo = user_manager.get_user_by_username("demo")
+        if existing_demo:
             return {
-                "message": "Admin user already exists",
-                "username": "admin",
-                "email": existing_admin["email"]
+                "message": "Demo user already exists",
+                "username": "demo",
+                "email": existing_demo["email"]
             }
         
-        # Create admin user
-        admin_data = user_manager.create_user(
-            username="admin",
-            email="admin@marketpredictor.local",
-            password="admin123"
+        # Create demo user
+        demo_data = user_manager.create_user(
+            username="demo",
+            email="demo@marketpredictor.local",
+            password="demo12345"
         )
         
-        # Set as superuser
-        user_manager.set_superuser(admin_data["user_id"], True)
-        
-        log_security_event("ADMIN_USER_CREATED", {
-            "user_id": admin_data["user_id"],
-            "username": "admin",
+        log_security_event("DEMO_USER_CREATED", {
+            "user_id": demo_data["user_id"],
+            "username": "demo",
             "setup_method": "api_endpoint"
         })
         
         return {
-            "message": "Admin user created successfully",
-            "username": "admin",
-            "email": "admin@marketpredictor.local",
-            "password": "admin123",
-            "user_id": admin_data["user_id"],
-            "roles": admin_data["roles"],
-            "is_superuser": admin_data["is_superuser"]
+            "message": "Demo user created successfully",
+            "username": "demo",
+            "email": "demo@marketpredictor.local",
+            "password": "demo123",
+            "user_id": demo_data["user_id"],
+            "roles": demo_data["roles"],
+            "is_superuser": demo_data["is_superuser"]
         }
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating admin user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating demo user: {str(e)}")
 
 
 @app.get("/api/auth/me")
