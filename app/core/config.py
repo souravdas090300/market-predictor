@@ -102,6 +102,11 @@ ENABLE_DEBUG_MODE = os.getenv("ENABLE_DEBUG_MODE", "true" if ENV == "development
 ENABLE_PROFILING = os.getenv("ENABLE_PROFILING", "false").lower() == "true"
 ENABLE_TESTING_MODE = os.getenv("ENABLE_TESTING_MODE", "true" if ENV == "development" else "false").lower() == "true"
 
+# Subscription Settings
+# When false, all users have access to all features regardless of subscription status
+# When true, only subscribed users can access premium features
+SUBSCRIPTION_MODE_ENABLED = os.getenv("SUBSCRIPTION_MODE_ENABLED", "false").lower() == "true"
+
 # Advanced features
 HISTORY_KEEP_DAYS = 90
 

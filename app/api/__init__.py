@@ -335,6 +335,10 @@ class AdminLoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=100)
 
 
+class SubscriptionModeRequest(BaseModel):
+    enabled: bool = Field(..., description="Enable or disable subscription mode")
+
+
 @app.post("/api/admin/auth/login")
 @limiter.limit("10/minute")
 def admin_login(request: Request, body: AdminLoginRequest):
@@ -436,6 +440,39 @@ def toggle_maintenance(request: Request, enabled: bool, current_user: dict = Dep
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error toggling maintenance mode: {str(e)}")
+
+
+@app.get("/api/admin/subscription-mode")
+@limiter.limit("30/minute")
+def get_subscription_mode(request: Request, current_user: dict = Depends(admin_required)):
+    """Get subscription mode status (admin-only)."""
+    try:
+        return {
+            "subscription_mode_enabled": config.SUBSCRIPTION_MODE_ENABLED
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting subscription mode: {str(e)}")
+
+
+@app.post("/api/admin/subscription-mode")
+@limiter.limit("10/minute")
+def toggle_subscription_mode(request: Request, body: SubscriptionModeRequest, current_user: dict = Depends(admin_required)):
+    """Enable or disable subscription mode (admin-only)."""
+    try:
+        # Update the environment variable in the config
+        config.SUBSCRIPTION_MODE_ENABLED = body.enabled
+        
+        log_security_event("SUBSCRIPTION_MODE_TOGGLED", {
+            "enabled": body.enabled,
+            "admin": current_user["username"]
+        })
+        
+        return {
+            "message": f"Subscription mode {'enabled' if body.enabled else 'disabled'}",
+            "subscription_mode_enabled": body.enabled
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error toggling subscription mode: {str(e)}")
 
 
 @app.get("/api/admin/stats")
@@ -3119,7 +3156,90 @@ def get_user_subscription(request: Request, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=404, detail="User not found")
     
     subscription = user_manager.get_subscription_status(user["user_id"])
+    
+    # Add subscription mode status to response
+    subscription["subscription_mode_enabled"] = config.SUBSCRIPTION_MODE_ENABLED
+    
     return subscription
+
+
+@app.get("/api/user/features")
+@limiter.limit("30/minute")
+def get_user_features(request: Request, current_user: dict = Depends(get_current_active_user)):
+    """Get user's available features based on subscription."""
+    try:
+        # Get user
+        user = None
+        for u in user_manager.users.values():
+            if u["username"] == current_user["username"]:
+                user = u
+                break
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get user's subscription plan
+        subscription = user_manager.get_subscription_status(user["user_id"])
+        plan_str = subscription.get("plan", "free")
+        
+        try:
+            from ..auth import SubscriptionPlan
+            plan = SubscriptionPlan(plan_str)
+        except ValueError:
+            plan = SubscriptionPlan.FREE
+        
+        # Get effective plan (considering subscription mode)
+        from ..admin.feature_limits import get_user_effective_plan, feature_limits_manager
+        effective_plan = get_user_effective_plan(plan)
+        
+        # Get available features
+        available_features = feature_limits_manager.get_available_features(effective_plan)
+        user_limits = feature_limits_manager.get_user_limits(effective_plan)
+        
+        return {
+            "subscription_mode_enabled": config.SUBSCRIPTION_MODE_ENABLED,
+            "current_plan": plan_str,
+            "effective_plan": effective_plan.value,
+            "available_features": available_features,
+            "limits": user_limits,
+            "has_full_access": not config.SUBSCRIPTION_MODE_ENABLED
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting user features: {str(e)}")
+
+
+# Helper function for checking user feature access
+def check_user_feature_access(feature: str, current_user: dict) -> bool:
+    """Check if current user has access to a specific feature."""
+    try:
+        # If subscription mode is disabled, everyone has access
+        if not config.SUBSCRIPTION_MODE_ENABLED:
+            return True
+        
+        # Get user
+        user = None
+        for u in user_manager.users.values():
+            if u["username"] == current_user["username"]:
+                user = u
+                break
+        
+        if not user:
+            return False
+        
+        # Get user's subscription plan
+        subscription = user_manager.get_subscription_status(user["user_id"])
+        plan_str = subscription.get("plan", "free")
+        
+        try:
+            from ..auth import SubscriptionPlan
+            from ..admin.feature_limits import FeatureType, check_feature_access
+            plan = SubscriptionPlan(plan_str)
+            feature_type = FeatureType(feature)
+            return check_feature_access(feature_type, plan)
+        except (ValueError, KeyError):
+            return False
+    except Exception:
+        return False
 
 
 @app.put("/api/user/subscription")

@@ -345,9 +345,28 @@ feature_limits_manager = FeatureLimitsManager()
 
 def check_feature_access(feature: FeatureType, plan: SubscriptionPlan) -> bool:
     """Convenience function to check feature access."""
+    # If subscription mode is disabled, all users have access to all features
+    if not config.SUBSCRIPTION_MODE_ENABLED:
+        return True
     return feature_limits_manager.has_access(feature, plan)
 
 
 def check_feature_limit(feature: FeatureType, plan: SubscriptionPlan, current_usage: int) -> Dict[str, Any]:
     """Convenience function to check feature limits."""
+    # If subscription mode is disabled, all users have unlimited access
+    if not config.SUBSCRIPTION_MODE_ENABLED:
+        return {
+            "allowed": True,
+            "reason": "Subscription mode disabled - unlimited access",
+            "limit": "unlimited",
+            "current_usage": current_usage
+        }
     return feature_limits_manager.check_limit(feature, plan, current_usage)
+
+
+def get_user_effective_plan(user_plan: SubscriptionPlan) -> SubscriptionPlan:
+    """Get the effective plan for a user considering subscription mode."""
+    # If subscription mode is disabled, treat all users as enterprise (full access)
+    if not config.SUBSCRIPTION_MODE_ENABLED:
+        return SubscriptionPlan.ENTERPRISE
+    return user_plan

@@ -295,11 +295,165 @@ function AnalyticsTab() {
 }
 
 function SettingsTab() {
+  const [subscriptionMode, setSubscriptionMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    fetchSubscriptionMode();
+  }, []);
+
+  const fetchSubscriptionMode = async () => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/subscription-mode`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionMode(data.subscription_mode_enabled);
+      }
+    } catch (err) {
+      console.error('Error fetching subscription mode:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSubscriptionMode = async (enabled) => {
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const token = localStorage.getItem('auth-token');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/subscription-mode`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ enabled })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionMode(enabled);
+        setSuccess(data.message);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.detail || 'Failed to update subscription mode');
+      }
+    } catch (err) {
+      console.error('Error toggling subscription mode:', err);
+      setError('An error occurred. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div>
       <h2 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '2rem' }}>System Settings</h2>
 
       <div style={{ maxWidth: '600px' }}>
+        {/* Subscription Mode Toggle */}
+        <div style={{ marginBottom: '2rem', border: '1px solid #2D3748', padding: '1.5rem', borderRadius: '8px' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
+            Subscription Mode
+          </label>
+          <p style={{ color: '#D1D5DB', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            When enabled, only subscribed users can access premium features. When disabled, all users have full access.
+          </p>
+          
+          {loading ? (
+            <div style={{ color: '#D1D5DB' }}>Loading...</div>
+          ) : (
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button
+                onClick={() => toggleSubscriptionMode(true)}
+                disabled={saving}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: subscriptionMode ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
+                  color: subscriptionMode ? '#10B981' : '#D1D5DB',
+                  border: subscriptionMode ? '1px solid #10B981' : '1px solid #2D3748',
+                  borderRadius: '6px',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  opacity: saving ? 0.6 : 1
+                }}
+              >
+                Enable
+              </button>
+              <button
+                onClick={() => toggleSubscriptionMode(false)}
+                disabled={saving}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: !subscriptionMode ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
+                  color: !subscriptionMode ? '#EF4444' : '#D1D5DB',
+                  border: !subscriptionMode ? '1px solid #EF4444' : '1px solid #2D3748',
+                  borderRadius: '6px',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  fontWeight: '600',
+                  opacity: saving ? 0.6 : 1
+                }}
+              >
+                Disable
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid #EF4444',
+              color: '#FCA5A5',
+              borderRadius: '6px',
+              fontSize: '0.9rem'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem',
+              backgroundColor: 'rgba(16, 185, 129, 0.2)',
+              border: '1px solid #10B981',
+              color: '#6EE7B7',
+              borderRadius: '6px',
+              fontSize: '0.9rem'
+            }}>
+              {success}
+            </div>
+          )}
+
+          <div style={{
+            marginTop: '1rem',
+            padding: '0.75rem',
+            backgroundColor: subscriptionMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+            border: `1px solid ${subscriptionMode ? '#10B981' : '#6B7280'}`,
+            borderRadius: '6px',
+            fontSize: '0.85rem',
+            color: subscriptionMode ? '#6EE7B7' : '#9CA3AF'
+          }}>
+            Current status: <strong>{subscriptionMode ? 'ENABLED' : 'DISABLED'}</strong>
+          </div>
+        </div>
+
         <div style={{ marginBottom: '2rem', border: '1px solid #2D3748', padding: '1.5rem', borderRadius: '8px' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
             Maintenance Mode
