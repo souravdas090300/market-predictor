@@ -212,20 +212,11 @@ export const authAPI = {
   },
 
   login: async (username: string, password: string): Promise<AuthTokens & { user: any }> => {
-    try {
-      console.log('Login API call:', { username, passwordLength: password.length });
-      const response = await api.post('/api/auth/login', {
-        username,
-        password
-      });
-      console.log('Login API response:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('Login API error:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
-      throw error;
-    }
+    const response = await api.post('/api/auth/login', {
+      username,
+      password
+    });
+    return response.data;
   },
 
   refreshToken: async (refreshToken: string): Promise<AuthTokens> => {

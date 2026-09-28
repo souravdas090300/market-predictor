@@ -2701,12 +2701,9 @@ def register(request: Request, body: RegisterRequest):
 
 
 @app.post("/api/auth/login")
-# @limiter.limit("10/minute")  # Temporarily disabled for debugging
+@limiter.limit("10/minute")
 def login(request: Request, body: LoginRequest):
     """Authenticate user and return tokens."""
-    # Debug logging
-    print(f"Login attempt: username={body.username}, password_length={len(body.password)}")
-    
     # Authenticate user
     user_data = user_manager.authenticate_user(body.username, body.password)
     
@@ -2832,6 +2829,58 @@ def revoke_api_key(request: Request, key_id: str, current_user: dict = Depends(g
         return {"message": "API key revoked successfully"}
     else:
         raise HTTPException(status_code=404, detail="API key not found")
+
+
+@app.post("/api/auth/setup-admin")
+@limiter.limit("1/hour")
+def setup_admin_user(request: Request, setup_key: str = None):
+    """Setup admin user for production (one-time setup)."""
+    # Simple security check - use a setup key from environment
+    SETUP_KEY = os.getenv("ADMIN_SETUP_KEY", "setup-market-predictor-admin-2024")
+    
+    if setup_key != SETUP_KEY:
+        raise HTTPException(status_code=403, detail="Invalid setup key")
+    
+    try:
+        # Check if admin already exists
+        existing_admin = user_manager.get_user_by_username("admin")
+        if existing_admin:
+            return {
+                "message": "Admin user already exists",
+                "username": "admin",
+                "email": existing_admin["email"]
+            }
+        
+        # Create admin user
+        admin_data = user_manager.create_user(
+            username="admin",
+            email="admin@marketpredictor.local",
+            password="admin123"
+        )
+        
+        # Set as superuser
+        user_manager.set_superuser(admin_data["user_id"], True)
+        
+        log_security_event("ADMIN_USER_CREATED", {
+            "user_id": admin_data["user_id"],
+            "username": "admin",
+            "setup_method": "api_endpoint"
+        })
+        
+        return {
+            "message": "Admin user created successfully",
+            "username": "admin",
+            "email": "admin@marketpredictor.local",
+            "password": "admin123",
+            "user_id": admin_data["user_id"],
+            "roles": admin_data["roles"],
+            "is_superuser": admin_data["is_superuser"]
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating admin user: {str(e)}")
 
 
 @app.get("/api/auth/me")
