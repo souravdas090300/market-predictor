@@ -233,11 +233,19 @@
                     localStorage.setItem('refresh_token', data.refresh_token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     
+                    // Store admin status for frontend checks
+                    const isSuperuser = data.user.is_superuser || data.user.role === 'superuser' || data.user.role === 'admin';
+                    localStorage.setItem('is_superuser', String(isSuperuser));
+                    
                     showMessage('Login successful! Redirecting...', 'success');
                     
-                    // Redirect to dashboard
+                    // Redirect based on user role
                     setTimeout(() => {
-                        window.location.href = '/index.html';
+                        if (isSuperuser) {
+                            window.location.href = '/admin';
+                        } else {
+                            window.location.href = '/index.html';
+                        }
                     }, 1000);
                 } else {
                     showMessage(data.detail || 'Login failed', 'error');
@@ -266,7 +274,12 @@
 
         // Check if already logged in
         if (localStorage.getItem('access_token')) {
-            window.location.href = '/index.html';
+            const isSuperuser = localStorage.getItem('is_superuser') === 'true';
+            if (isSuperuser) {
+                window.location.href = '/admin';
+            } else {
+                window.location.href = '/index.html';
+            }
         }
         
         // Handle login redirect from registration

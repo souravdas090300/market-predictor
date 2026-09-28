@@ -3277,6 +3277,15 @@ async def admin_page_trailing():
     return Response(status_code=404, content="Admin page not found")
 
 
+@app.get("/auth/login")
+async def login_page():
+    """Serve the login page."""
+    login_path = config.ROOT / "static" / "login.html"
+    if login_path.exists():
+        return FileResponse(login_path, media_type="text/html")
+    return Response(status_code=404, content="Login page not found")
+
+
 # Favicon endpoint to prevent 404/502 errors (must be before static mount)
 @app.get("/favicon.ico")
 async def favicon():

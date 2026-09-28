@@ -563,6 +563,10 @@
                 localStorage.setItem('refresh_token', data.refresh_token);
                 localStorage.setItem('user', JSON.stringify(data.user));
                 
+                // Store admin status
+                const isSuperuser = data.user.is_superuser || data.user.role === 'superuser' || data.user.role === 'admin';
+                localStorage.setItem('is_superuser', String(isSuperuser));
+                
                 return data;
             } catch (error) {
                 throw error;
@@ -936,9 +940,14 @@
         // Authentication
         function checkAuthentication() {
             const token = localStorage.getItem('access_token');
-            if (token) {
+            const isSuperuser = localStorage.getItem('is_superuser') === 'true';
+            
+            if (token && isSuperuser) {
                 document.getElementById('login-section').style.display = 'none';
                 document.getElementById('dashboard-section').style.display = 'block';
+            } else if (token && !isSuperuser) {
+                // Has token but not superuser - redirect to main app
+                window.location.href = '/index.html';
             } else {
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('dashboard-section').style.display = 'none';
@@ -968,7 +977,8 @@
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');
-            checkAuthentication();
+            localStorage.removeItem('is_superuser');
+            window.location.href = '/auth/login';
         }
     </script>
 </body>
