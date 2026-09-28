@@ -432,6 +432,47 @@ def add_admin_user(request: Request, username: str, current_user: dict = Depends
         raise HTTPException(status_code=500, detail=f"Error adding superuser: {str(e)}")
 
 
+# Temporary setup endpoint for initial admin setup (remove after first use)
+class SetupAdminRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=100)
+
+@app.post("/api/setup-initial-admin")
+@limiter.limit("5/hour")
+def setup_initial_admin(request: Request, body: SetupAdminRequest):
+    """Setup initial admin user - for one-time use only."""
+    try:
+        # Authenticate the user
+        user_data = user_manager.authenticate_user(body.username, body.password)
+        
+        if not user_data:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Check if there are any existing superusers
+        existing_superusers = [u for u in user_manager.users.values() if u.get("is_superuser", False)]
+        
+        if existing_superusers:
+            raise HTTPException(status_code=403, detail="Admin already exists - use regular admin promotion")
+        
+        # Set as superuser
+        user_manager.set_superuser(user_data["user_id"], True)
+        
+        log_security_event("INITIAL_ADMIN_SETUP", {
+            "username": body.username,
+            "ip": request.client.host
+        })
+        
+        return {
+            "message": f"Initial admin '{body.username}' setup successfully",
+            "username": body.username,
+            "is_superuser": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error setting up initial admin: {str(e)}")
+
+
 @app.delete("/api/admin/remove-admin/{username}")
 @limiter.limit("10/minute")
 def remove_admin_user(request: Request, username: str, current_user: dict = Depends(admin_required)):
