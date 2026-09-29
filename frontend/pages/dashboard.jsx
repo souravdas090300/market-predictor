@@ -24,8 +24,9 @@ export default function Dashboard() {
   const [loadingData, setLoadingData] = useState(false);
   const [shortTermPrediction, setShortTermPrediction] = useState(null);
   const [selectedHorizon, setSelectedHorizon] = useState('24h');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL = 'http://localhost:8000';
 
   useEffect(() => {
     const token = localStorage.getItem('auth-token');
@@ -49,17 +50,17 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     setLoadingData(true);
     try {
-      // Load watchlist
-      const watchlistRes = await fetch(`${API_URL}/api/watchlist`);
-      if (watchlistRes.ok) {
-        const watchlistData = await watchlistRes.json();
-        setWatchlist(watchlistData);
+      // Load all assets from assets/all endpoint to get the full list
+      const assetsRes = await fetch(`${API_URL}/api/assets/all`);
+      if (assetsRes.ok) {
+        const assetsData = await assetsRes.json();
+        setWatchlist(assetsData.assets || []);
       } else {
-        // Fallback to assets endpoint if watchlist fails
-        const assetsRes = await fetch(`${API_URL}/api/assets/all`);
-        if (assetsRes.ok) {
-          const assetsData = await assetsRes.json();
-          setWatchlist(assetsData.assets || []);
+        // Fallback to watchlist endpoint
+        const watchlistRes = await fetch(`${API_URL}/api/watchlist`);
+        if (watchlistRes.ok) {
+          const watchlistData = await watchlistRes.json();
+          setWatchlist(watchlistData);
         }
       }
 
@@ -370,6 +371,7 @@ export default function Dashboard() {
               
               {activeTab === 'analysis' && (
                 <AnalysisComponent 
+                  watchlist={watchlist}
                   selectedSymbol={selectedSymbol}
                   newsData={newsData}
                   sentimentData={sentimentData}
@@ -415,14 +417,73 @@ export default function Dashboard() {
 
 // Watchlist Component
 function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+
+  const filteredAssets = watchlist.filter(item => {
+    const symbol = (item.symbol || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    const category = item.class || item.category || 'stock';
+    
+    const matchesSearch = symbol.includes(query) || name.includes(query);
+    const matchesCategory = filterCategory === 'all' || category === filterCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
+
+  const categories = ['all', 'stock', 'crypto', 'forex', 'commodity'];
+
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
-      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📋 Watchlist ({watchlist.length} assets)</h3>
-      {watchlist.length === 0 ? (
-        <p style={{ color: '#D1D5DB' }}>No items in watchlist</p>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📋 Asset Library ({watchlist.length} assets)</h3>
+      
+      {/* Search and Filter */}
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          placeholder="Search assets..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            flex: 1,
+            minWidth: '200px',
+            padding: '0.75rem',
+            backgroundColor: '#1E293B',
+            color: '#F9FAFB',
+            border: '1px solid #2D3748',
+            borderRadius: '6px',
+            fontSize: '0.9rem'
+          }}
+        />
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          style={{
+            padding: '0.75rem',
+            backgroundColor: '#1E293B',
+            color: '#F9FAFB',
+            border: '1px solid #2D3748',
+            borderRadius: '6px',
+            fontSize: '0.9rem'
+          }}
+        >
+          {categories.map(cat => (
+            <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+          ))}
+        </select>
+      </div>
+      
+      {/* Results count */}
+      <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#D1D5DB' }}>
+        Showing {filteredAssets.length} of {watchlist.length} assets
+      </div>
+      
+      {filteredAssets.length === 0 ? (
+        <p style={{ color: '#D1D5DB' }}>No assets found matching your search</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {watchlist.map((item, index) => {
+          {filteredAssets.map((item, index) => {
             const symbol = item.symbol || item.symbol;
             const name = item.name || item.name;
             const assetClass = item.class || item.category || 'stock';
@@ -555,11 +616,36 @@ function PortfolioComponent({ portfolio, onCalculateRisk, riskMetrics }) {
 
 // Signals Component
 function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalData, onLoadSignal }) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAssets = watchlist.filter(item => {
+    const symbol = (item.symbol || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return symbol.includes(query) || name.includes(query);
+  });
+
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📊 Market Signals</h3>
       
       <div style={{ marginBottom: '1rem' }}>
+        <input
+          type="text"
+          placeholder="Search assets..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            backgroundColor: '#1E293B',
+            color: '#F9FAFB',
+            border: '1px solid #2D3748',
+            borderRadius: '6px',
+            fontSize: '0.9rem',
+            marginBottom: '0.75rem'
+          }}
+        />
         <select
           value={selectedSymbol}
           onChange={(e) => {
@@ -577,7 +663,7 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
           }}
         >
           <option value="">Select a symbol...</option>
-          {watchlist.map((item, index) => {
+          {filteredAssets.slice(0, 100).map((item, index) => {
             const symbol = item.symbol || item.symbol;
             const name = item.name || item.name;
             return (
@@ -585,6 +671,11 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
             );
           })}
         </select>
+        {filteredAssets.length > 100 && (
+          <div style={{ fontSize: '0.75rem', color: '#D1D5DB', marginTop: '0.5rem' }}>
+            Showing first 100 of {filteredAssets.length} results. Refine your search.
+          </div>
+        )}
       </div>
       
       {signalData ? (
@@ -631,7 +722,16 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
 }
 
 // Analysis Component
-function AnalysisComponent({ selectedSymbol, newsData, sentimentData, technicalIndicators, onSelectSymbol, onLoadData }) {
+function AnalysisComponent({ watchlist, selectedSymbol, newsData, sentimentData, technicalIndicators, onSelectSymbol, onLoadData }) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAssets = watchlist.filter(item => {
+    const symbol = (item.symbol || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return symbol.includes(query) || name.includes(query);
+  });
+
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>🔬 Market Analysis</h3>
@@ -639,9 +739,23 @@ function AnalysisComponent({ selectedSymbol, newsData, sentimentData, technicalI
       <div style={{ marginBottom: '1rem' }}>
         <input
           type="text"
+          placeholder="Search assets..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            backgroundColor: '#1E293B',
+            color: '#F9FAFB',
+            border: '1px solid #2D3748',
+            borderRadius: '6px',
+            fontSize: '0.9rem',
+            marginBottom: '0.5rem'
+          }}
+        />
+        <select
           value={selectedSymbol}
-          onChange={(e) => onSelectSymbol(e.target.value.toUpperCase())}
-          placeholder="Enter symbol (e.g., AAPL)"
+          onChange={(e) => onSelectSymbol(e.target.value)}
           style={{
             width: '100%',
             padding: '0.75rem',
@@ -652,7 +766,21 @@ function AnalysisComponent({ selectedSymbol, newsData, sentimentData, technicalI
             fontSize: '0.9rem',
             marginBottom: '0.75rem'
           }}
-        />
+        >
+          <option value="">Select a symbol...</option>
+          {filteredAssets.slice(0, 100).map((item, index) => {
+            const symbol = item.symbol || item.symbol;
+            const name = item.name || item.name;
+            return (
+              <option key={index} value={symbol}>{symbol} - {name}</option>
+            );
+          })}
+        </select>
+        {filteredAssets.length > 100 && (
+          <div style={{ fontSize: '0.75rem', color: '#D1D5DB', marginBottom: '0.5rem' }}>
+            Showing first 100 of {filteredAssets.length} results. Refine your search.
+          </div>
+        )}
         <button
           onClick={() => onLoadData(selectedSymbol)}
           disabled={!selectedSymbol}
@@ -757,6 +885,14 @@ function AnalysisComponent({ selectedSymbol, newsData, sentimentData, technicalI
 function BacktestingComponent({ watchlist, onRunBacktest, backtestResults }) {
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [selectedStrategy, setSelectedStrategy] = useState('momentum');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAssets = watchlist.filter(item => {
+    const symbol = (item.symbol || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return symbol.includes(query) || name.includes(query);
+  });
 
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
@@ -765,6 +901,22 @@ function BacktestingComponent({ watchlist, onRunBacktest, backtestResults }) {
       <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1rem' }}>
         <div>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#D1D5DB' }}>Symbol</label>
+          <input
+            type="text"
+            placeholder="Search assets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              fontSize: '0.9rem',
+              marginBottom: '0.5rem'
+            }}
+          />
           <select
             value={selectedSymbol}
             onChange={(e) => setSelectedSymbol(e.target.value)}
@@ -779,7 +931,7 @@ function BacktestingComponent({ watchlist, onRunBacktest, backtestResults }) {
             }}
           >
             <option value="">Select a symbol...</option>
-            {watchlist.map((item, index) => {
+            {filteredAssets.slice(0, 100).map((item, index) => {
               const symbol = item.symbol || item.symbol;
               return (
                 <option key={index} value={symbol}>{symbol}</option>
@@ -939,6 +1091,15 @@ function AlertsComponent({ alerts, onRefresh }) {
 
 // Short-Term Prediction Component
 function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbol, selectedHorizon, onSelectHorizon, shortTermPrediction, onLoadPrediction }) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAssets = watchlist.filter(item => {
+    const symbol = (item.symbol || '').toLowerCase();
+    const name = (item.name || '').toLowerCase();
+    const query = searchQuery.toLowerCase();
+    return symbol.includes(query) || name.includes(query);
+  });
+
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>⏰ Predictions</h3>
@@ -946,6 +1107,22 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
       <div style={{ marginBottom: '1rem' }}>
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#D1D5DB' }}>Select Asset</label>
+          <input
+            type="text"
+            placeholder="Search assets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              fontSize: '0.9rem',
+              marginBottom: '0.5rem'
+            }}
+          />
           <select
             value={selectedSymbol}
             onChange={(e) => onSelectSymbol(e.target.value)}
@@ -960,7 +1137,7 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
             }}
           >
             <option value="">Select a symbol...</option>
-            {watchlist.map((item, index) => {
+            {filteredAssets.slice(0, 100).map((item, index) => {
               const symbol = item.symbol || item.symbol;
               const name = item.name || item.name;
               return (
@@ -968,6 +1145,11 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
               );
             })}
           </select>
+          {filteredAssets.length > 100 && (
+            <div style={{ fontSize: '0.75rem', color: '#D1D5DB', marginTop: '0.5rem' }}>
+              Showing first 100 of {filteredAssets.length} results. Refine your search.
+            </div>
+          )}
         </div>
         
         <div style={{ marginBottom: '0.75rem' }}>

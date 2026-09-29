@@ -83,6 +83,40 @@ def get_all_assets():
         }
     }
 
+@router.get("/api/assets/search")
+def search_assets(q: str = None, category: str = None, limit: int = 100):
+    """Search assets by symbol or name"""
+    from ..core import config
+    
+    all_assets = []
+    for idx, asset in enumerate(config.WATCHLIST):
+        all_assets.append({
+            "id": idx + 1,
+            "symbol": asset["symbol"],
+            "name": asset["name"],
+            "category": asset["class"],
+            "query": asset["query"]
+        })
+    
+    # Filter by search query
+    if q:
+        q_lower = q.lower()
+        all_assets = [a for a in all_assets if q_lower in a["symbol"].lower() or q_lower in a["name"].lower()]
+    
+    # Filter by category
+    if category and category != "all":
+        all_assets = [a for a in all_assets if a["category"] == category]
+    
+    # Limit results
+    all_assets = all_assets[:limit]
+    
+    return {
+        "assets": all_assets,
+        "total": len(all_assets),
+        "query": q,
+        "category": category
+    }
+
 @router.get("/api/assets/{symbol}")
 def get_asset_details(symbol: str):
     """Get asset details"""
