@@ -41,6 +41,9 @@ from ..services import backtesting
 from ..services import advanced_sentiment
 from ..services import trading_automation
 
+# Import new phase-based routes
+from ..routes import phase1_5_router, phase6_10_router, phase11_18_router
+
 
 # Initialize admin user on startup (production only)
 def ensure_admin_on_startup():
@@ -113,6 +116,11 @@ app.add_middleware(
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Include new phase-based routes
+app.include_router(phase1_5_router)
+app.include_router(phase6_10_router)
+app.include_router(phase11_18_router)
 
 # Security headers middleware
 @app.middleware("http")
