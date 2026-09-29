@@ -11,6 +11,7 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,28 +51,15 @@ export default function SignupPage() {
         return;
       }
 
-      // Auto-login after registration
-      const loginResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password
-        })
-      });
-
-      const loginData = await loginResponse.json();
-
-      if (loginResponse.ok) {
-        localStorage.setItem('auth-token', loginData.access_token);
-        localStorage.setItem('user-role', loginData.user.role);
-        localStorage.setItem('user-data', JSON.stringify(loginData.user));
-        router.push('/dashboard');
-      } else {
+      // Registration successful - redirect to login page
+      setError('');
+      setSuccess('Registration successful! Redirecting to login...');
+      setLoading(false);
+      
+      // Show success message and redirect
+      setTimeout(() => {
         router.push('/auth/login');
-      }
+      }, 2000);
     } catch (err) {
       console.error('Signup error:', err);
       setError('An error occurred. Please try again.');
@@ -129,6 +117,20 @@ export default function SignupPage() {
             marginBottom: '1.5rem'
           }}>
             {error}
+          </div>
+        )}
+
+        {/* Success Message */}
+        {success && (
+          <div style={{
+            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+            border: '1px solid #10B981',
+            color: '#6EE7B7',
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1.5rem'
+          }}>
+            {success}
           </div>
         )}
 

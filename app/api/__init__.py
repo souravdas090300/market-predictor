@@ -2821,6 +2821,10 @@ def register(request: Request, body: RegisterRequest):
             password=body.password
         )
         
+        # Small delay to ensure data is persisted
+        import time
+        time.sleep(0.1)
+        
         return {
             "message": "User registered successfully",
             "username": user_data["username"],
