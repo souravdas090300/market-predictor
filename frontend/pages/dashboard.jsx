@@ -54,12 +54,15 @@ export default function Dashboard() {
       const assetsRes = await fetch(`${API_URL}/api/assets/all`);
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
+        console.log('Loaded assets:', assetsData.assets?.length || 0, 'assets');
         setWatchlist(assetsData.assets || []);
       } else {
+        console.error('Failed to load assets/all, status:', assetsRes.status);
         // Fallback to watchlist endpoint
         const watchlistRes = await fetch(`${API_URL}/api/watchlist`);
         if (watchlistRes.ok) {
           const watchlistData = await watchlistRes.json();
+          console.log('Loaded watchlist fallback:', watchlistData?.length || 0, 'assets');
           setWatchlist(watchlistData);
         }
       }
@@ -182,15 +185,46 @@ export default function Dashboard() {
     
     setLoadingData(true);
     try {
-      const response = await fetch(`${API_URL}/api/predictions/${symbol}/short-term`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, horizon })
+      // Map frontend horizon values to API timeframe values
+      const horizonToTimeframe = {
+        '1h': '1h',
+        '4h': '4h', 
+        '24h': '1d',
+        '7d': '1w',
+        '30d': '1m'
+      };
+      
+      const timeframe = horizonToTimeframe[horizon] || '1d';
+      
+      const response = await fetch(`${API_URL}/api/predictions/assets/${symbol}/predictions?timeframe=${timeframe}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       
       if (response.ok) {
         const prediction = await response.json();
-        setShortTermPrediction(prediction);
+        // Transform API response to match frontend expectations
+        setShortTermPrediction({
+          symbol: prediction.symbol,
+          horizon: horizon,
+          current_price: prediction.current_price,
+          prediction: {
+            direction: prediction.trend === 'bullish' ? 'up' : prediction.trend === 'bearish' ? 'down' : 'neutral',
+            predicted_price: prediction.predicted_price,
+            change: prediction.predicted_price - prediction.current_price,
+            change_percent: prediction.predicted_change_pct,
+            confidence: prediction.confidence / 100,
+            factors: {
+              technical_indicators: 'RSI, MACD, Moving Averages',
+              sentiment_analysis: 'News sentiment analysis',
+              market_trend: 'Overall market direction',
+              volatility: 'Price volatility metrics'
+            }
+          },
+          risk_assessment: prediction.trend === 'bullish' ? 'low' : prediction.trend === 'bearish' ? 'high' : 'moderate'
+        });
+      } else {
+        console.error('Prediction API error:', response.status);
       }
     } catch (error) {
       console.error('Error loading short-term prediction:', error);
@@ -477,6 +511,11 @@ function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
       {/* Results count */}
       <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#D1D5DB' }}>
         Showing {filteredAssets.length} of {watchlist.length} assets
+        {filteredAssets.length > 200 && (
+          <span style={{ color: '#FBBF24', marginLeft: '0.5rem' }}>
+            (Use search to narrow results)
+          </span>
+        )}
       </div>
       
       {filteredAssets.length === 0 ? (
@@ -663,7 +702,7 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
           }}
         >
           <option value="">Select a symbol...</option>
-          {filteredAssets.slice(0, 100).map((item, index) => {
+          {filteredAssets.map((item, index) => {
             const symbol = item.symbol || item.symbol;
             const name = item.name || item.name;
             return (
@@ -671,9 +710,9 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
             );
           })}
         </select>
-        {filteredAssets.length > 100 && (
-          <div style={{ fontSize: '0.75rem', color: '#D1D5DB', marginTop: '0.5rem' }}>
-            Showing first 100 of {filteredAssets.length} results. Refine your search.
+        {filteredAssets.length > 200 && (
+          <div style={{ fontSize: '0.75rem', color: '#FBBF24', marginTop: '0.5rem' }}>
+            {filteredAssets.length} results. Use search to narrow down.
           </div>
         )}
       </div>
@@ -768,7 +807,7 @@ function AnalysisComponent({ watchlist, selectedSymbol, newsData, sentimentData,
           }}
         >
           <option value="">Select a symbol...</option>
-          {filteredAssets.slice(0, 100).map((item, index) => {
+          {filteredAssets.map((item, index) => {
             const symbol = item.symbol || item.symbol;
             const name = item.name || item.name;
             return (
@@ -776,9 +815,9 @@ function AnalysisComponent({ watchlist, selectedSymbol, newsData, sentimentData,
             );
           })}
         </select>
-        {filteredAssets.length > 100 && (
-          <div style={{ fontSize: '0.75rem', color: '#D1D5DB', marginBottom: '0.5rem' }}>
-            Showing first 100 of {filteredAssets.length} results. Refine your search.
+        {filteredAssets.length > 200 && (
+          <div style={{ fontSize: '0.75rem', color: '#FBBF24', marginBottom: '0.5rem' }}>
+            {filteredAssets.length} results. Use search to narrow down.
           </div>
         )}
         <button
@@ -931,13 +970,18 @@ function BacktestingComponent({ watchlist, onRunBacktest, backtestResults }) {
             }}
           >
             <option value="">Select a symbol...</option>
-            {filteredAssets.slice(0, 100).map((item, index) => {
+            {filteredAssets.map((item, index) => {
               const symbol = item.symbol || item.symbol;
               return (
                 <option key={index} value={symbol}>{symbol}</option>
               );
             })}
           </select>
+          {filteredAssets.length > 200 && (
+            <div style={{ fontSize: '0.75rem', color: '#FBBF24', marginTop: '0.5rem' }}>
+              {filteredAssets.length} results. Use search to narrow down.
+            </div>
+          )}
         </div>
         
         <div>
@@ -1137,7 +1181,7 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
             }}
           >
             <option value="">Select a symbol...</option>
-            {filteredAssets.slice(0, 100).map((item, index) => {
+            {filteredAssets.map((item, index) => {
               const symbol = item.symbol || item.symbol;
               const name = item.name || item.name;
               return (
@@ -1145,9 +1189,9 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
               );
             })}
           </select>
-          {filteredAssets.length > 100 && (
-            <div style={{ fontSize: '0.75rem', color: '#D1D5DB', marginTop: '0.5rem' }}>
-              Showing first 100 of {filteredAssets.length} results. Refine your search.
+          {filteredAssets.length > 200 && (
+            <div style={{ fontSize: '0.75rem', color: '#FBBF24', marginTop: '0.5rem' }}>
+              {filteredAssets.length} results. Use search to narrow down.
             </div>
           )}
         </div>
