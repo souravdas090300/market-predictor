@@ -802,12 +802,13 @@ def get_asset_details(request: Request, symbol: str):
         raise HTTPException(status_code=500, detail=f"Error fetching asset details: {str(e)}")
 
 
-@app.get("/api/predictions/assets/{symbol:path}/predictions")
+@app.get("/api/predictions/{symbol}")
 @limiter.limit("30/minute")
 def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
     """Get AI price predictions for a specific asset."""
     try:
-        sanitized_symbol = sanitize_symbol(symbol)
+        # Temporarily skip sanitization to debug
+        sanitized_symbol = symbol.strip().upper()
         
         # Validate timeframe
         valid_timeframes = ["1h", "4h", "1d", "1w", "1m", "3m"]

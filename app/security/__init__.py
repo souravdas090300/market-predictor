@@ -387,8 +387,8 @@ def sanitize_symbol(symbol: str) -> str:
     # Remove whitespace and convert to uppercase
     symbol = symbol.strip().upper()
     
-    # Validate format (basic validation)
-    if not re.match(r'^[A-Z0-9\-\.=]+$', symbol):
+    # Validate format (basic validation) - allow common symbol characters
+    if not re.match(r'^[A-Z0-9\-\.=:_]+$', symbol):
         raise ValueError("Invalid symbol format")
     
     # Length check

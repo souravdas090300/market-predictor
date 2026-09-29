@@ -26,7 +26,7 @@ export default function Dashboard() {
   const [selectedHorizon, setSelectedHorizon] = useState('24h');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const API_URL = 'http://localhost:8000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     const token = localStorage.getItem('auth-token');
