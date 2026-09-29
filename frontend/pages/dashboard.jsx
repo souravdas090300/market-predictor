@@ -54,6 +54,13 @@ export default function Dashboard() {
       if (watchlistRes.ok) {
         const watchlistData = await watchlistRes.json();
         setWatchlist(watchlistData);
+      } else {
+        // Fallback to assets endpoint if watchlist fails
+        const assetsRes = await fetch(`${API_URL}/api/assets/all`);
+        if (assetsRes.ok) {
+          const assetsData = await assetsRes.json();
+          setWatchlist(assetsData.assets || []);
+        }
       }
 
       // Load portfolio
@@ -71,6 +78,12 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      // Set fallback data on error
+      setWatchlist([
+        {"symbol": "AAPL", "name": "Apple", "class": "stock", "query": "Apple AAPL stock"},
+        {"symbol": "BTC-USD", "name": "Bitcoin", "class": "crypto", "query": "Bitcoin price"},
+        {"symbol": "EURUSD=X", "name": "EUR/USD", "class": "forex", "query": "EUR USD forex"}
+      ]);
     } finally {
       setLoadingData(false);
     }
@@ -298,7 +311,7 @@ export default function Dashboard() {
               overflowX: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}>
-              {['watchlist', 'portfolio', 'signals', 'short-term', 'analysis', 'backtesting', 'alerts'].map(tab => (
+              {['watchlist', 'portfolio', 'signals', 'prediction', 'analysis', 'backtesting', 'alerts'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -366,7 +379,7 @@ export default function Dashboard() {
                 />
               )}
               
-              {activeTab === 'short-term' && (
+              {activeTab === 'prediction' && (
                 <ShortTermPredictionComponent 
                   watchlist={watchlist}
                   selectedSymbol={selectedSymbol}
@@ -404,35 +417,41 @@ export default function Dashboard() {
 function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
-      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📋 Watchlist</h3>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📋 Watchlist ({watchlist.length} assets)</h3>
       {watchlist.length === 0 ? (
         <p style={{ color: '#D1D5DB' }}>No items in watchlist</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
-          {watchlist.map((item, index) => (
-            <div
-              key={index}
-              onClick={() => onSelectSymbol(item.symbol)}
-              style={{
-                border: '1px solid #2D3748',
-                padding: '0.75rem',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                backgroundColor: selectedSymbol === item.symbol ? 'rgba(59, 130, 246, 0.2)' : 'rgba(45, 55, 72, 0.3)',
-                transition: 'background-color 0.2s'
-              }}
-            >
-              <div style={{ fontWeight: '700', fontSize: '1rem', marginBottom: '0.25rem' }}>
-                {item.symbol}
+          {watchlist.map((item, index) => {
+            const symbol = item.symbol || item.symbol;
+            const name = item.name || item.name;
+            const assetClass = item.class || item.category || 'stock';
+            
+            return (
+              <div
+                key={index}
+                onClick={() => onSelectSymbol(symbol)}
+                style={{
+                  border: '1px solid #2D3748',
+                  padding: '0.75rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  backgroundColor: selectedSymbol === symbol ? 'rgba(59, 130, 246, 0.2)' : 'rgba(45, 55, 72, 0.3)',
+                  transition: 'background-color 0.2s'
+                }}
+              >
+                <div style={{ fontWeight: '700', fontSize: '1rem', marginBottom: '0.25rem' }}>
+                  {symbol}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#D1D5DB' }}>
+                  {name}
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
+                  {assetClass}
+                </div>
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#D1D5DB' }}>
-                {item.name}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
-                {item.class}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -558,9 +577,13 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
           }}
         >
           <option value="">Select a symbol...</option>
-          {watchlist.map((item, index) => (
-            <option key={index} value={item.symbol}>{item.symbol} - {item.name}</option>
-          ))}
+          {watchlist.map((item, index) => {
+            const symbol = item.symbol || item.symbol;
+            const name = item.name || item.name;
+            return (
+              <option key={index} value={symbol}>{symbol} - {name}</option>
+            );
+          })}
         </select>
       </div>
       
@@ -756,9 +779,12 @@ function BacktestingComponent({ watchlist, onRunBacktest, backtestResults }) {
             }}
           >
             <option value="">Select a symbol...</option>
-            {watchlist.map((item, index) => (
-              <option key={index} value={item.symbol}>{item.symbol}</option>
-            ))}
+            {watchlist.map((item, index) => {
+              const symbol = item.symbol || item.symbol;
+              return (
+                <option key={index} value={symbol}>{symbol}</option>
+              );
+            })}
           </select>
         </div>
         
@@ -915,7 +941,7 @@ function AlertsComponent({ alerts, onRefresh }) {
 function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbol, selectedHorizon, onSelectHorizon, shortTermPrediction, onLoadPrediction }) {
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
-      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>⏰ Short-Term Predictions</h3>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>⏰ Predictions</h3>
       
       <div style={{ marginBottom: '1rem' }}>
         <div style={{ marginBottom: '0.75rem' }}>
@@ -934,9 +960,13 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
             }}
           >
             <option value="">Select a symbol...</option>
-            {watchlist.map((item, index) => (
-              <option key={index} value={item.symbol}>{item.symbol} - {item.name}</option>
-            ))}
+            {watchlist.map((item, index) => {
+              const symbol = item.symbol || item.symbol;
+              const name = item.name || item.name;
+              return (
+                <option key={index} value={symbol}>{symbol} - {name}</option>
+              );
+            })}
           </select>
         </div>
         
