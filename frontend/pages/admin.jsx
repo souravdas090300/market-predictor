@@ -18,13 +18,13 @@ export default function AdminDashboard() {
     const userData = localStorage.getItem('user-data');
 
     if (!token) {
-      router.push('/auth/login');
+      router.push('/auth/admin-login');
       return;
     }
 
     // Check if user is admin
     if (userRole !== 'admin' && userRole !== 'superuser') {
-      router.push('/dashboard');
+      router.push('/auth/admin-login');
       return;
     }
 
@@ -82,7 +82,7 @@ export default function AdminDashboard() {
               localStorage.removeItem('auth-token');
               localStorage.removeItem('user-role');
               localStorage.removeItem('user-data');
-              router.push('/auth/login');
+              router.push('/auth/admin-login');
             }}
             style={{
               padding: '0.5rem 1rem',

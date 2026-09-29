@@ -2854,6 +2854,17 @@ def login(request: Request, body: LoginRequest):
     if not user_data.get("is_active") or user_data.get("disabled"):
         raise HTTPException(status_code=400, detail="Inactive user")
     
+    # Prevent admin users from using regular login - they must use admin login
+    if user_manager.is_superuser_by_username(body.username):
+        log_security_event("ADMIN_USER_REGULAR_LOGIN_ATTEMPT", {
+            "username": body.username,
+            "ip": request.client.host
+        })
+        raise HTTPException(
+            status_code=403,
+            detail="Admin users must use /api/admin/auth/login endpoint"
+        )
+    
     # Create tokens
     access_token = create_access_token(data={"sub": user_data["username"]})
     refresh_token = create_refresh_token(data={"sub": user_data["username"]})
