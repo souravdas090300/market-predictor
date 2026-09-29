@@ -34,14 +34,18 @@ class RateLimitUpdateRequest(BaseModel):
 @router.get("/api/assets")
 def get_assets(category: str = None, search: str = None, skip: int = 0, limit: int = 50):
     """Get list of available assets"""
-    all_assets = [
-        {"id": 1, "symbol": "AAPL", "name": "Apple Inc", "category": "stock", "exchange": "NASDAQ"},
-        {"id": 2, "symbol": "MSFT", "name": "Microsoft Corp", "category": "stock", "exchange": "NASDAQ"},
-        {"id": 3, "symbol": "BTC", "name": "Bitcoin", "category": "crypto", "exchange": "various"},
-        {"id": 4, "symbol": "ETH", "name": "Ethereum", "category": "crypto", "exchange": "various"},
-        {"id": 5, "symbol": "EURUSD", "name": "Euro/USD", "category": "forex", "exchange": "forex"},
-        {"id": 6, "symbol": "GOLD", "name": "Gold", "category": "commodity", "exchange": "COMEX"}
-    ]
+    from ..core import config
+    
+    # Get assets from config
+    all_assets = []
+    for idx, asset in enumerate(config.WATCHLIST):
+        all_assets.append({
+            "id": idx + 1,
+            "symbol": asset["symbol"],
+            "name": asset["name"],
+            "category": asset["class"],
+            "exchange": "various" if asset["class"] in ["crypto", "forex"] else "NASDAQ/NYSE"
+        })
     
     if category:
         all_assets = [a for a in all_assets if a["category"] == category]
@@ -51,6 +55,32 @@ def get_assets(category: str = None, search: str = None, skip: int = 0, limit: i
     return {
         "assets": all_assets[skip:skip+limit],
         "total": len(all_assets)
+    }
+
+@router.get("/api/assets/all")
+def get_all_assets():
+    """Get all available assets without pagination"""
+    from ..core import config
+    
+    all_assets = []
+    for idx, asset in enumerate(config.WATCHLIST):
+        all_assets.append({
+            "id": idx + 1,
+            "symbol": asset["symbol"],
+            "name": asset["name"],
+            "category": asset["class"],
+            "query": asset["query"]
+        })
+    
+    return {
+        "assets": all_assets,
+        "total": len(all_assets),
+        "categories": {
+            "stock": len([a for a in all_assets if a["category"] == "stock"]),
+            "crypto": len([a for a in all_assets if a["category"] == "crypto"]),
+            "forex": len([a for a in all_assets if a["category"] == "forex"]),
+            "commodity": len([a for a in all_assets if a["category"] == "commodity"])
+        }
     }
 
 @router.get("/api/assets/{symbol}")

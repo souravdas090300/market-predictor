@@ -22,6 +22,8 @@ export default function Dashboard() {
   const [riskMetrics, setRiskMetrics] = useState(null);
   const [backtestResults, setBacktestResults] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
+  const [shortTermPrediction, setShortTermPrediction] = useState(null);
+  const [selectedHorizon, setSelectedHorizon] = useState('24h');
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -161,6 +163,28 @@ export default function Dashboard() {
     }
   };
 
+  const loadShortTermPrediction = async (symbol, horizon) => {
+    if (!symbol) return;
+    
+    setLoadingData(true);
+    try {
+      const response = await fetch(`${API_URL}/api/predictions/${symbol}/short-term`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, horizon })
+      });
+      
+      if (response.ok) {
+        const prediction = await response.json();
+        setShortTermPrediction(prediction);
+      }
+    } catch (error) {
+      console.error('Error loading short-term prediction:', error);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('auth-token');
     localStorage.removeItem('user-role');
@@ -274,7 +298,7 @@ export default function Dashboard() {
               overflowX: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}>
-              {['watchlist', 'portfolio', 'signals', 'analysis', 'backtesting', 'alerts'].map(tab => (
+              {['watchlist', 'portfolio', 'signals', 'short-term', 'analysis', 'backtesting', 'alerts'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -339,6 +363,18 @@ export default function Dashboard() {
                   technicalIndicators={technicalIndicators}
                   onSelectSymbol={setSelectedSymbol}
                   onLoadData={loadSymbolData}
+                />
+              )}
+              
+              {activeTab === 'short-term' && (
+                <ShortTermPredictionComponent 
+                  watchlist={watchlist}
+                  selectedSymbol={selectedSymbol}
+                  onSelectSymbol={setSelectedSymbol}
+                  selectedHorizon={selectedHorizon}
+                  onSelectHorizon={setSelectedHorizon}
+                  shortTermPrediction={shortTermPrediction}
+                  onLoadPrediction={loadShortTermPrediction}
                 />
               )}
               
@@ -869,6 +905,136 @@ function AlertsComponent({ alerts, onRefresh }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Short-Term Prediction Component
+function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbol, selectedHorizon, onSelectHorizon, shortTermPrediction, onLoadPrediction }) {
+  return (
+    <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>⏰ Short-Term Predictions</h3>
+      
+      <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#D1D5DB' }}>Select Asset</label>
+          <select
+            value={selectedSymbol}
+            onChange={(e) => onSelectSymbol(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              fontSize: '0.9rem'
+            }}
+          >
+            <option value="">Select a symbol...</option>
+            {watchlist.map((item, index) => (
+              <option key={index} value={item.symbol}>{item.symbol} - {item.name}</option>
+            ))}
+          </select>
+        </div>
+        
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#D1D5DB' }}>Time Horizon</label>
+          <select
+            value={selectedHorizon}
+            onChange={(e) => onSelectHorizon(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              fontSize: '0.9rem'
+            }}
+          >
+            <option value="1h">1 Hour</option>
+            <option value="4h">4 Hours</option>
+            <option value="24h">24 Hours</option>
+            <option value="7d">7 Days</option>
+            <option value="30d">30 Days</option>
+          </select>
+        </div>
+        
+        <button
+          onClick={() => onLoadPrediction(selectedSymbol, selectedHorizon)}
+          disabled={!selectedSymbol}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#3B82F6',
+            color: '#F9FAFB',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: selectedSymbol ? 'pointer' : 'not-allowed',
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            opacity: selectedSymbol ? 1 : 0.5
+          }}
+        >
+          Predict
+        </button>
+      </div>
+      
+      {shortTermPrediction && (
+        <div style={{ padding: '1rem', borderRadius: '8px', backgroundColor: 'rgba(45, 55, 72, 0.3)' }}>
+          <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem' }}>📊 Prediction Results</h4>
+          
+          <div style={{
+            padding: '1rem',
+            borderRadius: '6px',
+            backgroundColor: shortTermPrediction.prediction.direction === 'up' ? 'rgba(16, 185, 129, 0.2)' : 
+                           shortTermPrediction.prediction.direction === 'down' ? 'rgba(239, 68, 68, 0.2)' : 
+                           'rgba(251, 191, 36, 0.2)',
+            border: `1px solid ${shortTermPrediction.prediction.direction === 'up' ? '#10B981' : 
+                              shortTermPrediction.prediction.direction === 'down' ? '#EF4444' : '#FBBF24'}`,
+            marginBottom: '1rem'
+          }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: '700', textTransform: 'capitalize', marginBottom: '0.5rem' }}>
+              {shortTermPrediction.prediction.direction} ({shortTermPrediction.horizon})
+            </div>
+            <div style={{ fontSize: '0.9rem', color: '#D1D5DB', marginBottom: '0.25rem' }}>
+              Current: ${shortTermPrediction.current_price?.toFixed(2) || 'N/A'}
+            </div>
+            <div style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.25rem' }}>
+              Predicted: ${shortTermPrediction.prediction.predicted_price?.toFixed(2) || 'N/A'}
+            </div>
+            <div style={{ fontSize: '0.9rem', color: shortTermPrediction.prediction.change >= 0 ? '#10B981' : '#EF4444' }}>
+              {shortTermPrediction.prediction.change >= 0 ? '+' : ''}${shortTermPrediction.prediction.change?.toFixed(2) || 0} 
+              ({shortTermPrediction.prediction.change_percent >= 0 ? '+' : ''}{shortTermPrediction.prediction.change_percent?.toFixed(2) || 0}%)
+            </div>
+            <div style={{ fontSize: '0.85rem', color: '#D1D5DB' }}>
+              Confidence: {(shortTermPrediction.prediction.confidence * 100)?.toFixed(1)}%
+            </div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ padding: '0.75rem', borderRadius: '6px', backgroundColor: 'rgba(45, 55, 72, 0.3)' }}>
+              <div style={{ fontSize: '0.8rem', color: '#D1D5DB' }}>Risk Level</div>
+              <div style={{ fontWeight: '700', fontSize: '1rem', textTransform: 'capitalize' }}>
+                {shortTermPrediction.risk_assessment}
+              </div>
+            </div>
+            <div style={{ padding: '0.75rem', borderRadius: '6px', backgroundColor: 'rgba(45, 55, 72, 0.3)' }}>
+              <div style={{ fontSize: '0.8rem', color: '#D1D5DB' }}>Timeframe</div>
+              <div style={{ fontWeight: '700', fontSize: '1rem' }}>
+                {shortTermPrediction.horizon}
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '6px', backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6' }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: '#3B82F6' }}>🔍 Analysis Factors</h4>
+            <div style={{ fontSize: '0.85rem', color: '#D1D5DB' }}>
+              {shortTermPrediction.prediction.factors?.technical_indicators}, {shortTermPrediction.prediction.factors?.sentiment_analysis}, {shortTermPrediction.prediction.factors?.market_trend}, {shortTermPrediction.prediction.factors?.volatility}
+            </div>
+          </div>
         </div>
       )}
     </div>
