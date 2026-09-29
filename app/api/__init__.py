@@ -3393,6 +3393,53 @@ def system_status(request: Request):
         }
 
 
+# Landing page route (main user-facing page)
+@app.get("/")
+async def landing_page():
+    """Serve the landing page."""
+    landing_path = config.ROOT / "static" / "landing.html"
+    if landing_path.exists():
+        return FileResponse(landing_path, media_type="text/html")
+    return Response(status_code=404, content="Landing page not found")
+
+
+# User dashboard route
+@app.get("/dashboard")
+async def dashboard_page():
+    """Serve the user dashboard page."""
+    dashboard_path = config.ROOT / "static" / "index.html"
+    if dashboard_path.exists():
+        return FileResponse(dashboard_path, media_type="text/html")
+    return Response(status_code=404, content="Dashboard page not found")
+
+
+@app.get("/app")
+async def app_page():
+    """Serve the user dashboard page (alternate route)."""
+    dashboard_path = config.ROOT / "static" / "index.html"
+    if dashboard_path.exists():
+        return FileResponse(dashboard_path, media_type="text/html")
+    return Response(status_code=404, content="Dashboard page not found")
+
+
+@app.get("/assets")
+async def assets_page():
+    """Serve the assets page."""
+    assets_path = config.ROOT / "static" / "assets.html"
+    if assets_path.exists():
+        return FileResponse(assets_path, media_type="text/html")
+    return Response(status_code=404, content="Assets page not found")
+
+
+@app.get("/profile")
+async def profile_page():
+    """Serve the profile page."""
+    profile_path = config.ROOT / "static" / "profile.html"
+    if profile_path.exists():
+        return FileResponse(profile_path, media_type="text/html")
+    return Response(status_code=404, content="Profile page not found")
+
+
 # Admin page route (must be before static mount)
 @app.get("/admin")
 async def admin_page():
@@ -3432,7 +3479,7 @@ async def favicon():
     return Response(status_code=204)
 
 
-@app.get("/market_predictor_favicon_32x32.png")
+@app.get("/static/market_predictor_favicon_32x32.png")
 async def favicon_png():
     """Return PNG favicon directly."""
     favicon_path = config.ROOT / "static" / "market_predictor_favicon_32x32.png"
@@ -3441,6 +3488,6 @@ async def favicon_png():
     return Response(status_code=404)
 
 
-# Static files last so they cannot shadow /api routes.
-# Note: /admin is now handled by the specific route above
-app.mount("/", StaticFiles(directory=str(config.ROOT / "static"), html=True), name="static")
+# Static files (serves CSS, JS, images, etc. from /static/ path)
+# Note: /admin, /, /dashboard are handled by specific routes above
+app.mount("/static", StaticFiles(directory=str(config.ROOT / "static"), html=True), name="static")

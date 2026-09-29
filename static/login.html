@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Market Predictor</title>
-    <link rel="icon" type="image/png" href="/market_predictor_favicon_32x32.png">
+    <link rel="icon" type="image/png" href="/static/market_predictor_favicon_32x32.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -244,7 +244,7 @@
                         if (isSuperuser) {
                             window.location.href = '/admin';
                         } else {
-                            window.location.href = '/index.html';
+                            window.location.href = '/dashboard';
                         }
                     }, 1000);
                 } else {
@@ -278,7 +278,7 @@
             if (isSuperuser) {
                 window.location.href = '/admin';
             } else {
-                window.location.href = '/index.html';
+                window.location.href = '/dashboard';
             }
         }
         

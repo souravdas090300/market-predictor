@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Market Predictor – AI-Powered Trading Signals for Stocks, Crypto & Commodities</title>
-    <link rel="icon" type="image/png" href="/market_predictor_favicon_32x32.png">
+    <link rel="icon" type="image/png" href="/static/market_predictor_favicon_32x32.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         * {
@@ -114,11 +114,30 @@
             letter-spacing: 0.5px;
             cursor: pointer;
             transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
         }
 
         .cta-header:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn {
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:visited {
+            color: inherit;
+        }
+
+        .btn-primary:visited {
+            color: var(--color-navy);
+        }
+
+        .btn-secondary:visited {
+            color: var(--color-text-primary);
         }
 
         /* HERO SECTION */
@@ -408,7 +427,7 @@
                 <li><a href="#how-it-works">How It Works</a></li>
                 <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#contact">Contact</a></li>
-                <li><button class="cta-header">Launch App</button></li>
+                <li><a href="/dashboard" class="cta-header">Launch App</a></li>
             </ul>
         </nav>
     </header>
@@ -423,8 +442,8 @@
                 Combine ML predictions with technical analysis and live market news.
             </p>
             <div class="hero-cta">
-                <button class="btn btn-primary">Launch App</button>
-                <button class="btn btn-secondary">View Demo</button>
+                <a href="/dashboard" class="btn btn-primary">Launch App</a>
+                <a href="/dashboard" class="btn btn-secondary">View Demo</a>
             </div>
             <div class="hero-demo">
                 <span>Interactive Dashboard Preview</span>
@@ -505,7 +524,7 @@
                     Market Predictor combines the power of machine learning, technical analysis, 
                     and real-time market data to give you the edge you need.
                 </p>
-                <button class="btn btn-primary">Launch App Now</button>
+                <a href="/dashboard" class="btn btn-primary">Launch App Now</a>
             </div>
         </div>
     </section>

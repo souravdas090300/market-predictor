@@ -54,9 +54,6 @@ export default function LandingPage() {
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
           <a href="#features" style={{ color: '#D1D5DB', textDecoration: 'none', cursor: 'pointer' }}>Features</a>
           <a href="#pricing" style={{ color: '#D1D5DB', textDecoration: 'none', cursor: 'pointer' }}>Pricing</a>
-          <Link href="/auth/admin-login" style={{ color: '#EF4444', textDecoration: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
-            Admin
-          </Link>
           <Link href="/auth/login">
             <button style={{
               padding: '0.5rem 1.5rem',
@@ -317,11 +314,6 @@ export default function LandingPage() {
         color: '#D1D5DB'
       }}>
         <p>&copy; 2024 Market Predictor Pro. All rights reserved.</p>
-        <div style={{ marginTop: '1rem', fontSize: '0.85rem' }}>
-          <Link href="/auth/admin-login" style={{ color: '#EF4444', textDecoration: 'none', cursor: 'pointer' }}>
-            🔐 Admin Access
-          </Link>
-        </div>
       </footer>
     </div>
   );

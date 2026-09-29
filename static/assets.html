@@ -256,8 +256,8 @@
             <div class="header-controls">
                 <span class="live-pill"><span class="live-dot"></span> LIVE</span>
                 <button class="refresh-btn" id="refreshBtn" type="button">Refresh</button>
-                <a class="nav-link" href="/index.html">Dashboard</a>
-                <a class="nav-link" href="/profile.html">Account</a>
+                <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link" href="/profile">Account</a>
             </div>
         </header>
         
@@ -441,7 +441,7 @@
             // Store the selected symbol in localStorage
             localStorage.setItem('selectedSymbol', symbol);
             // Navigate to the main dashboard
-            window.location.href = '/index.html';
+            window.location.href = '/dashboard';
         }
         
         function startRealTimeUpdates() {

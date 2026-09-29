@@ -1,6 +1,7 @@
 /**
  * Admin Dashboard - Protected Route
  * Only accessible by users with admin or superuser role
+ * Includes built-in admin login form
  */
 
 import React, { useState, useEffect } from 'react';
@@ -10,6 +11,11 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
@@ -18,24 +24,90 @@ export default function AdminDashboard() {
     const userData = localStorage.getItem('user-data');
 
     if (!token) {
-      router.push('/auth/admin-login');
+      setShowLogin(true);
+      setLoading(false);
       return;
     }
 
     // Check if user is admin
     if (userRole !== 'admin' && userRole !== 'superuser') {
-      router.push('/auth/admin-login');
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('user-role');
+      localStorage.removeItem('user-data');
+      setShowLogin(true);
+      setLoading(false);
       return;
     }
 
     try {
       setUser(JSON.parse(userData || '{}'));
+      setIsLoggedIn(true);
     } catch (e) {
       console.error('Failed to parse user data', e);
+      setShowLogin(true);
     }
 
     setLoading(false);
   }, [router]);
+
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: loginForm.username,
+          password: loginForm.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setLoginError(data.detail || 'Admin login failed');
+        setLoginLoading(false);
+        return;
+      }
+
+      localStorage.setItem('auth-token', data.access_token);
+      localStorage.setItem('user-role', 'admin');
+      localStorage.setItem('user-data', JSON.stringify({
+        id: data.user_id,
+        username: loginForm.username,
+        role: 'admin',
+        is_superuser: true
+      }));
+
+      setIsLoggedIn(true);
+      setUser({
+        id: data.user_id,
+        username: loginForm.username,
+        role: 'admin',
+        is_superuser: true
+      });
+      setShowLogin(false);
+    } catch (err) {
+      console.error('Admin login error:', err);
+      setLoginError('An error occurred. Please try again.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth-token');
+    localStorage.removeItem('user-role');
+    localStorage.removeItem('user-data');
+    setIsLoggedIn(false);
+    setUser(null);
+    setShowLogin(true);
+  };
 
   if (loading) {
     return (
@@ -49,6 +121,144 @@ export default function AdminDashboard() {
         fontSize: '1.2rem'
       }}>
         Loading admin panel...
+      </div>
+    );
+  }
+
+  // Show admin login form
+  if (showLogin) {
+    return (
+      <div style={{
+        backgroundColor: '#0F172A',
+        color: '#F9FAFB',
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '2rem'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '450px',
+          backgroundColor: 'rgba(31, 41, 55, 0.8)',
+          border: '1px solid #2D3748',
+          borderRadius: '12px',
+          padding: '3rem',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              background: 'linear-gradient(135deg, #EF4444 0%, #F59E0B 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              marginBottom: '1rem'
+            }}>
+              🛡️ Admin Panel
+            </div>
+            <h1 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '0.5rem' }}>Admin Access</h1>
+            <p style={{ color: '#D1D5DB' }}>Secure administrator login</p>
+          </div>
+
+          <div style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid #EF4444',
+            color: '#FCA5A5',
+            padding: '1rem',
+            borderRadius: '8px',
+            marginBottom: '1.5rem',
+            fontSize: '0.85rem'
+          }}>
+            <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>⚠️ Admin Access Only</div>
+            <div>This page is restricted to administrators. Regular users should use the main login page.</div>
+          </div>
+
+          {loginError && (
+            <div style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid #EF4444',
+              color: '#FCA5A5',
+              padding: '1rem',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.95rem' }}>
+                Admin Username
+              </label>
+              <input
+                type="text"
+                placeholder="Enter admin username"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#1F2937',
+                  color: '#F9FAFB',
+                  border: '1px solid #2D3748',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+                disabled={loginLoading}
+                required
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', fontSize: '0.95rem' }}>
+                Admin Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={loginForm.password}
+                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#1F2937',
+                  color: '#F9FAFB',
+                  border: '1px solid #2D3748',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+                disabled={loginLoading}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              style={{
+                padding: '0.75rem',
+                backgroundColor: '#EF4444',
+                color: '#F9FAFB',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: '700',
+                cursor: loginLoading ? 'not-allowed' : 'pointer',
+                opacity: loginLoading ? 0.6 : 1
+              }}
+            >
+              {loginLoading ? 'Authenticating...' : 'Admin Login'}
+            </button>
+          </form>
+
+          <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+            <Link href="/" style={{ color: '#6B7280', textDecoration: 'none', cursor: 'pointer' }}>
+              ← Back to home
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -78,12 +288,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <button
-            onClick={() => {
-              localStorage.removeItem('auth-token');
-              localStorage.removeItem('user-role');
-              localStorage.removeItem('user-data');
-              router.push('/auth/admin-login');
-            }}
+            onClick={handleLogout}
             style={{
               padding: '0.5rem 1rem',
               backgroundColor: '#EF4444',

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Market Predictor</title>
-    <link rel="icon" type="image/png" href="/market_predictor_favicon_32x32.png">
+    <link rel="icon" type="image/png" href="/static/market_predictor_favicon_32x32.png">
     <style>
         * {
             margin: 0;
@@ -308,7 +308,7 @@
 <body>
     <div class="admin-container">
         <!-- Login Form (shown when not authenticated) -->
-        <div id="login-section" class="admin-section" style="display: none;">
+        <div id="login-section" class="admin-section">
             <h2>Admin Login</h2>
             <div class="control-row">
                 <div class="input-group">
@@ -325,7 +325,9 @@
             <div class="admin-header">
                 <h1>🔧 Admin Dashboard</h1>
                 <p>Manage system settings, rate limiting, and batch predictions</p>
-                <button class="btn btn-danger" onclick="handleLogout()" style="margin-top: 1rem;">Logout</button>
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-danger" onclick="handleLogout()">Logout</button>
+                </div>
             </div>
 
             <div class="nav-bar">
@@ -334,7 +336,6 @@
                 <a href="#" data-section="batch">Batch Predictions</a>
                 <a href="#" data-section="users">User Management</a>
                 <a href="#" data-section="subscriptions">Subscriptions</a>
-                <a href="/index.html">Back to Main App</a>
             </div>
 
             <div id="message-container"></div>
@@ -932,8 +933,11 @@
         // Check authentication on load
         checkAuthentication();
 
+        // Initial authentication check
+        checkAuthentication();
+        
         // Initial load (if authenticated)
-        if (localStorage.getItem('access_token')) {
+        if (localStorage.getItem('access_token') && localStorage.getItem('is_superuser') === 'true') {
             loadOverview();
         }
 
@@ -945,10 +949,8 @@
             if (token && isSuperuser) {
                 document.getElementById('login-section').style.display = 'none';
                 document.getElementById('dashboard-section').style.display = 'block';
-            } else if (token && !isSuperuser) {
-                // Has token but not superuser - redirect to main app
-                window.location.href = '/index.html';
             } else {
+                // No token or not superuser - show login
                 document.getElementById('login-section').style.display = 'block';
                 document.getElementById('dashboard-section').style.display = 'none';
             }
@@ -978,7 +980,8 @@
             localStorage.removeItem('refresh_token');
             localStorage.removeItem('user');
             localStorage.removeItem('is_superuser');
-            window.location.href = '/auth/login';
+            // Reload page to show login form
+            window.location.reload();
         }
     </script>
 </body>

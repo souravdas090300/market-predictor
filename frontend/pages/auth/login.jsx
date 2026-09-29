@@ -274,15 +274,6 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* Admin Login Link */}
-        <p style={{ textAlign: 'center', color: '#6B7280', marginBottom: '1rem', fontSize: '0.85rem' }}>
-          <Link href="/auth/admin-login">
-            <span style={{ color: '#EF4444', fontWeight: '600', cursor: 'pointer' }}>
-              🔐 Admin Login
-            </span>
-          </Link>
-        </p>
-
         {/* Back to Home */}
         <Link href="/">
           <div style={{
