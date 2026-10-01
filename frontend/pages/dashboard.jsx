@@ -196,7 +196,7 @@ export default function Dashboard() {
       
       const timeframe = horizonToTimeframe[horizon] || '1d';
       
-      const response = await fetch(`${API_URL}/api/predictions/assets/${symbol}/predictions?timeframe=${timeframe}`, {
+      const response = await fetch(`${API_URL}/api/predictions/${symbol}?timeframe=${timeframe}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
