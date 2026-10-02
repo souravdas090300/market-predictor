@@ -148,6 +148,120 @@
         }
         .search-input:focus { outline: none; border-color: var(--color-bullish); }
         
+        .top-movers-section {
+            margin-bottom: var(--spacing-lg);
+            padding: var(--spacing-md);
+            background: rgba(31, 41, 55, 0.35);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+        }
+        
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: var(--spacing-md);
+            color: var(--color-text-primary);
+        }
+        
+        .top-movers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-md);
+        }
+        
+        .mover-category {
+            background: rgba(17, 24, 39, 0.5);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+        }
+        
+        .mover-category-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            margin-bottom: var(--spacing-sm);
+            padding-bottom: var(--spacing-xs);
+            border-bottom: 1px solid var(--color-border);
+        }
+        
+        .mover-category-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        
+        .mover-category-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        
+        .mover-category-icon.stock { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+        .mover-category-icon.crypto { background: rgba(251, 191, 36, 0.2); color: #FBBF24; }
+        .mover-category-icon.forex { background: rgba(168, 85, 247, 0.2); color: #A78BFA; }
+        .mover-category-icon.commodity { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        
+        .mover-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .mover-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .mover-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .mover-symbol {
+            font-size: 12px;
+            font-weight: 600;
+            font-family: var(--font-mono);
+        }
+        
+        .mover-change {
+            font-size: 11px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        
+        .mover-change.gainer { color: var(--color-bullish); }
+        .mover-change.loser { color: var(--color-bearish); }
+        
+        .mover-section-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--color-text-secondary);
+            margin-bottom: 4px;
+            margin-top: 8px;
+        }
+        
+        .mover-section-label.gainer { color: var(--color-bullish); }
+        .mover-section-label.loser { color: var(--color-bearish); }
+        
+        .no-movers {
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            text-align: center;
+            padding: var(--spacing-sm);
+        }
+        
         .assets-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -268,6 +382,14 @@
             <button class="filter-btn" data-filter="forex">Forex</button>
             <button class="filter-btn" data-filter="commodity">Commodities</button>
             <input class="search-input" id="searchInput" placeholder="Search assets..." />
+        </div>
+        
+        <!-- Top Movers Section -->
+        <div class="top-movers-section" id="topMoversSection">
+            <h2 class="section-title">Top Movers of the Day</h2>
+            <div class="top-movers-grid" id="topMoversGrid">
+                <div class="loading">Loading top movers...</div>
+            </div>
         </div>
         
         <div class="assets-grid" id="assetsGrid">
@@ -437,6 +559,71 @@
             }
         }
         
+        async function loadTopMovers() {
+            try {
+                const response = await fetch('/api/assets/categories');
+                if (!response.ok) throw new Error('Failed to fetch top movers');
+                
+                const data = await response.json();
+                renderTopMovers(data.categories);
+            } catch (error) {
+                console.error('Error loading top movers:', error);
+                $('topMoversGrid').innerHTML = '<div class="error">Failed to load top movers.</div>';
+            }
+        }
+        
+        function renderTopMovers(categories) {
+            const grid = $('topMoversGrid');
+            
+            if (!categories || Object.keys(categories).length === 0) {
+                grid.innerHTML = '<div class="no-movers">No top movers data available</div>';
+                return;
+            }
+            
+            const categoryOrder = ['crypto', 'stock', 'forex', 'commodity'];
+            const html = categoryOrder.map(catKey => {
+                const category = categories[catKey];
+                if (!category) return '';
+                
+                const categoryIcon = catKey.charAt(0).toUpperCase();
+                
+                const gainersHtml = category.top_gainers && category.top_gainers.length > 0
+                    ? category.top_gainers.map(mover => `
+                        <div class="mover-item" onclick="loadSymbol('${mover.symbol}')">
+                            <span class="mover-symbol">${mover.symbol}</span>
+                            <span class="mover-change gainer">+${pct(mover.change_pct)}</span>
+                        </div>
+                    `).join('')
+                    : '<div class="no-movers">No gainers</div>';
+                
+                const losersHtml = category.top_losers && category.top_losers.length > 0
+                    ? category.top_losers.map(mover => `
+                        <div class="mover-item" onclick="loadSymbol('${mover.symbol}')">
+                            <span class="mover-symbol">${mover.symbol}</span>
+                            <span class="mover-change loser">${pct(mover.change_pct)}</span>
+                        </div>
+                    `).join('')
+                    : '<div class="no-movers">No losers</div>';
+                
+                return `
+                    <div class="mover-category">
+                        <div class="mover-category-header">
+                            <div class="mover-category-icon ${catKey}">${categoryIcon}</div>
+                            <div class="mover-category-title">${category.label}</div>
+                        </div>
+                        <div class="mover-list">
+                            <div class="mover-section-label gainer">Top Gainers</div>
+                            ${gainersHtml}
+                            <div class="mover-section-label loser">Top Losers</div>
+                            ${losersHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            grid.innerHTML = html;
+        }
+        
         function loadSymbol(symbol) {
             // Store the selected symbol in localStorage
             localStorage.setItem('selectedSymbol', symbol);
@@ -488,6 +675,58 @@
                 clearInterval(pollingInterval);
             }
             
+            pollingInterval = setInterval(async () => {
+                try {
+                    const symbols = allAssets.map(a => a.symbol).join(',');
+                    if (!symbols) return;
+                    
+                    const response = await fetch(`/api/live/quotes?symbols=${symbols}`);
+                    if (response.ok) {
+                        const quotes = await response.json();
+                        updateQuotes(quotes);
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 15000); // Poll every 15 seconds
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAssets();
+            loadTopMovers();
+            
+            // Update top movers every 60 seconds
+            setInterval(loadTopMovers, 60000);
+            
+            // Event listeners for filters
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilter = btn.dataset.filter;
+                    filterAssets();
+                });
+            });
+            
+            // Event listener for search
+            $('searchInput').addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                filterAssets();
+            });
+            
+            // Event listener for refresh button
+            $('refreshBtn').addEventListener('click', () => {
+                loadAssets();
+                loadTopMovers();
+            });
+        });
+        
+        function startPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
             // Poll every 15 seconds as fallback
             pollingInterval = setInterval(() => {
                 if (!document.hidden) {
@@ -495,32 +734,6 @@
                 }
             }, 15000);
         }
-        
-        // Event listeners
-        $('refreshBtn').addEventListener('click', () => {
-            loadAssets();
-        });
-        
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.filter;
-                filterAssets();
-                // Clear existing polling
-                if (pollingInterval) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
-                // Restart SSE with new filtered symbols
-                startRealTimeUpdates();
-            });
-        });
-        
-        $('searchInput').addEventListener('input', (e) => {
-            searchQuery = e.target.value;
-            filterAssets();
-        });
         
         // Handle page visibility - pause updates when tab is not visible
         document.addEventListener('visibilitychange', () => {
@@ -537,9 +750,6 @@
                 startRealTimeUpdates();
             }
         });
-        
-        // Initial load
-        loadAssets();
     </script>
 </body>
 </html>

@@ -25,6 +25,8 @@ export default function Dashboard() {
   const [shortTermPrediction, setShortTermPrediction] = useState(null);
   const [selectedHorizon, setSelectedHorizon] = useState('6h');
   const [searchQuery, setSearchQuery] = useState('');
+  const [assetCategories, setAssetCategories] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -62,6 +64,13 @@ export default function Dashboard() {
           const watchlistData = await watchlistRes.json();
           setWatchlist(watchlistData);
         }
+      }
+
+      // Load asset categories with top gainers/losers
+      const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        setAssetCategories(categoriesData.categories);
       }
 
       // Load portfolio
@@ -349,7 +358,7 @@ export default function Dashboard() {
               overflowX: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}>
-              {['watchlist', 'portfolio', 'signals', 'prediction', 'analysis', 'backtesting', 'alerts'].map(tab => (
+              {['watchlist', 'portfolio', 'signals', 'prediction', 'categories', 'analysis', 'backtesting', 'alerts'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -427,6 +436,14 @@ export default function Dashboard() {
                   onSelectHorizon={setSelectedHorizon}
                   shortTermPrediction={shortTermPrediction}
                   onLoadPrediction={loadShortTermPrediction}
+                />
+              )}
+              
+              {activeTab === 'categories' && (
+                <AssetCategoriesComponent 
+                  assetCategories={assetCategories}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={setSelectedCategory}
                 />
               )}
               
@@ -1136,15 +1153,140 @@ function AlertsComponent({ alerts, onRefresh }) {
   );
 }
 
+// Asset Categories Component
+function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectCategory }) {
+  const [expandedCategory, setExpandedCategory] = useState(null);
+
+  if (!assetCategories) {
+    return (
+      <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📊 Asset Categories</h3>
+        <div style={{ color: '#D1D5DB', fontSize: '0.9rem' }}>Loading categories...</div>
+      </div>
+    );
+  }
+
+  const categories = Object.entries(assetCategories).map(([key, data]) => ({
+    key,
+    ...data
+  }));
+
+  return (
+    <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
+      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📊 Asset Categories</h3>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button
+          onClick={() => { setSelectedCategory('all'); setExpandedCategory(null); }}
+          style={{
+            padding: '0.5rem',
+            backgroundColor: selectedCategory === 'all' ? '#3B82F6' : '#1E293B',
+            color: '#F9FAFB',
+            border: '1px solid #2D3748',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '0.85rem'
+          }}
+        >
+          All ({categories.reduce((sum, cat) => sum + cat.total_assets, 0)})
+        </button>
+        {categories.map((category) => (
+          <button
+            key={category.key}
+            onClick={() => { setSelectedCategory(category.key); setExpandedCategory(category.key); }}
+            style={{
+              padding: '0.5rem',
+              backgroundColor: selectedCategory === category.key ? '#3B82F6' : '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '0.85rem'
+            }}
+          >
+            {category.label} ({category.total_assets})
+          </button>
+        ))}
+      </div>
+
+      {categories.map((category) => (
+        expandedCategory === category.key && (
+          <div key={category.key} style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#1E293B', borderRadius: '6px' }}>
+            <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#10B981' }}>
+              📈 {category.label} - Top Gainers
+            </h4>
+            {category.top_gainers.length > 0 ? (
+              <div style={{ marginBottom: '1rem' }}>
+                {category.top_gainers.map((asset, index) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    padding: '0.5rem', 
+                    backgroundColor: '#0F172A', 
+                    borderRadius: '4px', 
+                    marginBottom: '0.25rem',
+                    fontSize: '0.85rem'
+                  }}>
+                    <span style={{ color: '#F9FAFB' }}>{asset.symbol} - {asset.name}</span>
+                    <span style={{ color: '#10B981', fontWeight: '600' }}>
+                      ${asset.price?.toFixed(2) || 'N/A'} ({asset.change_pct?.toFixed(2) || 0}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: '#D1D5DB', fontSize: '0.85rem', marginBottom: '1rem' }}>No gainers data available</div>
+            )}
+
+            <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#EF4444' }}>
+              📉 {category.label} - Top Losers
+            </h4>
+            {category.top_losers.length > 0 ? (
+              <div>
+                {category.top_losers.map((asset, index) => (
+                  <div key={index} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    padding: '0.5rem', 
+                    backgroundColor: '#0F172A', 
+                    borderRadius: '4px', 
+                    marginBottom: '0.25rem',
+                    fontSize: '0.85rem'
+                  }}>
+                    <span style={{ color: '#F9FAFB' }}>{asset.symbol} - {asset.name}</span>
+                    <span style={{ color: '#EF4444', fontWeight: '600' }}>
+                      ${asset.price?.toFixed(2) || 'N/A'} ({asset.change_pct?.toFixed(2) || 0}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: '#D1D5DB', fontSize: '0.85rem' }}>No losers data available</div>
+            )}
+          </div>
+        )
+      ))}
+    </div>
+  );
+}
+
 // Short-Term Prediction Component
-function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbol, selectedHorizon, onSelectHorizon, shortTermPrediction, onLoadPrediction }) {
+function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbol, selectedHorizon, onSelectHorizon, shortTermPrediction, onLoadPrediction, assetCategories, selectedCategory, onSelectCategory }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredAssets = watchlist.filter(item => {
     const symbol = (item.symbol || '').toLowerCase();
     const name = (item.name || '').toLowerCase();
     const query = searchQuery.toLowerCase();
-    return symbol.includes(query) || name.includes(query);
+    const matchesSearch = symbol.includes(query) || name.includes(query);
+    
+    // Filter by category if a specific category is selected
+    if (selectedCategory && selectedCategory !== 'all') {
+      const itemClass = (item.class || '').toLowerCase();
+      return matchesSearch && itemClass === selectedCategory;
+    }
+    
+    return matchesSearch;
   });
 
   return (
@@ -1152,6 +1294,29 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>⏰ Predictions</h3>
       
       <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#D1D5DB' }}>Category Filter</label>
+          <select
+            value={selectedCategory}
+            onChange={(e) => onSelectCategory(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              backgroundColor: '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              fontSize: '0.9rem',
+              marginBottom: '0.5rem'
+            }}
+          >
+            <option value="all">All Categories</option>
+            {assetCategories && Object.entries(assetCategories).map(([key, data]) => (
+              <option key={key} value={key}>{data.label} ({data.total_assets})</option>
+            ))}
+          </select>
+        </div>
+        
         <div style={{ marginBottom: '0.75rem' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: '#D1D5DB' }}>Select Asset</label>
           <input

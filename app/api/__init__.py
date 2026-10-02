@@ -260,7 +260,9 @@ def get_all_assets(request: Request):
         try:
             quotes = data.get_quotes(symbols)
         except Exception as e:
-            print(f"Error fetching quotes: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error fetching quotes: {e}")
             quotes = {symbol: None for symbol in symbols}
         
         # Combine watchlist info with live quotes
@@ -293,6 +295,132 @@ def get_all_assets(request: Request):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching asset data: {str(e)}")
+
+
+@app.get("/api/assets/by-class/{asset_class}")
+@limiter.limit("30/minute")
+def get_assets_by_class_new(request: Request, asset_class: str):
+    """Get assets filtered by class (stock, crypto, forex, commodity)."""
+    try:
+        if asset_class not in config.CLASS_LABELS:
+            raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
+        
+        watchlist = config.WATCHLIST
+        filtered_assets = [asset for asset in watchlist if asset["class"] == asset_class]
+        symbols = [asset["symbol"] for asset in filtered_assets]
+        
+        # Get live quotes for filtered symbols
+        try:
+            quotes = data.get_quotes(symbols)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error fetching quotes for {asset_class}: {e}")
+            quotes = {symbol: None for symbol in symbols}
+        
+        # Combine watchlist info with live quotes
+        assets_data = []
+        for asset in filtered_assets:
+            symbol = asset["symbol"]
+            quote = quotes.get(symbol)
+            
+            asset_data = {
+                "symbol": symbol,
+                "name": asset["name"],
+                "class": asset["class"],
+                "query": asset.get("query", ""),
+                "quote": quote,
+                "price": quote.get("price", 0) if quote else 0,
+                "change_pct": quote.get("change_pct", 0) if quote else 0,
+                "volume": quote.get("volume", 0) if quote else 0,
+                "high_24h": quote.get("high_24h", 0) if quote else 0,
+                "low_24h": quote.get("low_24h", 0) if quote else 0,
+                "market_cap": quote.get("market_cap") if quote else None,
+                "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
+            }
+            assets_data.append(asset_data)
+        
+        return {
+            "class": asset_class,
+            "class_label": config.CLASS_LABELS.get(asset_class, asset_class),
+            "assets": assets_data,
+            "total": len(assets_data),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching assets by class: {str(e)}")
+
+
+@app.get("/api/assets/categories")
+@limiter.limit("30/minute")
+def get_asset_categories(request: Request):
+    """Get all asset categories with their asset counts and sample data."""
+    try:
+        watchlist = config.WATCHLIST
+        symbols = [asset["symbol"] for asset in watchlist]
+        
+        # Get live quotes for all symbols
+        try:
+            quotes = data.get_quotes(symbols)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error fetching quotes for categories: {e}")
+            quotes = {symbol: None for symbol in symbols}
+        
+        # Group assets by class
+        categories = {}
+        for asset_class in config.CLASS_LABELS.keys():
+            class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
+            
+            # Calculate top gainers and losers
+            assets_with_change = []
+            for asset in class_assets:
+                symbol = asset["symbol"]
+                quote = quotes.get(symbol)
+                if quote and quote.get("change_pct") is not None:
+                    assets_with_change.append({
+                        "symbol": symbol,
+                        "name": asset["name"],
+                        "class": asset["class"],
+                        "price": quote.get("price", 0),
+                        "change_pct": quote.get("change_pct", 0),
+                        "volume": quote.get("volume", 0),
+                        "market_cap": quote.get("market_cap")
+                    })
+            
+            # Sort by change percentage
+            assets_with_change.sort(key=lambda x: x["change_pct"], reverse=True)
+            
+            top_gainers = assets_with_change[:5] if len(assets_with_change) > 0 else []
+            top_losers = assets_with_change[-5:] if len(assets_with_change) > 0 else []
+            top_losers.reverse()  # Show highest losers first
+            
+            categories[asset_class] = {
+                "label": config.CLASS_LABELS.get(asset_class, asset_class),
+                "total_assets": len(class_assets),
+                "top_gainers": top_gainers,
+                "top_losers": top_losers,
+                "sample_assets": [
+                    {
+                        "symbol": asset["symbol"],
+                        "name": asset["name"],
+                        "price": quotes.get(asset["symbol"], {}).get("price", 0) if quotes.get(asset["symbol"]) else 0,
+                        "change_pct": quotes.get(asset["symbol"], {}).get("change_pct", 0) if quotes.get(asset["symbol"]) else 0
+                    }
+                    for asset in class_assets[:10]  # First 10 assets as sample
+                ]
+            }
+        
+        return {
+            "categories": categories,
+            "total_assets": len(watchlist),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching asset categories: {str(e)}")
 
 
 @app.get("/api/assets/by-class")
