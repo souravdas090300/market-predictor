@@ -182,7 +182,8 @@ MATERIAL_HINTS = {
     ],
 }
 
-WATCHLIST = [
+# Create deduplicated watchlist to avoid data fetching issues
+_RAW_WATCHLIST = [
     # Major Stocks
     {"symbol": "AAPL", "name": "Apple", "class": "stock", "query": "Apple AAPL stock"},
     {"symbol": "MSFT", "name": "Microsoft", "class": "stock", "query": "Microsoft MSFT stock"},
@@ -765,6 +766,14 @@ WATCHLIST = [
     {"symbol": "OJ=F", "name": "Orange Juice", "class": "commodity", "query": "orange juice futures price"},
     {"symbol": "RS=F", "name": "Rapeseed", "class": "commodity", "query": "rapeseed futures price"},
 ]
+
+# Deduplicate watchlist to avoid duplicate API calls and display issues
+seen_symbols = set()
+WATCHLIST = []
+for asset in _RAW_WATCHLIST:
+    if asset["symbol"] not in seen_symbols:
+        seen_symbols.add(asset["symbol"])
+        WATCHLIST.append(asset)
 
 _BY_SYMBOL = {a["symbol"].upper(): a for a in WATCHLIST}
 
