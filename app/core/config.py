@@ -2,9 +2,21 @@
 import os
 import re
 from pathlib import Path
+import warnings
 
 # Environment
 ENV = os.getenv("ENV", "development").lower()
+
+# Security warnings for production
+if ENV == "production":
+    required_env_vars = ["SECRET_KEY"]
+    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    if missing_vars:
+        warnings.warn(
+            f"SECURITY WARNING: Missing required environment variables for production: {missing_vars}. "
+            "Set these before deploying to production!",
+            RuntimeWarning
+        )
 
 # Base directory
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -21,7 +33,9 @@ LOGS.mkdir(exist_ok=True)
 DB_PATH = ROOT / "data" / "signals.db"
 
 # Security Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production" if ENV == "development" else "production-secret-key-change-me")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production" if ENV == "development" else None)
+if SECRET_KEY is None and ENV == "production":
+    raise ValueError("SECRET_KEY environment variable must be set in production")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Security Settings
@@ -110,7 +124,7 @@ def get_cors_origins():
     return origins
 
 CORS_ORIGINS = get_cors_origins()
-ADMIN_CORS_ORIGINS = os.getenv("ADMIN_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000" if ENV == "development" else "https://*.vercel.app,https://*.railway.app").split(",")
+ADMIN_CORS_ORIGINS = os.getenv("ADMIN_CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000" if ENV == "development" else "https://market-predictor-eta.vercel.app").split(",")
 
 # Feature Flags
 ENABLE_DEBUG_MODE = os.getenv("ENABLE_DEBUG_MODE", "true" if ENV == "development" else "false").lower() == "true"

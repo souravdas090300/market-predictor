@@ -211,9 +211,22 @@ def rate_limit_decorator(max_requests: int = 100, window: int = 60):
     def decorator(func):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
-            # Get client identifier (IP or user)
-            # This is a simplified version - in production you'd get this from request headers
-            client_id = "default"  # In production, use request.client.host or user ID
+            # Get client identifier from request if available
+            # FastAPI endpoints typically have Request as first argument
+            request = None
+            if args and hasattr(args[0], 'client'):
+                request = args[0]
+            elif kwargs and 'request' in kwargs:
+                request = kwargs['request']
+            
+            # Use IP address as client identifier
+            if request and hasattr(request, 'client'):
+                client_id = request.client.host
+            else:
+                # Fallback to a random identifier (not ideal but better than 'default')
+                import hashlib
+                import secrets
+                client_id = hashlib.sha256(secrets.token_bytes(16)).hexdigest()[:16]
             
             rate_limiter.max_requests = max_requests
             rate_limiter.window = window
@@ -244,9 +257,21 @@ def rate_limit_decorator(max_requests: int = 100, window: int = 60):
         
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
-            # Get client identifier (IP or user)
-            # This is a simplified version - in production you'd get this from request headers
-            client_id = "default"  # In production, use request.client.host or user ID
+            # Get client identifier from request if available
+            request = None
+            if args and hasattr(args[0], 'client'):
+                request = args[0]
+            elif kwargs and 'request' in kwargs:
+                request = kwargs['request']
+            
+            # Use IP address as client identifier
+            if request and hasattr(request, 'client'):
+                client_id = request.client.host
+            else:
+                # Fallback to a random identifier (not ideal but better than 'default')
+                import hashlib
+                import secrets
+                client_id = hashlib.sha256(secrets.token_bytes(16)).hexdigest()[:16]
             
             rate_limiter.max_requests = max_requests
             rate_limiter.window = window
@@ -306,6 +331,16 @@ class APIKeyManager:
     
     def _save_api_keys(self):
         """Save API keys to storage."""
+        # SECURITY: In production, use a proper database with encryption
+        # JSON file storage is not suitable for production applications
+        if config.ENV == "production":
+            import warnings
+            warnings.warn(
+                "SECURITY WARNING: Using JSON file storage for API keys in production. "
+                "This is not secure. Use a proper database with encryption.",
+                RuntimeWarning
+            )
+        
         api_keys_file = config.ROOT / "data"
         api_keys_file.mkdir(exist_ok=True)
         api_keys_file = api_keys_file / "api_keys.json"
@@ -447,7 +482,7 @@ def get_security_headers() -> Dict[str, str]:
         "X-Frame-Options": "DENY",
         "X-XSS-Protection": "1; mode=block",
         "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;",
+        "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;",
         "Referrer-Policy": "strict-origin-when-cross-origin",
         "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
     }

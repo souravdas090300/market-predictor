@@ -11,5 +11,5 @@ dirs = ["data", "logs", "models", "static"]
 [environment]
 PYTHONPATH = "/app"
 PYTHONUNBUFFERED = "1"
-CORS_ORIGINS = "https://market-predictor-eta.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
+CORS_ORIGINS = "https://market-predictor-eta.vercel.app"
 ENV = "production"

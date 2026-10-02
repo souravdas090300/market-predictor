@@ -99,7 +99,9 @@ class NewsAggregator:
             
             return articles
         except Exception as e:
-            print(f"Google News error: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Google News error: {e}")
             return []
     
     def _fetch_yahoo_news(self, symbol: str, max_articles: int) -> List[Dict]:
@@ -125,7 +127,9 @@ class NewsAggregator:
             
             return articles
         except Exception as e:
-            print(f"Bloomberg error: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Bloomberg error: {e}")
             return []
     
     def analyze_news_sentiment(self, articles: List[Dict]) -> Dict:

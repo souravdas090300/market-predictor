@@ -939,8 +939,10 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
     except Exception as e:
         # Log the error for debugging
         import traceback
+        import logging
+        logger = logging.getLogger(__name__)
         error_detail = f"Error generating prediction for {symbol}: {str(e)}\n{traceback.format_exc()}"
-        print(f"Prediction error: {error_detail}")
+        logger.error(error_detail)
         raise HTTPException(status_code=500, detail=f"Error generating prediction: {str(e)}")
 
 

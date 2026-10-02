@@ -52,6 +52,16 @@ class UserManager:
     
     def _save_users(self):
         """Save users to storage."""
+        # SECURITY: In production, use a proper database with encryption
+        # JSON file storage is not suitable for production applications
+        if config.ENV == "production":
+            import warnings
+            warnings.warn(
+                "SECURITY WARNING: Using JSON file storage for user data in production. "
+                "This is not secure. Use a proper database with encryption.",
+                RuntimeWarning
+            )
+        
         with open(USERS_FILE, 'w') as f:
             json.dump(self.users, f, indent=2)
     

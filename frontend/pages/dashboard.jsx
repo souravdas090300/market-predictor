@@ -54,15 +54,12 @@ export default function Dashboard() {
       const assetsRes = await fetch(`${API_URL}/api/assets/all`);
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
-        console.log('Loaded assets:', assetsData.assets?.length || 0, 'assets');
         setWatchlist(assetsData.assets || []);
       } else {
-        console.error('Failed to load assets/all, status:', assetsRes.status);
         // Fallback to watchlist endpoint
         const watchlistRes = await fetch(`${API_URL}/api/watchlist`);
         if (watchlistRes.ok) {
           const watchlistData = await watchlistRes.json();
-          console.log('Loaded watchlist fallback:', watchlistData?.length || 0, 'assets');
           setWatchlist(watchlistData);
         }
       }
