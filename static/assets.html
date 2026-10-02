@@ -3,481 +3,470 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Market Predictor – Live Assets</title>
+    <title>Market Predictor – Asset Library</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         :root {
-            --color-bullish: #10B981;
-            --color-bearish: #EF4444;
-            --color-navy: #0F172A;
-            --color-gold: #FBBF24;
-            --color-slate: #1F2937;
-            --color-gray-dark: #111827;
-            --color-border: #2D3748;
-            --color-text-primary: #F9FAFB;
-            --color-text-secondary: #D1D5DB;
-            --font-body: 'Inter', sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
-            --spacing-xs: 0.5rem;
-            --spacing-sm: 1rem;
-            --spacing-md: 1.5rem;
-            --spacing-lg: 2rem;
-            --radius-sm: 6px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
+            /* Light mode colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        .chart-tooltip {
-            position: absolute;
-            background: rgba(17, 24, 39, 0.95);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-sm);
-            padding: 12px;
-            pointer-events: none;
-            z-index: 100;
-            min-width: 200px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            display: none;
+        
+        [data-theme="dark"] {
+            /* Dark mode colors */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: #334155;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
         }
-        .tooltip-date { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 8px; }
-        .tooltip-price { font-family: var(--font-mono); font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-        .tooltip-details { font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; }
-        .tooltip-trend {
-            margin-top: 8px;
-            padding: 6px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-        .tooltip-trend.bullish { background: rgba(16, 185, 129, 0.2); color: var(--color-bullish); }
-        .tooltip-trend.bearish { background: rgba(239, 68, 68, 0.2); color: var(--color-bearish); }
-        .tooltip-trend.neutral { background: rgba(251, 191, 36, 0.2); color: var(--color-gold); }
+        
         body {
-            background: linear-gradient(135deg, var(--color-navy) 0%, #1a2a4a 100%);
-            color: var(--color-text-primary);
-            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
             font-size: 14px;
             line-height: 1.6;
             min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
         }
+        
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: var(--spacing-lg);
+            padding: 20px;
         }
+        
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--spacing-lg);
-            padding-bottom: var(--spacing-md);
-            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
         }
-        .header-title { display: flex; align-items: center; gap: var(--spacing-sm); }
-        .logo-icon {
-            width: 32px; height: 32px;
-            background: linear-gradient(135deg, var(--color-gold), var(--color-bullish));
-            border-radius: var(--radius-md);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 14px;
-        }
-        .header-controls { display: flex; gap: var(--spacing-sm); align-items: center; }
-        .live-pill {
-            display: inline-flex; align-items: center; gap: 6px;
-            font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
-            color: var(--color-bullish);
-        }
-        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-bullish); animation: pulse 1.6s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-        .refresh-btn {
-            padding: 8px 16px;
-            background: rgba(16, 185, 129, 0.15);
-            border: 1px solid var(--color-bullish);
-            color: var(--color-bullish);
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 12px;
-        }
-        .refresh-btn:hover { background: rgba(16, 185, 129, 0.25); }
-        .nav-link {
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--color-border);
-            color: var(--color-text-secondary);
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            font-size: 12px;
-            text-decoration: none;
-        }
-        .nav-link:hover { background: rgba(255, 255, 255, 0.1); color: var(--color-text-primary); }
         
-        .filters {
+        .header-title {
             display: flex;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-md);
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .theme-toggle {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--border-color);
+        }
+        
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+        
+        .category-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
             flex-wrap: wrap;
         }
-        .filter-btn {
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--color-border);
-            color: var(--color-text-secondary);
-            border-radius: var(--radius-sm);
+        
+        .category-tab {
+            padding: 10px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 500;
             transition: all 0.2s;
         }
-        .filter-btn:hover { background: rgba(255, 255, 255, 0.1); }
-        .filter-btn.active {
-            background: rgba(16, 185, 129, 0.2);
-            border-color: var(--color-bullish);
-            color: var(--color-bullish);
-        }
-        .search-input {
-            padding: 8px 12px;
-            background: rgba(0,0,0,0.25);
-            border: 1px solid var(--color-border);
-            color: var(--color-text-primary);
-            border-radius: var(--radius-sm);
-            font-family: var(--font-mono);
-            font-size: 12px;
-            min-width: 200px;
-        }
-        .search-input:focus { outline: none; border-color: var(--color-bullish); }
         
+        .category-tab:hover {
+            background: var(--border-color);
+        }
+        
+        .category-tab.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
+        }
+        
+        .assets-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .assets-table th {
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .assets-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .assets-table tr:hover {
+            background: var(--bg-secondary);
+            cursor: pointer;
+        }
+        
+        .asset-symbol {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+        
+        .asset-name {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .asset-class {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .asset-class.stock { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); }
+        .asset-class.crypto { background: rgba(251, 191, 36, 0.1); color: #fbbf24; }
+        .asset-class.forex { background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); }
+        .asset-class.commodity { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); }
+        
+        .price {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .change {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .change.positive { color: var(--accent-green); }
+        .change.negative { color: var(--accent-red); }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: var(--accent-red);
+        }
+        
+        /* Top Movers Section */
         .top-movers-section {
-            margin-bottom: var(--spacing-lg);
-            padding: var(--spacing-md);
-            background: rgba(31, 41, 55, 0.35);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
         }
         
         .section-title {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 700;
-            margin-bottom: var(--spacing-md);
-            color: var(--color-text-primary);
+            margin-bottom: 16px;
         }
         
         .top-movers-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: var(--spacing-md);
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
         }
         
-        .mover-category {
-            background: rgba(17, 24, 39, 0.5);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            padding: var(--spacing-sm);
+        .mover-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
         }
         
-        .mover-category-header {
+        .mover-card-header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: var(--spacing-xs);
-            margin-bottom: var(--spacing-sm);
-            padding-bottom: var(--spacing-xs);
-            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 12px;
         }
         
-        .mover-category-title {
+        .mover-card-title {
+            font-weight: 600;
             font-size: 14px;
+        }
+        
+        .mover-card-label {
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-        }
-        
-        .mover-category-icon {
-            width: 24px;
-            height: 24px;
+            padding: 4px 8px;
             border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 700;
         }
         
-        .mover-category-icon.stock { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
-        .mover-category-icon.crypto { background: rgba(251, 191, 36, 0.2); color: #FBBF24; }
-        .mover-category-icon.forex { background: rgba(168, 85, 247, 0.2); color: #A78BFA; }
-        .mover-category-icon.commodity { background: rgba(16, 185, 129, 0.2); color: #10B981; }
+        .mover-card-label.gainer { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); }
+        .mover-card-label.loser { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); }
         
         .mover-list {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
         }
         
         .mover-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 6px 8px;
-            background: rgba(255, 255, 255, 0.03);
+            padding: 8px;
+            background: var(--bg-primary);
             border-radius: 4px;
             cursor: pointer;
             transition: background 0.2s;
         }
         
         .mover-item:hover {
-            background: rgba(255, 255, 255, 0.08);
+            background: var(--border-color);
         }
         
         .mover-symbol {
-            font-size: 12px;
             font-weight: 600;
-            font-family: var(--font-mono);
+            font-family: 'JetBrains Mono', monospace;
         }
         
         .mover-change {
-            font-size: 11px;
-            font-weight: 700;
-            font-family: var(--font-mono);
-        }
-        
-        .mover-change.gainer { color: var(--color-bullish); }
-        .mover-change.loser { color: var(--color-bearish); }
-        
-        .mover-section-label {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            color: var(--color-text-secondary);
-            margin-bottom: 4px;
-            margin-top: 8px;
-        }
-        
-        .mover-section-label.gainer { color: var(--color-bullish); }
-        .mover-section-label.loser { color: var(--color-bearish); }
-        
-        .no-movers {
-            font-size: 11px;
-            color: var(--color-text-secondary);
-            text-align: center;
-            padding: var(--spacing-sm);
-        }
-        
-        .calculator-section {
-            margin-bottom: var(--spacing-lg);
-            padding: var(--spacing-md);
-            background: rgba(31, 41, 55, 0.35);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-        }
-        
-        .calculator-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-md);
-        }
-        
-        @media (max-width: 768px) {
-            .calculator-container {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        .calculator-form {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-sm);
-        }
-        
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        
-        .form-group label {
-            font-size: 11px;
             font-weight: 600;
-            color: var(--color-text-secondary);
-            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
         }
         
-        .form-input {
-            padding: 10px 12px;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--color-border);
-            color: var(--color-text-primary);
-            border-radius: var(--radius-sm);
-            font-family: var(--font-mono);
-            font-size: 13px;
+        .mover-change.positive { color: var(--accent-green); }
+        .mover-change.negative { color: var(--accent-red); }
+        
+        /* Asset Detail Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
         }
         
-        .form-input:focus {
-            outline: none;
-            border-color: var(--color-bullish);
+        .modal-overlay.active {
+            display: flex;
         }
         
-        .calc-btn {
-            padding: 12px;
-            background: linear-gradient(135deg, var(--color-bullish), #059669);
-            border: none;
-            color: white;
-            border-radius: var(--radius-sm);
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-md);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .modal-title {
+            font-size: 24px;
             font-weight: 700;
-            font-size: 14px;
+        }
+        
+        .close-btn {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 8px;
             cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .price-display {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .current-price {
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .price-change {
+            font-size: 18px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .price-change.positive { color: var(--accent-green); }
+        .price-change.negative { color: var(--accent-red); }
+        
+        .price-high-low {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .timeframe-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .timeframe-tab {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
             transition: all 0.2s;
         }
         
-        .calc-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        .timeframe-tab:hover {
+            background: var(--border-color);
         }
         
-        .calculator-results {
-            background: rgba(17, 24, 39, 0.5);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            padding: var(--spacing-md);
+        .timeframe-tab.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: white;
         }
         
-        .results-placeholder {
+        .chart-container {
+            height: 400px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .chart-placeholder {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100%;
-            font-size: 13px;
-            color: var(--color-text-secondary);
-        }
-        
-        .result-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .result-item:last-child {
-            border-bottom: none;
-        }
-        
-        .result-label {
-            font-size: 12px;
-            color: var(--color-text-secondary);
-        }
-        
-        .result-value {
-            font-family: var(--font-mono);
-            font-size: 14px;
-            font-weight: 600;
-        }
-        
-        .result-value.profit { color: var(--color-bullish); }
-        .result-value.loss { color: var(--color-bearish); }
-        
-        .result-highlight {
-            background: rgba(16, 185, 129, 0.1);
-            border-radius: var(--radius-sm);
-            padding: var(--spacing-sm);
-            margin-top: var(--spacing-sm);
-        }
-        
-        .result-highlight.loss {
-            background: rgba(239, 68, 68, 0.1);
-        }
-        
-        .assets-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: var(--spacing-md);
-        }
-        .asset-card {
-            background: rgba(31, 41, 55, 0.55);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-md);
-            transition: all 0.2s;
-        }
-        .asset-card:hover {
-            border-color: var(--color-bullish);
-            transform: translateY(-2px);
-        }
-        .asset-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: var(--spacing-sm);
-        }
-        .asset-symbol { font-size: 18px; font-weight: 700; }
-        .asset-name { font-size: 12px; color: var(--color-text-secondary); }
-        .asset-class {
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            padding: 4px 8px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--color-text-secondary);
-        }
-        .asset-class.stock { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
-        .asset-class.crypto { background: rgba(251, 191, 36, 0.2); color: #FBBF24; }
-        .asset-class.forex { background: rgba(168, 85, 247, 0.2); color: #A78BFA; }
-        .asset-class.commodity { background: rgba(16, 185, 129, 0.2); color: #10B981; }
-        
-        .asset-price {
-            font-family: var(--font-mono);
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: var(--spacing-sm);
-        }
-        .asset-price.up { color: var(--color-bullish); }
-        .asset-price.down { color: var(--color-bearish); }
-        
-        .asset-change {
-            font-family: var(--font-mono);
-            font-size: 14px;
-            margin-bottom: var(--spacing-md);
-        }
-        .asset-change.up { color: var(--color-bullish); }
-        .asset-change.down { color: var(--color-bearish); }
-        
-        .asset-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-sm);
-            font-size: 11px;
-        }
-        .detail-item {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .detail-label { color: var(--color-text-secondary); font-size: 10px; text-transform: uppercase; }
-        .detail-value { font-family: var(--font-mono); font-weight: 600; }
-        
-        .loading {
-            text-align: center;
-            padding: var(--spacing-lg);
-            color: var(--color-text-secondary);
-        }
-        .error {
-            text-align: center;
-            padding: var(--spacing-lg);
-            color: var(--color-bearish);
-        }
-        .last-updated {
-            text-align: center;
-            font-size: 11px;
-            color: var(--color-text-secondary);
-            margin-top: var(--spacing-lg);
+            color: var(--text-secondary);
         }
         
         @media (max-width: 768px) {
-            .assets-grid { grid-template-columns: 1fr; }
-            .header { flex-direction: column; gap: var(--spacing-sm); align-items: flex-start; }
-            .header-controls { flex-wrap: wrap; }
-            .filters { flex-direction: column; }
-            .search-input { width: 100%; }
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+            
+            .assets-table {
+                font-size: 12px;
+            }
+            
+            .assets-table th,
+            .assets-table td {
+                padding: 12px 8px;
+            }
+            
+            .top-movers-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -487,25 +476,24 @@
             <div class="header-title">
                 <div class="logo-icon">MP</div>
                 <div>
-                    <h1 style="font-size: 20px; font-weight: 700;">Live Assets</h1>
-                    <p style="font-size: 12px; color: var(--color-text-secondary);">Real-time prices and market data</p>
+                    <h1>Asset Library</h1>
+                    <p>Real-time market data and predictions</p>
                 </div>
             </div>
-            <div class="header-controls">
-                <span class="live-pill"><span class="live-dot"></span> LIVE</span>
-                <button class="refresh-btn" id="refreshBtn" type="button">Refresh</button>
-                <a class="nav-link" href="/dashboard">Dashboard</a>
-                <a class="nav-link" href="/profile">Account</a>
-            </div>
+            <button class="theme-toggle" id="themeToggle">🌙 Dark Mode</button>
         </header>
         
-        <div class="filters">
-            <button class="filter-btn active" data-filter="all">All Assets</button>
-            <button class="filter-btn" data-filter="stock">Stocks</button>
-            <button class="filter-btn" data-filter="crypto">Crypto</button>
-            <button class="filter-btn" data-filter="forex">Forex</button>
-            <button class="filter-btn" data-filter="commodity">Commodities</button>
-            <input class="search-input" id="searchInput" placeholder="Search assets..." />
+        <div class="search-bar">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search assets by symbol or name..." />
+            <button id="clearSearch" style="padding: 12px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; cursor: pointer; font-size: 14px; display: none;">Clear</button>
+        </div>
+        
+        <div class="category-tabs" id="categoryTabs">
+            <button class="category-tab active" data-category="all">All Assets</button>
+            <button class="category-tab" data-category="stock">Stocks</button>
+            <button class="category-tab" data-category="crypto">Crypto</button>
+            <button class="category-tab" data-category="forex">Forex</button>
+            <button class="category-tab" data-category="commodity">Commodities</button>
         </div>
         
         <!-- Top Movers Section -->
@@ -516,51 +504,75 @@
             </div>
         </div>
         
-        <!-- Investment Calculator Section -->
-        <div class="calculator-section" id="calculatorSection">
-            <h2 class="section-title">Investment Calculator</h2>
-            <div class="calculator-container">
-                <div class="calculator-form">
-                    <div class="form-group">
-                        <label for="calcSymbol">Symbol</label>
-                        <input type="text" id="calcSymbol" class="form-input" placeholder="e.g., BTC-USD, AAPL" />
-                    </div>
-                    <div class="form-group">
-                        <label for="purchasePrice">Purchase Price</label>
-                        <input type="number" id="purchasePrice" class="form-input" placeholder="Price when you bought" step="any" />
-                    </div>
-                    <div class="form-group">
-                        <label for="purchaseAmount">Investment Amount ($)</label>
-                        <input type="number" id="purchaseAmount" class="form-input" placeholder="Total amount invested" step="any" />
-                    </div>
-                    <div class="form-group">
-                        <label for="targetPrice">Target Price (Optional)</label>
-                        <input type="number" id="targetPrice" class="form-input" placeholder="Future target price" step="any" />
-                    </div>
-                    <button class="calc-btn" id="calculateBtn" type="button">Calculate</button>
+        <!-- Assets Table -->
+        <table class="assets-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Price</th>
+                    <th>24h Change</th>
+                    <th>Volume</th>
+                    <th>Market Cap</th>
+                </tr>
+            </thead>
+            <tbody id="assetsTableBody">
+                <tr>
+                    <td colspan="7" class="loading">Loading assets...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Asset Detail Modal -->
+    <div class="modal-overlay" id="assetModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="modal-title" id="modalTitle">BTC-USD</h2>
+                    <p id="modalName" style="color: var(--text-secondary);">Bitcoin</p>
                 </div>
-                <div class="calculator-results" id="calculatorResults">
-                    <div class="results-placeholder">Enter details and click Calculate</div>
-                </div>
+                <button class="close-btn" id="closeModal">Close</button>
+            </div>
+            
+            <div class="price-display">
+                <span class="current-price" id="modalPrice">$84,693.20</span>
+                <span class="price-change positive" id="modalChange">+$1,209.59 (1.37%)</span>
+            </div>
+            
+            <div class="price-high-low">
+                <span>High: <span id="modalHigh">$85,020.70</span></span>
+                <span>Low: <span id="modalLow">$83,328.80</span></span>
+            </div>
+            
+            <div class="timeframe-tabs" id="timeframeTabs">
+                <button class="timeframe-tab active" data-timeframe="24h">24H</button>
+                <button class="timeframe-tab" data-timeframe="1w">1W</button>
+                <button class="timeframe-tab" data-timeframe="1m">1M</button>
+                <button class="timeframe-tab" data-timeframe="6m">6M</button>
+                <button class="timeframe-tab" data-timeframe="1y">1Y</button>
+                <button class="timeframe-tab" data-timeframe="5y">5Y</button>
+                <button class="timeframe-tab" data-timeframe="all">ALL</button>
+            </div>
+            
+            <div class="chart-container" id="chartContainer">
+                <div class="chart-placeholder">Loading chart...</div>
             </div>
         </div>
-        
-        <div class="assets-grid" id="assetsGrid">
-            <div class="loading">Loading assets...</div>
-        </div>
-        
-        <div class="last-updated" id="lastUpdated"></div>
     </div>
     
     <script>
         let allAssets = [];
-        let currentFilter = 'all';
+        let currentCategory = 'all';
         let searchQuery = '';
-        let eventSource = null;
+        let currentAsset = null;
+        let currentTimeframe = '24h';
+        let refreshInterval = null;
         
         const $ = (id) => document.getElementById(id);
         
-        function fmt(n, d=2) {
+        function fmt(n, d = 2) {
             if (n == null || Number.isNaN(n)) return '—';
             return Number(n).toLocaleString(undefined, { maximumFractionDigits: d });
         }
@@ -580,118 +592,28 @@
             return (n >= 0 ? '+' : '') + s + '%';
         }
         
-        function renderAssets(assets) {
-            const grid = $('assetsGrid');
-            
-            if (assets.length === 0) {
-                grid.innerHTML = '<div class="error">No assets found matching your criteria.</div>';
-                return;
-            }
-            
-            grid.innerHTML = assets.map(asset => {
-                const quote = asset.quote;
-                if (!quote) {
-                    return `
-                        <div class="asset-card">
-                            <div class="asset-header">
-                                <div>
-                                    <div class="asset-symbol">${asset.symbol}</div>
-                                    <div class="asset-name">${asset.name}</div>
-                                </div>
-                                <span class="asset-class ${asset.class}">${asset.class}</span>
-                            </div>
-                            <div class="asset-price">Loading...</div>
-                            <div class="asset-details">
-                                <div class="detail-item">
-                                    <span class="detail-label">Status</span>
-                                    <span class="detail-value">No data</span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                const priceClass = quote.change_pct >= 0 ? 'up' : 'down';
-                const changeClass = quote.change_pct >= 0 ? 'up' : 'down';
-                
-                return `
-                    <div class="asset-card" onclick="loadSymbol('${asset.symbol}')">
-                        <div class="asset-header">
-                            <div>
-                                <div class="asset-symbol">${asset.symbol}</div>
-                                <div class="asset-name">${asset.name}</div>
-                            </div>
-                            <span class="asset-class ${asset.class}">${asset.class}</span>
-                        </div>
-                        <div class="asset-price ${priceClass}">${fmt(quote.price, 4)}</div>
-                        <div class="asset-change ${changeClass}">
-                            ${fmt(quote.change, 4)} (${pct(quote.change_pct)})
-                        </div>
-                        <div class="asset-details">
-                            <div class="detail-item">
-                                <span class="detail-label">Volume</span>
-                                <span class="detail-value">${quote.volume ? fmtLargeNumber(quote.volume) : '—'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Market Cap</span>
-                                <span class="detail-value">${quote.market_cap ? fmtLargeNumber(quote.market_cap) : '—'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Day High</span>
-                                <span class="detail-value">${quote.day_high ? fmt(quote.day_high, 4) : '—'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Day Low</span>
-                                <span class="detail-value">${quote.day_low ? fmt(quote.day_low, 4) : '—'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Open</span>
-                                <span class="detail-value">${quote.open ? fmt(quote.open, 4) : '—'}</span>
-                            </div>
-                            <div class="detail-item">
-                                <span class="detail-label">Prev Close</span>
-                                <span class="detail-value">${fmt(quote.previous_close, 4)}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+        // Theme toggle
+        function initTheme() {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const savedTheme = localStorage.getItem('theme');
+            const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+            updateThemeButton(theme);
         }
         
-        function filterAssets() {
-            let filtered = allAssets;
-            
-            // Apply class filter
-            if (currentFilter !== 'all') {
-                filtered = filtered.filter(asset => asset.class === currentFilter);
-            }
-            
-            // Apply search filter
-            if (searchQuery) {
-                const query = searchQuery.toLowerCase();
-                filtered = filtered.filter(asset => 
-                    asset.symbol.toLowerCase().includes(query) ||
-                    asset.name.toLowerCase().includes(query)
-                );
-            }
-            
-            renderAssets(filtered);
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const newTheme = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeButton(newTheme);
         }
         
-        function updateQuotes(quotes) {
-            // Update the quotes in allAssets
-            for (const [symbol, quote] of Object.entries(quotes)) {
-                const asset = allAssets.find(a => a.symbol === symbol);
-                if (asset && quote) {
-                    asset.quote = quote;
-                }
-            }
-            
-            // Re-render with updated data
-            filterAssets();
-            $('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        function updateThemeButton(theme) {
+            $('themeToggle').textContent = theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
         }
         
+        // Load assets
         async function loadAssets() {
             try {
                 const response = await fetch('/api/assets/all');
@@ -700,18 +622,116 @@
                 const data = await response.json();
                 allAssets = data.assets || [];
                 
-                filterAssets();
-                
-                $('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-                
-                // Start real-time updates after initial load
-                startRealTimeUpdates();
+                renderAssetsTable();
+                loadTopMovers();
             } catch (error) {
                 console.error('Error loading assets:', error);
-                $('assetsGrid').innerHTML = '<div class="error">Failed to load assets. Please try again.</div>';
+                $('assetsTableBody').innerHTML = '<tr><td colspan="7" class="error">Failed to load assets</td></tr>';
             }
         }
         
+        // Refresh live prices
+        async function refreshPrices() {
+            try {
+                const response = await fetch('/api/assets/all');
+                if (!response.ok) throw new Error('Failed to refresh prices');
+                
+                const data = await response.json();
+                allAssets = data.assets || [];
+                
+                renderAssetsTable();
+                loadTopMovers();
+            } catch (error) {
+                console.error('Error refreshing prices:', error);
+            }
+        }
+        
+        // Render assets table
+        function renderAssetsTable() {
+            const tbody = $('assetsTableBody');
+            
+            let filtered = allAssets;
+            
+            if (currentCategory !== 'all') {
+                filtered = filtered.filter(asset => asset.class === currentCategory);
+            }
+            
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                filtered = filtered.filter(asset => 
+                    asset.symbol.toLowerCase().includes(query) ||
+                    asset.name.toLowerCase().includes(query)
+                );
+            }
+            
+            // Show search results count
+            const totalCount = allAssets.length;
+            const categoryCount = currentCategory !== 'all' 
+                ? allAssets.filter(a => a.class === currentCategory).length 
+                : totalCount;
+            
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="loading">No assets found matching "${searchQuery}"</td></tr>`;
+                return;
+            }
+            
+            tbody.innerHTML = filtered.map(asset => {
+                const quote = asset.quote;
+                const price = quote ? quote.price : 0;
+                const change = quote ? quote.change_pct : 0;
+                const changeClass = change >= 0 ? 'positive' : 'negative';
+                const changeSign = change >= 0 ? '+' : '';
+                
+                // Highlight matching text
+                const highlightMatch = (text, query) => {
+                    if (!query) return text;
+                    const regex = new RegExp(`(${query})`, 'gi');
+                    return text.replace(regex, '<mark style="background: rgba(59, 130, 246, 0.3); padding: 0 2px; border-radius: 2px;">$1</mark>');
+                };
+                
+                const highlightedSymbol = searchQuery ? highlightMatch(asset.symbol, searchQuery) : asset.symbol;
+                const highlightedName = searchQuery ? highlightMatch(asset.name, searchQuery) : asset.name;
+                
+                return `
+                    <tr onclick="openAssetModal('${asset.symbol}')" style="cursor: pointer;">
+                        <td>
+                            <div class="asset-symbol">${highlightedSymbol}</div>
+                        </td>
+                        <td>
+                            <div class="asset-name">${highlightedName}</div>
+                        </td>
+                        <td>
+                            <span class="asset-class ${asset.class}">${asset.class}</span>
+                        </td>
+                        <td>
+                            <div class="price">${fmt(price, 4)}</div>
+                        </td>
+                        <td>
+                            <div class="change ${changeClass}">${changeSign}${pct(change)}</div>
+                        </td>
+                        <td>
+                            <div class="price">${quote && quote.volume ? fmtLargeNumber(quote.volume) : '—'}</div>
+                        </td>
+                        <td>
+                            <div class="price">${quote && quote.market_cap ? fmtLargeNumber(quote.market_cap) : '—'}</div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Update results count
+            const tableElement = document.querySelector('.assets-table');
+            const existingCount = tableElement.parentElement.querySelector('.results-count');
+            if (existingCount) existingCount.remove();
+            
+            const countDiv = document.createElement('div');
+            countDiv.className = 'results-count';
+            countDiv.style.cssText = 'margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);';
+            countDiv.innerHTML = `Showing ${filtered.length} of ${categoryCount} assets ${searchQuery ? `matching "${searchQuery}"` : ''}`;
+            tableElement.parentElement.insertBefore(countDiv, tableElement);
+        }
+        
+        // Load top movers
         async function loadTopMovers() {
             try {
                 const response = await fetch('/api/assets/categories');
@@ -721,15 +741,16 @@
                 renderTopMovers(data.categories);
             } catch (error) {
                 console.error('Error loading top movers:', error);
-                $('topMoversGrid').innerHTML = '<div class="error">Failed to load top movers.</div>';
+                $('topMoversGrid').innerHTML = '<div class="error">Failed to load top movers</div>';
             }
         }
         
+        // Render top movers
         function renderTopMovers(categories) {
             const grid = $('topMoversGrid');
             
-            if (!categories || Object.keys(categories).length === 0) {
-                grid.innerHTML = '<div class="no-movers">No top movers data available</div>';
+            if (!categories) {
+                grid.innerHTML = '<div class="loading">No data available</div>';
                 return;
             }
             
@@ -738,36 +759,33 @@
                 const category = categories[catKey];
                 if (!category) return '';
                 
-                const categoryIcon = catKey.charAt(0).toUpperCase();
-                
                 const gainersHtml = category.top_gainers && category.top_gainers.length > 0
-                    ? category.top_gainers.map(mover => `
-                        <div class="mover-item" onclick="loadSymbol('${mover.symbol}')">
+                    ? category.top_gainers.slice(0, 3).map(mover => `
+                        <div class="mover-item" onclick="openAssetModal('${mover.symbol}')">
                             <span class="mover-symbol">${mover.symbol}</span>
-                            <span class="mover-change gainer">+${pct(mover.change_pct)}</span>
+                            <span class="mover-change positive">+${pct(mover.change_pct)}</span>
                         </div>
                     `).join('')
-                    : '<div class="no-movers">No gainers</div>';
+                    : '<div class="loading">No gainers</div>';
                 
                 const losersHtml = category.top_losers && category.top_losers.length > 0
-                    ? category.top_losers.map(mover => `
-                        <div class="mover-item" onclick="loadSymbol('${mover.symbol}')">
+                    ? category.top_losers.slice(0, 3).map(mover => `
+                        <div class="mover-item" onclick="openAssetModal('${mover.symbol}')">
                             <span class="mover-symbol">${mover.symbol}</span>
-                            <span class="mover-change loser">${pct(mover.change_pct)}</span>
+                            <span class="mover-change negative">${pct(mover.change_pct)}</span>
                         </div>
                     `).join('')
-                    : '<div class="no-movers">No losers</div>';
+                    : '<div class="loading">No losers</div>';
                 
                 return `
-                    <div class="mover-category">
-                        <div class="mover-category-header">
-                            <div class="mover-category-icon ${catKey}">${categoryIcon}</div>
-                            <div class="mover-category-title">${category.label}</div>
+                    <div class="mover-card">
+                        <div class="mover-card-header">
+                            <span class="mover-card-title">${category.label}</span>
                         </div>
                         <div class="mover-list">
-                            <div class="mover-section-label gainer">Top Gainers</div>
+                            <div class="mover-card-label gainer">Top Gainers</div>
                             ${gainersHtml}
-                            <div class="mover-section-label loser">Top Losers</div>
+                            <div class="mover-card-label loser">Top Losers</div>
                             ${losersHtml}
                         </div>
                     </div>
@@ -777,244 +795,134 @@
             grid.innerHTML = html;
         }
         
-        async function calculateInvestment() {
-            const symbol = $('calcSymbol').value.trim();
-            const purchasePrice = parseFloat($('purchasePrice').value);
-            const purchaseAmount = parseFloat($('purchaseAmount').value);
-            const targetPrice = parseFloat($('targetPrice').value) || null;
+        // Open asset modal
+        function openAssetModal(symbol) {
+            currentAsset = symbol;
             
-            if (!symbol || !purchasePrice || !purchaseAmount) {
-                $('calculatorResults').innerHTML = '<div class="results-placeholder">Please fill in all required fields</div>';
-                return;
+            const asset = allAssets.find(a => a.symbol === symbol);
+            if (!asset) return;
+            
+            const quote = asset.quote;
+            
+            $('modalTitle').textContent = symbol;
+            $('modalName').textContent = asset.name;
+            $('modalPrice').textContent = quote ? `$${fmt(quote.price, 2)}` : 'Loading...';
+            
+            if (quote) {
+                const change = quote.change_pct || 0;
+                const changeClass = change >= 0 ? 'positive' : 'negative';
+                const changeSign = change >= 0 ? '+' : '';
+                $('modalChange').textContent = `${changeSign}$${fmt(quote.change, 2)} (${changeSign}${pct(change)})`;
+                $('modalChange').className = `price-change ${changeClass}`;
+                $('modalHigh').textContent = quote.day_high ? `$${fmt(quote.day_high, 2)}` : '—';
+                $('modalLow').textContent = quote.day_low ? `$${fmt(quote.day_low, 2)}` : '—';
             }
             
-            try {
-                const response = await fetch('/api/investment/calculate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        symbol: symbol,
-                        purchase_price: purchasePrice,
-                        purchase_amount: purchaseAmount,
-                        target_price: targetPrice
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to calculate investment');
-                }
-                
-                const data = await response.json();
-                renderInvestmentResults(data);
-            } catch (error) {
-                console.error('Error calculating investment:', error);
-                $('calculatorResults').innerHTML = '<div class="results-placeholder" style="color: var(--color-bearish)">Error calculating investment</div>';
-            }
+            $('assetModal').classList.add('active');
+            loadChart(symbol, currentTimeframe);
         }
         
-        function renderInvestmentResults(data) {
-            const isProfit = data.profit_loss >= 0;
-            const profitClass = isProfit ? 'profit' : 'loss';
-            const profitSign = isProfit ? '+' : '';
+        // Close modal
+        function closeModal() {
+            $('assetModal').classList.remove('active');
+            currentAsset = null;
+        }
+        
+        // Load chart (placeholder - would integrate with chart library)
+        function loadChart(symbol, timeframe) {
+            const container = $('chartContainer');
+            container.innerHTML = `<div class="chart-placeholder">Loading ${symbol} chart for ${timeframe}...</div>`;
             
-            let futureHtml = '';
-            if (data.target_price && data.future_value !== null) {
-                const isFutureProfit = data.future_profit_loss >= 0;
-                const futureProfitClass = isFutureProfit ? 'profit' : 'loss';
-                const futureProfitSign = isFutureProfit ? '+' : '';
-                
-                futureHtml = `
-                    <div class="result-highlight ${futureProfitClass}">
-                        <div class="result-item">
-                            <span class="result-label">Target Price</span>
-                            <span class="result-value">${fmt(data.target_price, 2)}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">Future Value</span>
-                            <span class="result-value">${fmt(data.future_value, 2)}</span>
-                        </div>
-                        <div class="result-item">
-                            <span class="result-label">Future P/L</span>
-                            <span class="result-value ${futureProfitClass}">${futureProfitSign}${fmt(data.future_profit_loss, 2)} (${futureProfitSign}${fmt(data.future_profit_loss_pct, 2)}%)</span>
+            // In production, this would load actual chart data
+            setTimeout(() => {
+                container.innerHTML = `
+                    <div class="chart-placeholder">
+                        <div style="text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📈</div>
+                            <div>Chart for ${symbol} - ${timeframe.toUpperCase()}</div>
+                            <div style="font-size: 12px; margin-top: 8px; color: var(--text-secondary);">
+                                Chart integration would go here (e.g., TradingView, Chart.js)
+                            </div>
                         </div>
                     </div>
                 `;
-            }
-            
-            const html = `
-                <div class="result-item">
-                    <span class="result-label">Symbol</span>
-                    <span class="result-value">${data.symbol}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Purchase Price</span>
-                    <span class="result-value">${fmt(data.purchase_price, 4)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Investment Amount</span>
-                    <span class="result-value">${fmt(data.purchase_amount, 2)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Quantity</span>
-                    <span class="result-value">${fmt(data.purchase_quantity, 6)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Current Price</span>
-                    <span class="result-value">${fmt(data.current_price, 4)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Current Value</span>
-                    <span class="result-value">${fmt(data.current_value, 2)}</span>
-                </div>
-                <div class="result-highlight ${profitClass}">
-                    <div class="result-item">
-                        <span class="result-label">Profit/Loss</span>
-                        <span class="result-value ${profitClass}">${profitSign}${fmt(data.profit_loss, 2)} (${profitSign}${fmt(data.profit_loss_pct, 2)}%)</span>
-                    </div>
-                </div>
-                ${futureHtml}
-            `;
-            
-            $('calculatorResults').innerHTML = html;
+            }, 500);
         }
         
-        function loadSymbol(symbol) {
-            // Store the selected symbol in localStorage
-            localStorage.setItem('selectedSymbol', symbol);
-            // Navigate to the main dashboard
-            window.location.href = '/dashboard';
-        }
-        
-        function startRealTimeUpdates() {
-            // Close existing connection if any
-            if (eventSource) {
-                eventSource.close();
-            }
-            
-            // Get all symbols from current filtered view
-            const symbols = allAssets.map(a => a.symbol).join(',');
-            
-            if (!symbols) return;
-            
-            try {
-                eventSource = new EventSource(`/api/live/quotes?symbols=${symbols}`);
-                
-                eventSource.onmessage = (event) => {
-                    try {
-                        const quotes = JSON.parse(event.data);
-                        updateQuotes(quotes);
-                    } catch (e) {
-                        console.error('Error parsing SSE data:', e);
-                    }
-                };
-                
-                eventSource.onerror = (error) => {
-                    console.error('SSE error:', error);
-                    eventSource.close();
-                    eventSource = null;
-                    // Fallback to polling if SSE fails
-                    startPolling();
-                };
-            } catch (error) {
-                console.error('Error starting SSE:', error);
-                // Fallback to polling
-                startPolling();
-            }
-        }
-        
-        let pollingInterval = null;
-        
-        function startPolling() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
-            
-            pollingInterval = setInterval(async () => {
-                try {
-                    const symbols = allAssets.map(a => a.symbol).join(',');
-                    if (!symbols) return;
-                    
-                    const response = await fetch(`/api/live/quotes?symbols=${symbols}`);
-                    if (response.ok) {
-                        const quotes = await response.json();
-                        updateQuotes(quotes);
-                    }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                }
-            }, 15000); // Poll every 15 seconds
-        }
-        
-        // Initialize on page load
+        // Event listeners
         document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
             loadAssets();
-            loadTopMovers();
             
-            // Update top movers every 60 seconds
-            setInterval(loadTopMovers, 60000);
+            // Theme toggle
+            $('themeToggle').addEventListener('click', toggleTheme);
             
-            // Event listeners for filters
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentFilter = btn.dataset.filter;
-                    filterAssets();
+            // Category tabs
+            document.querySelectorAll('.category-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentCategory = tab.dataset.category;
+                    renderAssetsTable();
                 });
             });
             
-            // Event listener for search
+            // Search
             $('searchInput').addEventListener('input', (e) => {
                 searchQuery = e.target.value;
-                filterAssets();
+                $('clearSearch').style.display = searchQuery ? 'block' : 'none';
+                renderAssetsTable();
             });
             
-            // Event listener for refresh button
-            $('refreshBtn').addEventListener('click', () => {
-                loadAssets();
-                loadTopMovers();
+            // Clear search
+            $('clearSearch').addEventListener('click', () => {
+                searchQuery = '';
+                $('searchInput').value = '';
+                $('clearSearch').style.display = 'none';
+                renderAssetsTable();
             });
             
-            // Event listener for investment calculator
-            $('calculateBtn').addEventListener('click', calculateInvestment);
-            
-            // Allow Enter key to trigger calculation
-            $('targetPrice').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    calculateInvestment();
+            // Clear search on Escape key
+            $('searchInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    searchQuery = '';
+                    $('searchInput').value = '';
+                    $('clearSearch').style.display = 'none';
+                    renderAssetsTable();
                 }
             });
-        });
-        
-        function startPolling() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
             
-            // Poll every 15 seconds as fallback
-            pollingInterval = setInterval(() => {
-                if (!document.hidden) {
-                    loadAssets();
+            // Close modal
+            $('closeModal').addEventListener('click', closeModal);
+            $('assetModal').addEventListener('click', (e) => {
+                if (e.target === $('assetModal')) {
+                    closeModal();
                 }
+            });
+            
+            // Timeframe tabs
+            document.querySelectorAll('.timeframe-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.timeframe-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentTimeframe = tab.dataset.timeframe;
+                    if (currentAsset) {
+                        loadChart(currentAsset, currentTimeframe);
+                    }
+                });
+            });
+            
+            // Auto-refresh prices every 15 seconds
+            refreshInterval = setInterval(() => {
+                refreshPrices();
             }, 15000);
-        }
-        
-        // Handle page visibility - pause updates when tab is not visible
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (eventSource) {
-                    eventSource.close();
-                    eventSource = null;
+            
+            // Clean up interval on page unload
+            window.addEventListener('beforeunload', () => {
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
                 }
-                if (pollingInterval) {
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                }
-            } else {
-                startRealTimeUpdates();
-            }
+            });
         });
     </script>
 </body>

@@ -47,7 +47,17 @@ export default function Dashboard() {
 
     setLoading(false);
     loadDashboardData();
-  }, [router]);
+    
+    // Auto-refresh prices every 15 seconds
+    const refreshInterval = setInterval(() => {
+      refreshPrices();
+    }, 15000);
+    
+    // Clean up interval on unmount
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDashboardData = async () => {
     setLoadingData(true);
@@ -96,6 +106,27 @@ export default function Dashboard() {
       ]);
     } finally {
       setLoadingData(false);
+    }
+  };
+  
+  // Refresh only prices (lighter weight than full dashboard load)
+  const refreshPrices = async () => {
+    try {
+      // Refresh assets with live prices
+      const assetsRes = await fetch(`${API_URL}/api/assets/all`);
+      if (assetsRes.ok) {
+        const assetsData = await assetsRes.json();
+        setWatchlist(assetsData.assets || []);
+      }
+      
+      // Refresh categories
+      const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
+        setAssetCategories(categoriesData.categories);
+      }
+    } catch (error) {
+      console.error('Error refreshing prices:', error);
     }
   };
 
@@ -488,28 +519,60 @@ function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
 
   const categories = ['all', 'stock', 'crypto', 'forex', 'commodity'];
 
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
+
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📋 Asset Library ({watchlist.length} assets)</h3>
       
       {/* Search and Filter */}
       <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          placeholder="Search assets..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: '200px',
-            padding: '0.75rem',
-            backgroundColor: '#1E293B',
-            color: '#F9FAFB',
-            border: '1px solid #2D3748',
-            borderRadius: '6px',
-            fontSize: '0.9rem'
-          }}
-        />
+        <div style={{ flex: 1, minWidth: '200px', position: 'relative' }}>
+          <input
+            type="text"
+            placeholder="Search assets by symbol or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchQuery('');
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              paddingRight: searchQuery ? '3rem' : '0.75rem',
+              backgroundColor: '#1E293B',
+              color: '#F9FAFB',
+              border: '1px solid #2D3748',
+              borderRadius: '6px',
+              fontSize: '0.9rem'
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={clearSearch}
+              style={{
+                position: 'absolute',
+                right: '0.5rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: '#9CA3AF',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                padding: '0 0.5rem',
+                lineHeight: '1'
+              }}
+              title="Clear search"
+            >
+              ×
+            </button>
+          )}
+        </div>
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
@@ -531,6 +594,11 @@ function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
       {/* Results count */}
       <div style={{ marginBottom: '0.75rem', fontSize: '0.85rem', color: '#D1D5DB' }}>
         Showing {filteredAssets.length} of {watchlist.length} assets
+        {searchQuery && (
+          <span style={{ color: '#3B82F6', marginLeft: '0.5rem' }}>
+            matching "{searchQuery}"
+          </span>
+        )}
         {filteredAssets.length > 200 && (
           <span style={{ color: '#FBBF24', marginLeft: '0.5rem' }}>
             (Use search to narrow results)
@@ -547,17 +615,33 @@ function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
             const name = item.name || item.name;
             const assetClass = item.class || item.category || 'stock';
             
+            const quote = item.quote || {};
+            const price = quote.price || item.price || 0;
+            const changePct = quote.change_pct || item.change_pct || 0;
+            const change = quote.change || item.change || 0;
+            const volume = quote.volume || item.volume || 0;
+            
             return (
               <div
                 key={index}
                 onClick={() => onSelectSymbol(symbol)}
                 style={{
-                  border: '1px solid #2D3748',
+                  border: selectedSymbol === symbol ? '2px solid #3B82F6' : '1px solid #2D3748',
                   padding: '0.75rem',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: selectedSymbol === symbol ? 'rgba(59, 130, 246, 0.2)' : 'rgba(45, 55, 72, 0.3)',
-                  transition: 'background-color 0.2s'
+                  backgroundColor: selectedSymbol === symbol ? 'rgba(59, 130, 246, 0.3)' : 'rgba(45, 55, 72, 0.3)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedSymbol !== symbol) {
+                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedSymbol !== symbol) {
+                    e.currentTarget.style.backgroundColor = 'rgba(45, 55, 72, 0.3)';
+                  }
                 }}
               >
                 <div style={{ fontWeight: '700', fontSize: '1rem', marginBottom: '0.25rem' }}>
@@ -568,6 +652,27 @@ function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
                   {assetClass}
+                </div>
+                <div style={{ 
+                  fontSize: '0.9rem', 
+                  fontWeight: '600', 
+                  color: '#F9FAFB', 
+                  marginTop: '0.5rem',
+                  fontFamily: 'monospace'
+                }}>
+                  ${price?.toFixed(4) || 'N/A'}
+                </div>
+                <div style={{ 
+                  fontSize: '0.8rem', 
+                  fontWeight: '600', 
+                  color: changePct >= 0 ? '#10B981' : '#EF4444',
+                  marginTop: '0.25rem',
+                  fontFamily: 'monospace'
+                }}>
+                  {changePct >= 0 ? '+' : ''}{(changePct * 100)?.toFixed(2) || 0}%
+                </div>
+                <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: '0.25rem' }}>
+                  Vol: {volume ? formatLargeNumber(volume) : 'N/A'}
                 </div>
               </div>
             );
@@ -1156,6 +1261,7 @@ function AlertsComponent({ alerts, onRefresh }) {
 // Asset Categories Component
 function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectCategory }) {
   const [expandedCategory, setExpandedCategory] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   if (!assetCategories) {
     return (
@@ -1174,6 +1280,25 @@ function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectC
   return (
     <div style={{ border: '1px solid #2D3748', borderRadius: '8px', padding: '1rem' }}>
       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem' }}>📊 Asset Categories</h3>
+      
+      {/* Search within categories */}
+      <div style={{ marginBottom: '1rem' }}>
+        <input
+          type="text"
+          placeholder="Search assets in selected category..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            backgroundColor: '#1E293B',
+            color: '#F9FAFB',
+            border: '1px solid #2D3748',
+            borderRadius: '6px',
+            fontSize: '0.9rem'
+          }}
+        />
+      </div>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <button
@@ -1242,7 +1367,7 @@ function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectC
               📉 {category.label} - Top Losers
             </h4>
             {category.top_losers.length > 0 ? (
-              <div>
+              <div style={{ marginBottom: '1rem' }}>
                 {category.top_losers.map((asset, index) => (
                   <div key={index} style={{ 
                     display: 'flex', 
@@ -1261,7 +1386,71 @@ function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectC
                 ))}
               </div>
             ) : (
-              <div style={{ color: '#D1D5DB', fontSize: '0.85rem' }}>No losers data available</div>
+              <div style={{ color: '#D1D5DB', fontSize: '0.85rem', marginBottom: '1rem' }}>No losers data available</div>
+            )}
+
+            <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem', color: '#3B82F6' }}>
+              💎 All {category.label} Assets ({category.total_assets})
+            </h4>
+            {category.all_assets && category.all_assets.length > 0 ? (
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #2D3748', textAlign: 'left' }}>
+                      <th style={{ padding: '0.5rem', color: '#D1D5DB' }}>Symbol</th>
+                      <th style={{ padding: '0.5rem', color: '#D1D5DB' }}>Name</th>
+                      <th style={{ padding: '0.5rem', color: '#D1D5DB' }}>Price</th>
+                      <th style={{ padding: '0.5rem', color: '#D1D5DB' }}>24h Change</th>
+                      <th style={{ padding: '0.5rem', color: '#D1D5DB' }}>Volume</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {category.all_assets
+                      .filter(asset => {
+                        if (!searchQuery) return true;
+                        const query = searchQuery.toLowerCase();
+                        return asset.symbol.toLowerCase().includes(query) || 
+                               asset.name.toLowerCase().includes(query);
+                      })
+                      .map((asset, index) => (
+                      <tr key={index} style={{ 
+                        borderBottom: '1px solid #1E293B',
+                        backgroundColor: index % 2 === 0 ? '#0F172A' : '#1E293B',
+                        cursor: 'pointer'
+                      }}>
+                        <td style={{ padding: '0.5rem', color: '#F9FAFB', fontWeight: '600' }}>{asset.symbol}</td>
+                        <td style={{ padding: '0.5rem', color: '#D1D5DB' }}>{asset.name}</td>
+                        <td style={{ padding: '0.5rem', color: '#F9FAFB', fontFamily: 'monospace' }}>
+                          ${asset.price?.toFixed(4) || 'N/A'}
+                        </td>
+                        <td style={{ 
+                          padding: '0.5rem', 
+                          color: asset.change_pct >= 0 ? '#10B981' : '#EF4444',
+                          fontWeight: '600',
+                          fontFamily: 'monospace'
+                        }}>
+                          {asset.change_pct >= 0 ? '+' : ''}{(asset.change_pct * 100)?.toFixed(2) || 0}%
+                        </td>
+                        <td style={{ padding: '0.5rem', color: '#D1D5DB', fontFamily: 'monospace' }}>
+                          {asset.volume ? formatLargeNumber(asset.volume) : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {category.all_assets.filter(asset => {
+                  if (!searchQuery) return true;
+                  const query = searchQuery.toLowerCase();
+                  return asset.symbol.toLowerCase().includes(query) || 
+                         asset.name.toLowerCase().includes(query);
+                }).length === 0 && (
+                  <div style={{ color: '#D1D5DB', fontSize: '0.85rem', padding: '1rem', textAlign: 'center' }}>
+                    No assets match your search
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: '#D1D5DB', fontSize: '0.85rem' }}>No assets data available</div>
             )}
           </div>
         )
@@ -1469,6 +1658,16 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
       )}
     </div>
   );
+}
+
+// Helper function to format large numbers
+function formatLargeNumber(num) {
+  if (!num) return 'N/A';
+  if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+  return num.toFixed(2);
 }
 
 function StatCard({ number, label, color }) {

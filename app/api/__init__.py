@@ -20,7 +20,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from ..core import config, data
+from ..core import config, data, accuracy
 from ..services import material
 from ..models import predict
 from ..security import (
@@ -398,20 +398,32 @@ def get_asset_categories(request: Request):
             top_losers = assets_with_change[-5:] if len(assets_with_change) > 0 else []
             top_losers.reverse()  # Show highest losers first
             
+            # Build full asset list with live prices
+            all_assets = []
+            for asset in class_assets:
+                symbol = asset["symbol"]
+                quote = quotes.get(symbol)
+                all_assets.append({
+                    "symbol": symbol,
+                    "name": asset["name"],
+                    "class": asset["class"],
+                    "query": asset.get("query", ""),
+                    "price": quote.get("price", 0) if quote else 0,
+                    "change_pct": quote.get("change_pct", 0) if quote else 0,
+                    "change": quote.get("change", 0) if quote else 0,
+                    "volume": quote.get("volume", 0) if quote else 0,
+                    "market_cap": quote.get("market_cap") if quote else None,
+                    "high_24h": quote.get("day_high", 0) if quote else 0,
+                    "low_24h": quote.get("day_low", 0) if quote else 0,
+                    "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
+                })
+            
             categories[asset_class] = {
                 "label": config.CLASS_LABELS.get(asset_class, asset_class),
                 "total_assets": len(class_assets),
                 "top_gainers": top_gainers,
                 "top_losers": top_losers,
-                "sample_assets": [
-                    {
-                        "symbol": asset["symbol"],
-                        "name": asset["name"],
-                        "price": quotes.get(asset["symbol"], {}).get("price", 0) if quotes.get(asset["symbol"]) else 0,
-                        "change_pct": quotes.get(asset["symbol"], {}).get("change_pct", 0) if quotes.get(asset["symbol"]) else 0
-                    }
-                    for asset in class_assets[:10]  # First 10 assets as sample
-                ]
+                "all_assets": all_assets
             }
         
         return {
@@ -1100,6 +1112,24 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
         
         confidence_range = current_price * timeframe_multiplier * 0.5
         
+        # Get accuracy stats for this symbol and timeframe
+        accuracy_stats = accuracy.get_accuracy_stats(sanitized_symbol, timeframe)
+        if accuracy_stats["overall_accuracy"] is None or accuracy_stats["sample_size"] < 10:
+            # Use simulated accuracy if not enough real data
+            historical_accuracy = accuracy.get_simulated_accuracy(sanitized_symbol, timeframe)
+        else:
+            historical_accuracy = accuracy_stats["overall_accuracy"]
+        
+        # Record this prediction for future accuracy tracking
+        accuracy.record_prediction(
+            symbol=sanitized_symbol,
+            horizon=timeframe,
+            predicted_direction=trend,
+            predicted_price=predicted_price,
+            current_price=current_price,
+            confidence=confidence
+        )
+        
         return {
             "symbol": sanitized_symbol,
             "timeframe": timeframe,
@@ -1107,6 +1137,8 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
             "predicted_price": predicted_price,
             "predicted_change_pct": predicted_change * 100,
             "confidence": confidence,
+            "historical_accuracy": historical_accuracy,
+            "accuracy_sample_size": accuracy_stats["sample_size"],
             "confidence_interval": {
                 "low": predicted_price - confidence_range,
                 "high": predicted_price + confidence_range
@@ -1132,6 +1164,55 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
         error_detail = f"Error generating prediction for {symbol}: {str(e)}\n{traceback.format_exc()}"
         logger.error(error_detail)
         raise HTTPException(status_code=500, detail=f"Error generating prediction: {str(e)}")
+
+
+@app.get("/api/predictions/{symbol}/accuracy")
+@limiter.limit("30/minute")
+def get_prediction_accuracy(request: Request, symbol: str):
+    """Get prediction accuracy statistics for a symbol across all timeframes."""
+    try:
+        sanitized_symbol = sanitize_symbol(symbol)
+        
+        # Get accuracy stats for all timeframes
+        all_timeframes = ["1h", "2h", "3h", "4h", "5h", "6h", "8h", "12h", "24h", "7d", "30d"]
+        
+        accuracy_data = {}
+        for timeframe in all_timeframes:
+            stats = accuracy.get_accuracy_stats(sanitized_symbol, timeframe)
+            
+            if stats["overall_accuracy"] is None or stats["sample_size"] < 10:
+                # Use simulated accuracy
+                simulated_acc = accuracy.get_simulated_accuracy(sanitized_symbol, timeframe)
+                accuracy_data[timeframe] = {
+                    "accuracy": simulated_acc,
+                    "total_predictions": 0,
+                    "correct_predictions": 0,
+                    "sample_size": 0,
+                    "simulated": True
+                }
+            else:
+                accuracy_data[timeframe] = {
+                    "accuracy": stats["overall_accuracy"],
+                    "total_predictions": stats["total_predictions"],
+                    "correct_predictions": stats["correct_predictions"],
+                    "sample_size": stats["sample_size"],
+                    "simulated": False
+                }
+        
+        # Calculate overall average accuracy
+        accuracies = [a["accuracy"] for a in accuracy_data.values()]
+        overall_avg = sum(accuracies) / len(accuracies) if accuracies else None
+        
+        return {
+            "symbol": sanitized_symbol,
+            "overall_average_accuracy": round(overall_avg, 2) if overall_avg else None,
+            "timeframe_accuracy": accuracy_data,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching accuracy data: {str(e)}")
 
 
 @app.get("/api/predictions/assets/{symbol:path}/historical")
