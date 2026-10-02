@@ -466,6 +466,66 @@ def get_assets_by_class(request: Request, asset_class: str):
         raise HTTPException(status_code=500, detail=f"Error fetching asset data: {str(e)}")
 
 
+class InvestmentRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=20)
+    purchase_price: float = Field(..., gt=0)
+    purchase_amount: float = Field(..., gt=0)
+    target_price: float = Field(default=None, gt=0)
+
+
+@app.post("/api/investment/calculate")
+@limiter.limit("30/minute")
+def calculate_investment(request: Request, req: InvestmentRequest):
+    """Calculate investment returns based on purchase price, current price, and target price."""
+    try:
+        # Get current live price
+        quote = data.get_live_quote(req.symbol)
+        if not quote or quote.get("price") is None:
+            raise HTTPException(status_code=404, detail=f"Could not fetch current price for {req.symbol}")
+
+        current_price = quote["price"]
+
+        # Calculate purchase quantity
+        purchase_quantity = req.purchase_amount / req.purchase_price
+
+        # Calculate current value
+        current_value = purchase_quantity * current_price
+
+        # Calculate profit/loss
+        profit_loss = current_value - req.purchase_amount
+        profit_loss_pct = (profit_loss / req.purchase_amount) * 100 if req.purchase_amount > 0 else 0
+
+        # Calculate future value at target price if provided
+        future_value = None
+        future_profit_loss = None
+        future_profit_loss_pct = None
+
+        if req.target_price and req.target_price > 0:
+            future_value = purchase_quantity * req.target_price
+            future_profit_loss = future_value - req.purchase_amount
+            future_profit_loss_pct = (future_profit_loss / req.purchase_amount) * 100 if req.purchase_amount > 0 else 0
+
+        return {
+            "symbol": req.symbol,
+            "purchase_price": req.purchase_price,
+            "purchase_amount": req.purchase_amount,
+            "purchase_quantity": round(purchase_quantity, 6),
+            "current_price": current_price,
+            "current_value": round(current_value, 2),
+            "profit_loss": round(profit_loss, 2),
+            "profit_loss_pct": round(profit_loss_pct, 2),
+            "target_price": req.target_price,
+            "future_value": round(future_value, 2) if future_value else None,
+            "future_profit_loss": round(future_profit_loss, 2) if future_profit_loss else None,
+            "future_profit_loss_pct": round(future_profit_loss_pct, 2) if future_profit_loss_pct else None,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error calculating investment: {str(e)}")
+
+
 # Admin endpoints
 
 

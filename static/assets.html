@@ -262,6 +262,130 @@
             padding: var(--spacing-sm);
         }
         
+        .calculator-section {
+            margin-bottom: var(--spacing-lg);
+            padding: var(--spacing-md);
+            background: rgba(31, 41, 55, 0.35);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+        }
+        
+        .calculator-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+        }
+        
+        @media (max-width: 768px) {
+            .calculator-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .calculator-form {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .form-group label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+        }
+        
+        .form-input {
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--color-border);
+            color: var(--color-text-primary);
+            border-radius: var(--radius-sm);
+            font-family: var(--font-mono);
+            font-size: 13px;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--color-bullish);
+        }
+        
+        .calc-btn {
+            padding: 12px;
+            background: linear-gradient(135deg, var(--color-bullish), #059669);
+            border: none;
+            color: white;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .calc-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .calculator-results {
+            background: rgba(17, 24, 39, 0.5);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+        }
+        
+        .results-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            font-size: 13px;
+            color: var(--color-text-secondary);
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+        }
+        
+        .result-value {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .result-value.profit { color: var(--color-bullish); }
+        .result-value.loss { color: var(--color-bearish); }
+        
+        .result-highlight {
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-sm);
+            margin-top: var(--spacing-sm);
+        }
+        
+        .result-highlight.loss {
+            background: rgba(239, 68, 68, 0.1);
+        }
+        
         .assets-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -389,6 +513,35 @@
             <h2 class="section-title">Top Movers of the Day</h2>
             <div class="top-movers-grid" id="topMoversGrid">
                 <div class="loading">Loading top movers...</div>
+            </div>
+        </div>
+        
+        <!-- Investment Calculator Section -->
+        <div class="calculator-section" id="calculatorSection">
+            <h2 class="section-title">Investment Calculator</h2>
+            <div class="calculator-container">
+                <div class="calculator-form">
+                    <div class="form-group">
+                        <label for="calcSymbol">Symbol</label>
+                        <input type="text" id="calcSymbol" class="form-input" placeholder="e.g., BTC-USD, AAPL" />
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasePrice">Purchase Price</label>
+                        <input type="number" id="purchasePrice" class="form-input" placeholder="Price when you bought" step="any" />
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseAmount">Investment Amount ($)</label>
+                        <input type="number" id="purchaseAmount" class="form-input" placeholder="Total amount invested" step="any" />
+                    </div>
+                    <div class="form-group">
+                        <label for="targetPrice">Target Price (Optional)</label>
+                        <input type="number" id="targetPrice" class="form-input" placeholder="Future target price" step="any" />
+                    </div>
+                    <button class="calc-btn" id="calculateBtn" type="button">Calculate</button>
+                </div>
+                <div class="calculator-results" id="calculatorResults">
+                    <div class="results-placeholder">Enter details and click Calculate</div>
+                </div>
             </div>
         </div>
         
@@ -624,6 +777,109 @@
             grid.innerHTML = html;
         }
         
+        async function calculateInvestment() {
+            const symbol = $('calcSymbol').value.trim();
+            const purchasePrice = parseFloat($('purchasePrice').value);
+            const purchaseAmount = parseFloat($('purchaseAmount').value);
+            const targetPrice = parseFloat($('targetPrice').value) || null;
+            
+            if (!symbol || !purchasePrice || !purchaseAmount) {
+                $('calculatorResults').innerHTML = '<div class="results-placeholder">Please fill in all required fields</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/investment/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        purchase_price: purchasePrice,
+                        purchase_amount: purchaseAmount,
+                        target_price: targetPrice
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to calculate investment');
+                }
+                
+                const data = await response.json();
+                renderInvestmentResults(data);
+            } catch (error) {
+                console.error('Error calculating investment:', error);
+                $('calculatorResults').innerHTML = '<div class="results-placeholder" style="color: var(--color-bearish)">Error calculating investment</div>';
+            }
+        }
+        
+        function renderInvestmentResults(data) {
+            const isProfit = data.profit_loss >= 0;
+            const profitClass = isProfit ? 'profit' : 'loss';
+            const profitSign = isProfit ? '+' : '';
+            
+            let futureHtml = '';
+            if (data.target_price && data.future_value !== null) {
+                const isFutureProfit = data.future_profit_loss >= 0;
+                const futureProfitClass = isFutureProfit ? 'profit' : 'loss';
+                const futureProfitSign = isFutureProfit ? '+' : '';
+                
+                futureHtml = `
+                    <div class="result-highlight ${futureProfitClass}">
+                        <div class="result-item">
+                            <span class="result-label">Target Price</span>
+                            <span class="result-value">${fmt(data.target_price, 2)}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Future Value</span>
+                            <span class="result-value">${fmt(data.future_value, 2)}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Future P/L</span>
+                            <span class="result-value ${futureProfitClass}">${futureProfitSign}${fmt(data.future_profit_loss, 2)} (${futureProfitSign}${fmt(data.future_profit_loss_pct, 2)}%)</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const html = `
+                <div class="result-item">
+                    <span class="result-label">Symbol</span>
+                    <span class="result-value">${data.symbol}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Purchase Price</span>
+                    <span class="result-value">${fmt(data.purchase_price, 4)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Investment Amount</span>
+                    <span class="result-value">${fmt(data.purchase_amount, 2)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Quantity</span>
+                    <span class="result-value">${fmt(data.purchase_quantity, 6)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Current Price</span>
+                    <span class="result-value">${fmt(data.current_price, 4)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Current Value</span>
+                    <span class="result-value">${fmt(data.current_value, 2)}</span>
+                </div>
+                <div class="result-highlight ${profitClass}">
+                    <div class="result-item">
+                        <span class="result-label">Profit/Loss</span>
+                        <span class="result-value ${profitClass}">${profitSign}${fmt(data.profit_loss, 2)} (${profitSign}${fmt(data.profit_loss_pct, 2)}%)</span>
+                    </div>
+                </div>
+                ${futureHtml}
+            `;
+            
+            $('calculatorResults').innerHTML = html;
+        }
+        
         function loadSymbol(symbol) {
             // Store the selected symbol in localStorage
             localStorage.setItem('selectedSymbol', symbol);
@@ -719,6 +975,16 @@
             $('refreshBtn').addEventListener('click', () => {
                 loadAssets();
                 loadTopMovers();
+            });
+            
+            // Event listener for investment calculator
+            $('calculateBtn').addEventListener('click', calculateInvestment);
+            
+            // Allow Enter key to trigger calculation
+            $('targetPrice').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    calculateInvestment();
+                }
             });
         });
         
