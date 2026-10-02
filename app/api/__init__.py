@@ -841,7 +841,7 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
         sanitized_symbol = symbol.strip().upper()
         
         # Validate timeframe
-        valid_timeframes = ["1h", "4h", "1d", "1w", "1m", "3m"]
+        valid_timeframes = ["1h", "2h", "3h", "4h", "5h", "6h", "8h", "12h", "1d", "1w", "1m", "3m"]
         if timeframe not in valid_timeframes:
             raise HTTPException(status_code=400, detail=f"Invalid timeframe. Must be one of: {valid_timeframes}")
         
@@ -887,7 +887,13 @@ def get_asset_predictions(request: Request, symbol: str, timeframe: str = "1d"):
         # This is a simplified prediction logic - in production, use your ML model
         timeframe_multiplier = {
             "1h": 0.001,
+            "2h": 0.002,
+            "3h": 0.0025,
             "4h": 0.003,
+            "5h": 0.0035,
+            "6h": 0.004,
+            "8h": 0.005,
+            "12h": 0.007,
             "1d": 0.01,
             "1w": 0.03,
             "1m": 0.08,

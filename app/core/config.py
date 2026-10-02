@@ -35,7 +35,13 @@ HORIZON_DAYS = 5
 # Short-term prediction horizons (in hours)
 SHORT_TERM_HORIZONS = {
     "1h": 1,      # 1 hour
+    "2h": 2,      # 2 hours
+    "3h": 3,      # 3 hours
     "4h": 4,      # 4 hours
+    "5h": 5,      # 5 hours
+    "6h": 6,      # 6 hours
+    "8h": 8,      # 8 hours
+    "12h": 12,    # 12 hours
     "24h": 24,    # 24 hours
     "7d": 168,    # 7 days
     "30d": 720    # 30 days

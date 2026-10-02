@@ -65,7 +65,7 @@ class PredictRequest(BaseModel):
 
 class ShortTermPredictRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=10)
-    horizon: str = Field(default="24h", pattern="^(1h|4h|24h|7d|30d)$")
+    horizon: str = Field(default="24h", pattern="^(1h|2h|3h|4h|5h|6h|8h|12h|24h|7d|30d)$")
 
 class SettingsRequest(BaseModel):
     settings: dict

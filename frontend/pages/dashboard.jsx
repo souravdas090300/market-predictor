@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [backtestResults, setBacktestResults] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
   const [shortTermPrediction, setShortTermPrediction] = useState(null);
-  const [selectedHorizon, setSelectedHorizon] = useState('24h');
+  const [selectedHorizon, setSelectedHorizon] = useState('6h');
   const [searchQuery, setSearchQuery] = useState('');
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -188,7 +188,13 @@ export default function Dashboard() {
       // Map frontend horizon values to API timeframe values
       const horizonToTimeframe = {
         '1h': '1h',
-        '4h': '4h', 
+        '2h': '2h',
+        '3h': '3h',
+        '4h': '4h',
+        '5h': '5h',
+        '6h': '6h',
+        '8h': '8h',
+        '12h': '12h',
         '24h': '1d',
         '7d': '1w',
         '30d': '1m'
@@ -1212,7 +1218,13 @@ function ShortTermPredictionComponent({ watchlist, selectedSymbol, onSelectSymbo
             }}
           >
             <option value="1h">1 Hour</option>
+            <option value="2h">2 Hours</option>
+            <option value="3h">3 Hours</option>
             <option value="4h">4 Hours</option>
+            <option value="5h">5 Hours</option>
+            <option value="6h">6 Hours</option>
+            <option value="8h">8 Hours</option>
+            <option value="12h">12 Hours</option>
             <option value="24h">24 Hours</option>
             <option value="7d">7 Days</option>
             <option value="30d">30 Days</option>
