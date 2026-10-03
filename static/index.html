@@ -787,12 +787,12 @@
 
         async function loadModalAssets() {
             try {
-                const response = await fetch('/api/assets/all');
+                const response = await fetch('/api/assets/live-prices');
                 if (!response.ok) throw new Error('Failed to fetch assets');
-                
+
                 const data = await response.json();
                 modalAssets = data.assets || [];
-                
+
                 renderModalAssets();
             } catch (error) {
                 console.error('Error loading assets:', error);
@@ -825,8 +825,12 @@
             }
             
             grid.innerHTML = filtered.map(asset => {
-                const quote = asset.quote;
-                if (!quote) {
+                // Handle both old format (asset.quote) and new format (direct price fields)
+                const price = asset.price || (asset.quote && asset.quote.price) || 0;
+                const change = asset.change || (asset.quote && asset.quote.change) || 0;
+                const changePct = asset.change_pct || (asset.quote && asset.quote.change_pct) || 0;
+
+                if (!price) {
                     return `
                         <div style="background: rgba(31, 41, 55, 0.55); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; cursor: pointer;" onclick="loadSymbolFromModal('${asset.symbol}')">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -840,10 +844,10 @@
                         </div>
                     `;
                 }
-                
-                const priceClass = quote.change_pct >= 0 ? 'up' : 'down';
-                const priceColor = quote.change_pct >= 0 ? 'var(--color-bullish)' : 'var(--color-bearish)';
-                
+
+                const priceClass = changePct >= 0 ? 'up' : 'down';
+                const priceColor = changePct >= 0 ? 'var(--color-bullish)' : 'var(--color-bearish)';
+
                 return `
                     <div style="background: rgba(31, 41, 55, 0.55); border: 1px solid var(--color-border); border-radius: 12px; padding: 1.5rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--color-bullish)'" onmouseout="this.style.borderColor='var(--color-border)'" onclick="loadSymbolFromModal('${asset.symbol}')">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -853,9 +857,9 @@
                             </div>
                             <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); color: var(--color-text-secondary);">${asset.class}</span>
                         </div>
-                        <div style="font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: ${priceColor};">${fmt(quote.price, 4)}</div>
+                        <div style="font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: ${priceColor};">${fmt(price, 4)}</div>
                         <div style="font-family: var(--font-mono); font-size: 14px; color: ${priceColor};">
-                            ${fmt(quote.change, 4)} (${pct(quote.change_pct)})
+                            ${fmt(change, 4)} (${pct(changePct)})
                         </div>
                     </div>
                 `;

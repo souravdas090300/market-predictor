@@ -616,12 +616,12 @@
         // Load assets
         async function loadAssets() {
             try {
-                const response = await fetch('/api/assets/all');
+                const response = await fetch('/api/assets/live-prices');
                 if (!response.ok) throw new Error('Failed to fetch assets');
-                
+
                 const data = await response.json();
                 allAssets = data.assets || [];
-                
+
                 renderAssetsTable();
                 loadTopMovers();
             } catch (error) {
@@ -629,16 +629,16 @@
                 $('assetsTableBody').innerHTML = '<tr><td colspan="7" class="error">Failed to load assets</td></tr>';
             }
         }
-        
+
         // Refresh live prices
         async function refreshPrices() {
             try {
-                const response = await fetch('/api/assets/all');
+                const response = await fetch('/api/assets/live-prices');
                 if (!response.ok) throw new Error('Failed to refresh prices');
-                
+
                 const data = await response.json();
                 allAssets = data.assets || [];
-                
+
                 renderAssetsTable();
                 loadTopMovers();
             } catch (error) {
@@ -676,22 +676,24 @@
             }
             
             tbody.innerHTML = filtered.map(asset => {
-                const quote = asset.quote;
-                const price = quote ? quote.price : 0;
-                const change = quote ? quote.change_pct : 0;
+                // Handle both old format (asset.quote) and new format (direct price fields)
+                const price = asset.price || (asset.quote && asset.quote.price) || 0;
+                const change = asset.change_pct || (asset.quote && asset.quote.change_pct) || 0;
+                const volume = asset.volume || (asset.quote && asset.quote.volume) || 0;
+                const marketCap = asset.market_cap || (asset.quote && asset.quote.market_cap) || 0;
                 const changeClass = change >= 0 ? 'positive' : 'negative';
                 const changeSign = change >= 0 ? '+' : '';
-                
+
                 // Highlight matching text
                 const highlightMatch = (text, query) => {
                     if (!query) return text;
                     const regex = new RegExp(`(${query})`, 'gi');
                     return text.replace(regex, '<mark style="background: rgba(59, 130, 246, 0.3); padding: 0 2px; border-radius: 2px;">$1</mark>');
                 };
-                
+
                 const highlightedSymbol = searchQuery ? highlightMatch(asset.symbol, searchQuery) : asset.symbol;
                 const highlightedName = searchQuery ? highlightMatch(asset.name, searchQuery) : asset.name;
-                
+
                 return `
                     <tr onclick="openAssetModal('${asset.symbol}')" style="cursor: pointer;">
                         <td>
@@ -710,10 +712,10 @@
                             <div class="change ${changeClass}">${changeSign}${pct(change)}</div>
                         </td>
                         <td>
-                            <div class="price">${quote && quote.volume ? fmtLargeNumber(quote.volume) : '—'}</div>
+                            <div class="price">${volume ? fmtLargeNumber(volume) : '—'}</div>
                         </td>
                         <td>
-                            <div class="price">${quote && quote.market_cap ? fmtLargeNumber(quote.market_cap) : '—'}</div>
+                            <div class="price">${marketCap ? fmtLargeNumber(marketCap) : '—'}</div>
                         </td>
                     </tr>
                 `;

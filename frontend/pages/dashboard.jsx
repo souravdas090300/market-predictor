@@ -64,65 +64,44 @@ export default function Dashboard() {
     try {
       console.log('Loading dashboard data from:', API_URL);
       
-      // Load all assets from assets/all endpoint to get the full list
-      const assetsRes = await fetch(`${API_URL}/api/assets/all`);
+      // Load all assets with live prices from the new endpoint
+      const assetsRes = await fetch(`${API_URL}/api/assets/live-prices`);
       console.log('Assets response status:', assetsRes.status);
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
         console.log('Assets data received:', assetsData.assets?.length, 'assets');
         console.log('First asset sample:', assetsData.assets?.[0]);
-        setWatchlist(assetsData.assets || []);
         
-        // Fetch live quotes for all assets in batches of 50 (increased from 20)
-        const allAssets = assetsData.assets || [];
-        const batchSize = 50;
-        const allQuotes = {};
+        // Transform the data to match the expected format
+        const transformedAssets = (assetsData.assets || []).map(asset => ({
+          symbol: asset.symbol,
+          name: asset.name,
+          class: asset.class,
+          query: asset.query || '',
+          quote: {
+            price: asset.price,
+            previous_close: asset.previous_close,
+            change: asset.change,
+            change_pct: asset.change_pct,
+            volume: asset.volume,
+            day_high: asset.day_high,
+            day_low: asset.day_low,
+            open: asset.open,
+            market_cap: asset.market_cap,
+            as_of: asset.as_of,
+            source: asset.source
+          },
+          price: asset.price || 0,
+          change_pct: asset.change_pct || 0,
+          change: asset.change || 0,
+          volume: asset.volume || 0,
+          high_24h: asset.day_high || 0,
+          low_24h: asset.day_low || 0,
+          market_cap: asset.market_cap,
+          last_update: asset.as_of || new Date().toISOString()
+        }));
         
-        for (let i = 0; i < allAssets.length; i += batchSize) {
-          const batch = allAssets.slice(i, i + batchSize);
-          const symbols = batch.map(item => item.symbol).join(',');
-          
-          if (symbols) {
-            try {
-              const quotesRes = await fetch(`${API_URL}/api/quotes?symbols=${symbols}`);
-              if (quotesRes.ok) {
-                const quotesData = await quotesRes.json();
-                Object.assign(allQuotes, quotesData);
-              }
-            } catch (e) {
-              console.error(`Error fetching batch ${i}-${i + batchSize}:`, e);
-            }
-          }
-          
-          // Reduced delay between batches from 100ms to 50ms
-          if (i + batchSize < allAssets.length) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-          }
-        }
-        
-        console.log('Fetched quotes for', Object.keys(allQuotes).length, 'assets');
-        
-        // Update watchlist with all fetched quotes
-        setWatchlist(prevWatchlist => 
-          prevWatchlist.map(asset => {
-            const quote = allQuotes[asset.symbol];
-            if (quote) {
-              return {
-                ...asset,
-                quote: quote,
-                price: quote.price || 0,
-                change_pct: quote.change_pct || 0,
-                change: quote.change || 0,
-                volume: quote.volume || 0,
-                high_24h: quote.day_high || 0,
-                low_24h: quote.day_low || 0,
-                market_cap: quote.market_cap,
-                last_update: quote.as_of || new Date().toISOString()
-              };
-            }
-            return asset;
-          })
-        );
+        setWatchlist(transformedAssets);
       } else {
         console.error('Assets request failed:', assetsRes.status);
         // Fallback to watchlist endpoint
@@ -173,57 +152,43 @@ export default function Dashboard() {
   // Refresh only prices (lighter weight than full dashboard load)
   const refreshPrices = async () => {
     try {
-      // Get current watchlist symbols
-      const allAssets = watchlist;
-      const batchSize = 20;
-      const allQuotes = {};
-      
-      // Fetch live quotes in batches
-      for (let i = 0; i < allAssets.length; i += batchSize) {
-        const batch = allAssets.slice(i, i + batchSize);
-        const symbols = batch.map(item => item.symbol).join(',');
+      // Use the new live-prices endpoint to get all updated prices
+      const assetsRes = await fetch(`${API_URL}/api/assets/live-prices`);
+      if (assetsRes.ok) {
+        const assetsData = await assetsRes.json();
         
-        if (symbols) {
-          try {
-            const quotesRes = await fetch(`${API_URL}/api/quotes?symbols=${symbols}`);
-            if (quotesRes.ok) {
-              const quotesData = await quotesRes.json();
-              Object.assign(allQuotes, quotesData);
-            }
-          } catch (e) {
-            console.error(`Error fetching batch ${i}-${i + batchSize}:`, e);
-          }
-        }
+        // Transform the data to match the expected format
+        const transformedAssets = (assetsData.assets || []).map(asset => ({
+          symbol: asset.symbol,
+          name: asset.name,
+          class: asset.class,
+          query: asset.query || '',
+          quote: {
+            price: asset.price,
+            previous_close: asset.previous_close,
+            change: asset.change,
+            change_pct: asset.change_pct,
+            volume: asset.volume,
+            day_high: asset.day_high,
+            day_low: asset.day_low,
+            open: asset.open,
+            market_cap: asset.market_cap,
+            as_of: asset.as_of,
+            source: asset.source
+          },
+          price: asset.price || 0,
+          change_pct: asset.change_pct || 0,
+          change: asset.change || 0,
+          volume: asset.volume || 0,
+          high_24h: asset.day_high || 0,
+          low_24h: asset.day_low || 0,
+          market_cap: asset.market_cap,
+          last_update: asset.as_of || new Date().toISOString()
+        }));
         
-        // Small delay between batches
-        if (i + batchSize < allAssets.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        setWatchlist(transformedAssets);
+        console.log('Refreshed prices for', transformedAssets.length, 'assets');
       }
-      
-      console.log('Refreshed quotes for', Object.keys(allQuotes).length, 'assets');
-      
-      // Update watchlist with fetched quotes
-      setWatchlist(prevWatchlist => 
-        prevWatchlist.map(asset => {
-          const quote = allQuotes[asset.symbol];
-          if (quote) {
-            return {
-              ...asset,
-              quote: quote,
-              price: quote.price || 0,
-              change_pct: quote.change_pct || 0,
-              change: quote.change || 0,
-              volume: quote.volume || 0,
-              high_24h: quote.day_high || 0,
-              low_24h: quote.day_low || 0,
-              market_cap: quote.market_cap,
-              last_update: quote.as_of || new Date().toISOString()
-            };
-          }
-          return asset;
-        })
-      );
       
       // Refresh categories
       const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
