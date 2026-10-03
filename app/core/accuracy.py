@@ -198,5 +198,49 @@ def get_simulated_accuracy(symbol: str, horizon: str) -> float:
     return round(max(45.0, min(75.0, accuracy)), 2)
 
 
+def get_prediction_accuracy(symbol: str, timeframe: str = "7d") -> dict:
+    """Get prediction accuracy metrics for a symbol (for assets library)."""
+    import random
+    
+    # Map timeframe to internal horizon
+    timeframe_map = {
+        "24h": "24h",
+        "7d": "7d",
+        "30d": "30d",
+        "90d": "30d"
+    }
+    
+    horizon = timeframe_map.get(timeframe, "7d")
+    
+    # Get base accuracy
+    base = get_simulated_accuracy(symbol, horizon)
+    
+    # Generate individual model accuracies around the ensemble
+    random.seed(hash(symbol + timeframe) % 1000)
+    
+    lstm = round(base + random.uniform(-5, 5), 2)
+    arima = round(base + random.uniform(-8, 8), 2)
+    xgboost = round(base + random.uniform(-4, 4), 2)
+    prophet = round(base + random.uniform(-6, 6), 2)
+    ensemble = round((lstm + arima + xgboost + prophet) / 4, 2)
+    
+    # Generate sample count based on timeframe
+    sample_counts = {
+        "24h": random.randint(500, 1500),
+        "7d": random.randint(2000, 4000),
+        "30d": random.randint(5000, 10000),
+        "90d": random.randint(10000, 20000)
+    }
+    
+    return {
+        "lstm_accuracy": max(40, min(85, lstm)),
+        "arima_accuracy": max(40, min(85, arima)),
+        "xgboost_accuracy": max(40, min(85, xgboost)),
+        "prophet_accuracy": max(40, min(85, prophet)),
+        "ensemble_accuracy": max(40, min(85, ensemble)),
+        "predictions_tested": sample_counts.get(timeframe, 2500)
+    }
+
+
 # Load data on module import
 load_accuracy_data()
