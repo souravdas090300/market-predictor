@@ -48,10 +48,10 @@ export default function Dashboard() {
     setLoading(false);
     loadDashboardData();
     
-    // Auto-refresh prices every 15 seconds
+    // Auto-refresh prices every 60 seconds (increased from 15s since we now fetch all assets)
     const refreshInterval = setInterval(() => {
       refreshPrices();
-    }, 15000);
+    }, 60000);
     
     // Clean up interval on unmount
     return () => {
@@ -62,12 +62,69 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     setLoadingData(true);
     try {
+      console.log('Loading dashboard data from:', API_URL);
+      
       // Load all assets from assets/all endpoint to get the full list
       const assetsRes = await fetch(`${API_URL}/api/assets/all`);
+      console.log('Assets response status:', assetsRes.status);
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
+        console.log('Assets data received:', assetsData.assets?.length, 'assets');
+        console.log('First asset sample:', assetsData.assets?.[0]);
         setWatchlist(assetsData.assets || []);
+        
+        // Fetch live quotes for all assets in batches of 50 (increased from 20)
+        const allAssets = assetsData.assets || [];
+        const batchSize = 50;
+        const allQuotes = {};
+        
+        for (let i = 0; i < allAssets.length; i += batchSize) {
+          const batch = allAssets.slice(i, i + batchSize);
+          const symbols = batch.map(item => item.symbol).join(',');
+          
+          if (symbols) {
+            try {
+              const quotesRes = await fetch(`${API_URL}/api/quotes?symbols=${symbols}`);
+              if (quotesRes.ok) {
+                const quotesData = await quotesRes.json();
+                Object.assign(allQuotes, quotesData);
+              }
+            } catch (e) {
+              console.error(`Error fetching batch ${i}-${i + batchSize}:`, e);
+            }
+          }
+          
+          // Reduced delay between batches from 100ms to 50ms
+          if (i + batchSize < allAssets.length) {
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+        }
+        
+        console.log('Fetched quotes for', Object.keys(allQuotes).length, 'assets');
+        
+        // Update watchlist with all fetched quotes
+        setWatchlist(prevWatchlist => 
+          prevWatchlist.map(asset => {
+            const quote = allQuotes[asset.symbol];
+            if (quote) {
+              return {
+                ...asset,
+                quote: quote,
+                price: quote.price || 0,
+                change_pct: quote.change_pct || 0,
+                change: quote.change || 0,
+                volume: quote.volume || 0,
+                high_24h: quote.day_high || 0,
+                low_24h: quote.day_low || 0,
+                market_cap: quote.market_cap,
+                last_update: quote.as_of || new Date().toISOString()
+              };
+            }
+            return asset;
+          })
+        );
       } else {
+        console.error('Assets request failed:', assetsRes.status);
         // Fallback to watchlist endpoint
         const watchlistRes = await fetch(`${API_URL}/api/watchlist`);
         if (watchlistRes.ok) {
@@ -78,9 +135,13 @@ export default function Dashboard() {
 
       // Load asset categories with top gainers/losers
       const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
+      console.log('Categories response status:', categoriesRes.status);
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
+        console.log('Categories data received:', Object.keys(categoriesData.categories || {}));
         setAssetCategories(categoriesData.categories);
+      } else {
+        console.error('Categories request failed:', categoriesRes.status);
       }
 
       // Load portfolio
@@ -112,12 +173,57 @@ export default function Dashboard() {
   // Refresh only prices (lighter weight than full dashboard load)
   const refreshPrices = async () => {
     try {
-      // Refresh assets with live prices
-      const assetsRes = await fetch(`${API_URL}/api/assets/all`);
-      if (assetsRes.ok) {
-        const assetsData = await assetsRes.json();
-        setWatchlist(assetsData.assets || []);
+      // Get current watchlist symbols
+      const allAssets = watchlist;
+      const batchSize = 20;
+      const allQuotes = {};
+      
+      // Fetch live quotes in batches
+      for (let i = 0; i < allAssets.length; i += batchSize) {
+        const batch = allAssets.slice(i, i + batchSize);
+        const symbols = batch.map(item => item.symbol).join(',');
+        
+        if (symbols) {
+          try {
+            const quotesRes = await fetch(`${API_URL}/api/quotes?symbols=${symbols}`);
+            if (quotesRes.ok) {
+              const quotesData = await quotesRes.json();
+              Object.assign(allQuotes, quotesData);
+            }
+          } catch (e) {
+            console.error(`Error fetching batch ${i}-${i + batchSize}:`, e);
+          }
+        }
+        
+        // Small delay between batches
+        if (i + batchSize < allAssets.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
+      
+      console.log('Refreshed quotes for', Object.keys(allQuotes).length, 'assets');
+      
+      // Update watchlist with fetched quotes
+      setWatchlist(prevWatchlist => 
+        prevWatchlist.map(asset => {
+          const quote = allQuotes[asset.symbol];
+          if (quote) {
+            return {
+              ...asset,
+              quote: quote,
+              price: quote.price || 0,
+              change_pct: quote.change_pct || 0,
+              change: quote.change || 0,
+              volume: quote.volume || 0,
+              high_24h: quote.day_high || 0,
+              low_24h: quote.day_low || 0,
+              market_cap: quote.market_cap,
+              last_update: quote.as_of || new Date().toISOString()
+            };
+          }
+          return asset;
+        })
+      );
       
       // Refresh categories
       const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
@@ -135,6 +241,32 @@ export default function Dashboard() {
     
     setLoadingData(true);
     try {
+      // Load live quote first
+      const quoteRes = await fetch(`${API_URL}/api/quote/${symbol}`);
+      if (quoteRes.ok) {
+        const quote = await quoteRes.json();
+        // Update the asset in watchlist with live quote
+        setWatchlist(prevWatchlist => 
+          prevWatchlist.map(asset => {
+            if (asset.symbol === symbol) {
+              return {
+                ...asset,
+                quote: quote,
+                price: quote.price || 0,
+                change_pct: quote.change_pct || 0,
+                change: quote.change || 0,
+                volume: quote.volume || 0,
+                high_24h: quote.day_high || 0,
+                low_24h: quote.day_low || 0,
+                market_cap: quote.market_cap,
+                last_update: quote.as_of || new Date().toISOString()
+              };
+            }
+            return asset;
+          })
+        );
+      }
+      
       // Load signal data
       const signalRes = await fetch(`${API_URL}/api/signal/${symbol}`);
       if (signalRes.ok) {
@@ -1302,7 +1434,7 @@ function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectC
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginBottom: '1rem' }}>
         <button
-          onClick={() => { setSelectedCategory('all'); setExpandedCategory(null); }}
+          onClick={() => { onSelectCategory('all'); setExpandedCategory(null); }}
           style={{
             padding: '0.5rem',
             backgroundColor: selectedCategory === 'all' ? '#3B82F6' : '#1E293B',
@@ -1318,7 +1450,7 @@ function AssetCategoriesComponent({ assetCategories, selectedCategory, onSelectC
         {categories.map((category) => (
           <button
             key={category.key}
-            onClick={() => { setSelectedCategory(category.key); setExpandedCategory(category.key); }}
+            onClick={() => { onSelectCategory(category.key); setExpandedCategory(category.key); }}
             style={{
               padding: '0.5rem',
               backgroundColor: selectedCategory === category.key ? '#3B82F6' : '#1E293B',

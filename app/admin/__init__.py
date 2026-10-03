@@ -65,13 +65,23 @@ class AdminManager:
         return user_manager.is_superuser_by_username(username)
     
     def enable_rate_limiting(self, enabled: bool) -> Dict[str, Any]:
-        """Enable or disable rate limiting globally."""
+        """Enable or disable rate limiting globally.
+        
+        When rate limiting is enabled, subscription mode is also enabled to restrict
+        non-subscribed users to basic features. When disabled, all users get full access.
+        """
         self.config["rate_limiting_enabled"] = enabled
         self._save_config()
         
+        # Sync subscription mode with rate limiting
+        # When rate limiting is ON, enable subscription mode (restrict features)
+        # When rate limiting is OFF, disable subscription mode (full access for all)
+        config.SUBSCRIPTION_MODE_ENABLED = enabled
+        
         return {
-            "message": f"Rate limiting {'enabled' if enabled else 'disabled'}",
+            "message": f"Rate limiting {'enabled' if enabled else 'disabled'}. Subscription mode {'enabled' if enabled else 'disabled'}.",
             "rate_limiting_enabled": enabled,
+            "subscription_mode_enabled": enabled,
             "updated_at": self.config["updated_at"]
         }
     

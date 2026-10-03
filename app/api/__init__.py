@@ -96,7 +96,15 @@ async def lifespan(app: FastAPI):
 
 # Initialize security components
 security = HTTPBearer()
-limiter = Limiter(key_func=get_remote_address)
+# Custom key function that can bypass rate limiting
+def get_key_with_admin_check(request: Request) -> str:
+    """Get remote address key, but return None if rate limiting is disabled."""
+    # If rate limiting is disabled in admin config, bypass all rate limits
+    if not admin_manager.config.get("rate_limiting_enabled", True):
+        return None  # None means no rate limiting
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=get_key_with_admin_check, default_limits=["100/minute"])
 app = FastAPI(title="Market Predictor", version="1.0.0", lifespan=lifespan)
 
 # Security middleware
@@ -221,7 +229,6 @@ def quote(request: Request, symbol: str):
 
 
 @app.get("/api/quotes")
-@limiter.limit("60/minute")
 def quotes(request: Request, symbols: str):
     """Live quotes for a comma-separated watchlist."""
     syms = [sanitize_symbol(s) for s in symbols.split(",") if s.strip()][:20]
@@ -248,21 +255,26 @@ async def live_quotes_stream(request: Request, symbols: str):
     return StreamingResponse(events(), media_type="text/event-stream")
 
 
-@app.get("/api/assets/all")
-@limiter.limit("30/minute")
-def get_all_assets(request: Request):
-    """Get comprehensive data for all assets in the watchlist."""
+@app.get("/api/assets/live-prices")
+@limiter.limit("10/minute")
+def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None):
+    """Get live prices for all assets in the watchlist, optionally filtered by class."""
     try:
         watchlist = config.WATCHLIST
+        
+        # Filter by asset class if provided
+        if asset_class:
+            if asset_class not in config.CLASS_LABELS:
+                raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
+            watchlist = [asset for asset in watchlist if asset["class"] == asset_class]
+        
         symbols = [asset["symbol"] for asset in watchlist]
         
         # Get live quotes for all symbols with error handling
         try:
             quotes = data.get_quotes(symbols)
         except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Error fetching quotes: {e}")
+            print(f"Error fetching live quotes for assets: {e}")
             quotes = {symbol: None for symbol in symbols}
         
         # Combine watchlist info with live quotes
@@ -271,20 +283,76 @@ def get_all_assets(request: Request):
             symbol = asset["symbol"]
             quote = quotes.get(symbol)
             
+            if quote:
+                assets_data.append({
+                    "symbol": symbol,
+                    "name": asset["name"],
+                    "class": asset["class"],
+                    "price": quote.get("price", 0),
+                    "change": quote.get("change", 0),
+                    "change_pct": quote.get("change_pct", 0),
+                    "volume": quote.get("volume", 0),
+                    "day_high": quote.get("day_high", 0),
+                    "day_low": quote.get("day_low", 0),
+                    "open": quote.get("open", 0),
+                    "previous_close": quote.get("previous_close", 0),
+                    "market_cap": quote.get("market_cap"),
+                    "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
+                    "source": quote.get("source", "yahoo")
+                })
+            else:
+                # Include asset even if quote is not available
+                assets_data.append({
+                    "symbol": symbol,
+                    "name": asset["name"],
+                    "class": asset["class"],
+                    "price": 0,
+                    "change": 0,
+                    "change_pct": 0,
+                    "volume": 0,
+                    "day_high": 0,
+                    "day_low": 0,
+                    "open": 0,
+                    "previous_close": 0,
+                    "market_cap": None,
+                    "as_of": datetime.now(timezone.utc).isoformat(),
+                    "source": "unavailable"
+                })
+        
+        return {
+            "assets": assets_data,
+            "total": len(assets_data),
+            "asset_class": asset_class,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching live prices: {str(e)}")
+
+
+@app.get("/api/assets/all")
+@limiter.limit("30/minute")
+def get_all_assets(request: Request):
+    """Get comprehensive data for all assets in the watchlist."""
+    try:
+        watchlist = config.WATCHLIST
+        
+        # Return watchlist without live quotes to avoid timeout
+        # Frontend can fetch individual quotes on demand via /api/quote/{symbol}
+        assets_data = []
+        for asset in watchlist:
             asset_data = {
-                "symbol": symbol,
+                "symbol": asset["symbol"],
                 "name": asset["name"],
                 "class": asset["class"],
                 "query": asset.get("query", ""),
-                "quote": quote,
-                # Add fields that frontend might expect
-                "price": quote.get("price", 0) if quote else 0,
-                "change_pct": quote.get("change_pct", 0) if quote else 0,
-                "volume": quote.get("volume", 0) if quote else 0,
-                "high_24h": quote.get("high_24h", 0) if quote else 0,
-                "low_24h": quote.get("low_24h", 0) if quote else 0,
-                "market_cap": quote.get("market_cap") if quote else None,
-                "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
+                "quote": None,
+                "price": 0,
+                "change_pct": 0,
+                "volume": 0,
+                "high_24h": 0,
+                "low_24h": 0,
+                "market_cap": None,
+                "last_update": datetime.now(timezone.utc).isoformat()
             }
             assets_data.append(asset_data)
         
@@ -359,70 +427,35 @@ def get_asset_categories(request: Request):
     """Get all asset categories with their asset counts and sample data."""
     try:
         watchlist = config.WATCHLIST
-        symbols = [asset["symbol"] for asset in watchlist]
         
-        # Get live quotes for all symbols
-        try:
-            quotes = data.get_quotes(symbols)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Error fetching quotes for categories: {e}")
-            quotes = {symbol: None for symbol in symbols}
-        
-        # Group assets by class
+        # Group assets by class without fetching live quotes to avoid timeout
         categories = {}
         for asset_class in config.CLASS_LABELS.keys():
             class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
             
-            # Calculate top gainers and losers
-            assets_with_change = []
-            for asset in class_assets:
-                symbol = asset["symbol"]
-                quote = quotes.get(symbol)
-                if quote and quote.get("change_pct") is not None:
-                    assets_with_change.append({
-                        "symbol": symbol,
-                        "name": asset["name"],
-                        "class": asset["class"],
-                        "price": quote.get("price", 0),
-                        "change_pct": quote.get("change_pct", 0),
-                        "volume": quote.get("volume", 0),
-                        "market_cap": quote.get("market_cap")
-                    })
-            
-            # Sort by change percentage
-            assets_with_change.sort(key=lambda x: x["change_pct"], reverse=True)
-            
-            top_gainers = assets_with_change[:5] if len(assets_with_change) > 0 else []
-            top_losers = assets_with_change[-5:] if len(assets_with_change) > 0 else []
-            top_losers.reverse()  # Show highest losers first
-            
-            # Build full asset list with live prices
+            # Build asset list with basic info (no live quotes)
             all_assets = []
             for asset in class_assets:
-                symbol = asset["symbol"]
-                quote = quotes.get(symbol)
                 all_assets.append({
-                    "symbol": symbol,
+                    "symbol": asset["symbol"],
                     "name": asset["name"],
                     "class": asset["class"],
                     "query": asset.get("query", ""),
-                    "price": quote.get("price", 0) if quote else 0,
-                    "change_pct": quote.get("change_pct", 0) if quote else 0,
-                    "change": quote.get("change", 0) if quote else 0,
-                    "volume": quote.get("volume", 0) if quote else 0,
-                    "market_cap": quote.get("market_cap") if quote else None,
-                    "high_24h": quote.get("day_high", 0) if quote else 0,
-                    "low_24h": quote.get("day_low", 0) if quote else 0,
-                    "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
+                    "price": 0,
+                    "change_pct": 0,
+                    "change": 0,
+                    "volume": 0,
+                    "market_cap": None,
+                    "high_24h": 0,
+                    "low_24h": 0,
+                    "last_update": datetime.now(timezone.utc).isoformat()
                 })
             
             categories[asset_class] = {
                 "label": config.CLASS_LABELS.get(asset_class, asset_class),
                 "total_assets": len(class_assets),
-                "top_gainers": top_gainers,
-                "top_losers": top_losers,
+                "top_gainers": [],
+                "top_losers": [],
                 "all_assets": all_assets
             }
         

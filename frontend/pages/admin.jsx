@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -513,7 +514,7 @@ function SettingsTab() {
   const fetchSubscriptionMode = async () => {
     try {
       const token = localStorage.getItem('auth-token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/subscription-mode`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/rate-limits`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -521,10 +522,10 @@ function SettingsTab() {
       
       if (response.ok) {
         const data = await response.json();
-        setSubscriptionMode(data.subscription_mode_enabled);
+        setSubscriptionMode(data.rate_limiting_enabled);
       }
     } catch (err) {
-      console.error('Error fetching subscription mode:', err);
+      console.error('Error fetching rate limiting status:', err);
     } finally {
       setLoading(false);
     }
@@ -537,7 +538,7 @@ function SettingsTab() {
 
     try {
       const token = localStorage.getItem('auth-token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/subscription-mode`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/admin/rate-limiting`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -553,10 +554,10 @@ function SettingsTab() {
         setTimeout(() => setSuccess(''), 3000);
       } else {
         const errorData = await response.json();
-        setError(errorData.detail || 'Failed to update subscription mode');
+        setError(errorData.detail || 'Failed to update rate limiting');
       }
     } catch (err) {
-      console.error('Error toggling subscription mode:', err);
+      console.error('Error toggling rate limiting:', err);
       setError('An error occurred. Please try again.');
     } finally {
       setSaving(false);
@@ -568,13 +569,14 @@ function SettingsTab() {
       <h2 style={{ fontSize: '1.8rem', fontWeight: '700', marginBottom: '2rem' }}>System Settings</h2>
 
       <div style={{ maxWidth: '600px' }}>
-        {/* Subscription Mode Toggle */}
+        {/* Rate Limiting & Subscription Mode Toggle */}
         <div style={{ marginBottom: '2rem', border: '1px solid #2D3748', padding: '1.5rem', borderRadius: '8px' }}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>
-            Subscription Mode
+            Rate Limiting & Subscription Mode
           </label>
           <p style={{ color: '#D1D5DB', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            When enabled, only subscribed users can access premium features. When disabled, all users have full access.
+            When enabled, rate limiting is active and only subscribed users can access premium features. 
+            When disabled, all users have full access without rate limits.
           </p>
           
           {loading ? (
@@ -655,7 +657,8 @@ function SettingsTab() {
             fontSize: '0.85rem',
             color: subscriptionMode ? '#6EE7B7' : '#9CA3AF'
           }}>
-            Current status: <strong>{subscriptionMode ? 'ENABLED' : 'DISABLED'}</strong>
+            Rate Limiting: <strong>{subscriptionMode ? 'ENABLED' : 'DISABLED'}</strong><br />
+            Subscription Mode: <strong>{subscriptionMode ? 'ENABLED' : 'DISABLED'}</strong>
           </div>
         </div>
 
