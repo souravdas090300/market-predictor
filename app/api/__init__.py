@@ -430,34 +430,56 @@ def get_asset_categories(request: Request):
     try:
         watchlist = config.WATCHLIST
         
-        # Group assets by class without fetching live quotes to avoid timeout
+        # Group assets by class and fetch live quotes
         categories = {}
         for asset_class in config.CLASS_LABELS.keys():
             class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
+            symbols = [asset["symbol"] for asset in class_assets]
             
-            # Build asset list with basic info (no live quotes)
+            # Fetch live quotes for this class
+            try:
+                quotes = data.get_quotes(symbols)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error fetching quotes for {asset_class}: {e}")
+                quotes = {symbol: None for symbol in symbols}
+            
+            # Build asset list with live quotes
             all_assets = []
             for asset in class_assets:
+                symbol = asset["symbol"]
+                quote = quotes.get(symbol)
+                
                 all_assets.append({
-                    "symbol": asset["symbol"],
+                    "symbol": symbol,
                     "name": asset["name"],
                     "class": asset["class"],
                     "query": asset.get("query", ""),
-                    "price": 0,
-                    "change_pct": 0,
-                    "change": 0,
-                    "volume": 0,
-                    "market_cap": None,
-                    "high_24h": 0,
-                    "low_24h": 0,
-                    "last_update": datetime.now(timezone.utc).isoformat()
+                    "price": quote.get("price", 0) if quote else 0,
+                    "change_pct": quote.get("change_pct", 0) if quote else 0,
+                    "change": quote.get("change", 0) if quote else 0,
+                    "volume": quote.get("volume", 0) if quote else 0,
+                    "market_cap": quote.get("market_cap") if quote else None,
+                    "high_24h": quote.get("day_high", 0) if quote else 0,
+                    "low_24h": quote.get("day_low", 0) if quote else 0,
+                    "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
                 })
+            
+            # Calculate top gainers and losers
+            assets_with_change = [(a, a["change_pct"]) for a in all_assets if a["change_pct"] != 0]
+            assets_with_change.sort(key=lambda x: x[1], reverse=True)
+            
+            top_gainers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]} 
+                          for a, _ in assets_with_change[:5]]
+            top_losers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]} 
+                         for a, _ in assets_with_change[-5:]]
             
             categories[asset_class] = {
                 "label": config.CLASS_LABELS.get(asset_class, asset_class),
                 "total_assets": len(class_assets),
-                "top_gainers": [],
-                "top_losers": [],
+                "top_gainers": top_gainers,
+                "top_losers": top_losers,
                 "all_assets": all_assets
             }
         
