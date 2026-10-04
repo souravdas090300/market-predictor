@@ -36,3 +36,6 @@ pillow>=10.0.0
 # Additional dependencies
 transformers>=4.30.0
 torch>=2.0.0
+# Real-time data
+polygon-api-client>=3.0.0
+websockets>=12.0

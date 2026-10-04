@@ -7,6 +7,13 @@ from typing import Optional, Dict, List
 
 import requests
 
+# Import extended crypto database
+try:
+    from ..providers.crypto_extended_300 import get_coingecko_id_map
+    COINGECKO_ID_MAP = get_coingecko_id_map()
+except ImportError:
+    COINGECKO_ID_MAP = {}
+
 
 class CoinGeckoError(Exception):
     """Custom exception for CoinGecko API errors."""

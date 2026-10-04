@@ -10,11 +10,13 @@ import pandas as pd
 
 from . import config
 from . import coingecko
+from . import polygon
 
 _price_cache: dict[str, tuple[float, pd.DataFrame]] = {}
 _quote_cache: dict[str, tuple[float, dict | None]] = {}
 _crypto_cache: dict[str, tuple[float, dict | None]] = {}
 _crypto_market_cache: dict[str, tuple[float, list]] = {}
+_polygon_cache: dict[str, tuple[float, dict | None]] = {}
 
 
 def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
@@ -49,7 +51,7 @@ def get_prices(symbol: str, period: str = config.HISTORY_PERIOD) -> pd.DataFrame
 
 
 def get_live_quote(symbol: str) -> dict | None:
-    """Latest traded price from Yahoo. Never used as a training row.
+    """Latest traded price from Polygon (primary) or Yahoo (fallback). Never used as a training row.
 
     Returns None on failure so the daily model still works offline / in tests.
     """
@@ -59,6 +61,17 @@ def get_live_quote(symbol: str) -> dict | None:
         return hit[1]
 
     quote = None
+    
+    # Try Polygon first for real-time data
+    try:
+        quote = polygon.get_polygon_quote(symbol, asset_class="stock")
+        if quote:
+            _quote_cache[symbol] = (now, quote)
+            return quote
+    except Exception:
+        pass  # Fallback to Yahoo
+    
+    # Fallback to Yahoo Finance
     try:
         import yfinance as yf
 
@@ -123,7 +136,7 @@ def get_live_quote(symbol: str) -> dict | None:
 
 
 def get_crypto_quote(symbol: str) -> dict | None:
-    """Get live quote for cryptocurrency from CoinGecko or Yahoo Finance (fallback).
+    """Get live quote for cryptocurrency from CoinGecko (primary), Polygon (fallback), or Yahoo (last resort).
     
     Args:
         symbol: Crypto symbol (e.g., "BTC-USD")
@@ -142,7 +155,7 @@ def get_crypto_quote(symbol: str) -> dict | None:
     
     coin_symbol = symbol.replace("-USD", "").lower()
     
-    # Try CoinGecko first
+    # Try CoinGecko first (primary)
     try:
         # Use cached market data to avoid rate limiting
         # Fetch market data once and reuse it for all quotes
@@ -166,7 +179,7 @@ def get_crypto_quote(symbol: str) -> dict | None:
                 
                 if price:
                     prev = price / (1 + change_pct / 100) if change_pct else price
-                    return {
+                    quote = {
                         "symbol": symbol,
                         "price": round(price, 6),
                         "previous_close": round(prev, 6),
@@ -180,14 +193,27 @@ def get_crypto_quote(symbol: str) -> dict | None:
                         "as_of": datetime.now(timezone.utc).isoformat(),
                         "source": "coingecko"
                     }
+                    _crypto_cache[symbol] = (now, quote)
+                    return quote
         
     except Exception as e:
-        # Log error for debugging but don't fail - fallback to Yahoo
-        print(f"CoinGecko error for {symbol}, falling back to Yahoo: {e}")
+        print(f"CoinGecko error for {symbol}, trying Polygon: {e}")
     
-    # Fallback to Yahoo Finance for crypto
+    # Fallback to Polygon for crypto
     try:
-        return get_live_quote(symbol)
+        quote = polygon.get_polygon_quote(symbol, asset_class="crypto")
+        if quote:
+            _crypto_cache[symbol] = (now, quote)
+            return quote
+    except Exception as e:
+        print(f"Polygon error for {symbol}, trying Yahoo: {e}")
+    
+    # Last resort: Yahoo Finance for crypto
+    try:
+        quote = get_live_quote(symbol)
+        if quote:
+            _crypto_cache[symbol] = (now, quote)
+            return quote
     except Exception:
         pass
     
