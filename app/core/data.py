@@ -9,9 +9,12 @@ from datetime import datetime, timezone
 import pandas as pd
 
 from . import config
+from . import coingecko
 
 _price_cache: dict[str, tuple[float, pd.DataFrame]] = {}
 _quote_cache: dict[str, tuple[float, dict | None]] = {}
+_crypto_cache: dict[str, tuple[float, dict | None]] = {}
+_crypto_market_cache: dict[str, tuple[float, list]] = {}
 
 
 def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame:
@@ -119,8 +122,92 @@ def get_live_quote(symbol: str) -> dict | None:
     return quote
 
 
+def get_crypto_quote(symbol: str) -> dict | None:
+    """Get live quote for cryptocurrency from CoinGecko or Yahoo Finance (fallback).
+    
+    Args:
+        symbol: Crypto symbol (e.g., "BTC-USD")
+        
+    Returns:
+        Quote dictionary or None if failed
+    """
+    now = time.time()
+    hit = _crypto_cache.get(symbol)
+    if hit and now - hit[0] < config.LIVE_QUOTE_CACHE_SECONDS:
+        return hit[1]
+    
+    # Extract coin symbol from Yahoo format (e.g., "BTC-USD" -> "bitcoin")
+    if not symbol.endswith("-USD"):
+        return None
+    
+    coin_symbol = symbol.replace("-USD", "").lower()
+    
+    # Try CoinGecko first
+    try:
+        # Use cached market data to avoid rate limiting
+        # Fetch market data once and reuse it for all quotes
+        cache_key = "market_data"
+        hit = _crypto_market_cache.get(cache_key)
+        
+        if hit and now - hit[0] < 60:  # Cache for 60 seconds
+            market_data = hit[1]
+        else:
+            # Fetch fresh market data
+            client = coingecko.get_coingecko_client()
+            market_data = client.get_top_coins(per_page=250, page=1, 
+                                              price_change_percentage="24h")
+            _crypto_market_cache[cache_key] = (now, market_data)
+        
+        # Find the coin in market data
+        for coin in market_data:
+            if coin['symbol'].lower() == coin_symbol:
+                price = coin.get('current_price')
+                change_pct = coin.get('price_change_percentage_24h')
+                
+                if price:
+                    prev = price / (1 + change_pct / 100) if change_pct else price
+                    return {
+                        "symbol": symbol,
+                        "price": round(price, 6),
+                        "previous_close": round(prev, 6),
+                        "change": round(price - prev, 6),
+                        "change_pct": round(change_pct / 100, 6) if change_pct else 0.0,
+                        "volume": coin.get('total_volume'),
+                        "market_cap": coin.get('market_cap'),
+                        "day_high": coin.get('high_24h'),
+                        "day_low": coin.get('low_24h'),
+                        "open": None,
+                        "as_of": datetime.now(timezone.utc).isoformat(),
+                        "source": "coingecko"
+                    }
+        
+    except Exception as e:
+        # Log error for debugging but don't fail - fallback to Yahoo
+        print(f"CoinGecko error for {symbol}, falling back to Yahoo: {e}")
+    
+    # Fallback to Yahoo Finance for crypto
+    try:
+        return get_live_quote(symbol)
+    except Exception:
+        pass
+    
+    _crypto_cache[symbol] = (now, None)
+    return None
+
+
 def get_quotes(symbols: list[str]) -> dict[str, dict | None]:
-    return {s: get_live_quote(s) for s in symbols}
+    """Get quotes for multiple symbols, using appropriate data source.
+    
+    Crypto symbols (ending with -USD) use CoinGecko.
+    Other symbols use Yahoo Finance.
+    """
+    quotes = {}
+    for symbol in symbols:
+        if symbol.endswith("-USD"):
+            quotes[symbol] = get_crypto_quote(symbol)
+        else:
+            quotes[symbol] = get_live_quote(symbol)
+    return quotes
 
 
 def get_news(query: str, max_items: int = 30) -> list[dict]:
@@ -140,4 +227,36 @@ def get_news(query: str, max_items: int = 30) -> list[dict]:
             items.append({"title": e.title, "source": source, "published": ts, "link": e.link})
         return items
     except Exception:
+        return []
+
+
+def get_top_cryptos_watchlist(limit: int = 300) -> list[dict]:
+    """Fetch top cryptocurrencies from CoinGecko and format as watchlist entries.
+    
+    Args:
+        limit: Number of cryptocurrencies to fetch
+        
+    Returns:
+        List of watchlist-style dictionaries
+    """
+    try:
+        coins = coingecko.get_top_cryptos(limit=limit)
+        watchlist = []
+        
+        for coin in coins:
+            symbol = coin.get("symbol", "").upper()
+            name = coin.get("name", "")
+            coin_id = coin.get("id", "")
+            
+            watchlist.append({
+                "symbol": f"{symbol}-USD",
+                "name": name,
+                "class": "crypto",
+                "query": f"{name} {symbol} price",
+                "coingecko_id": coin_id
+            })
+        
+        return watchlist
+    except Exception as e:
+        print(f"Error fetching top cryptos: {e}")
         return []
