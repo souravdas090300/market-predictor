@@ -44,6 +44,7 @@ from ..services import trading_automation
 # Import new phase-based routes
 from ..routes import phase1_5_router, phase6_10_router, phase11_18_router
 from ..routes import assets_library
+from ..routes.assets_historical import router as assets_historical_router
 
 
 # Initialize admin user on startup (production only)
@@ -139,6 +140,7 @@ app.include_router(phase1_5_router)
 app.include_router(phase6_10_router)
 app.include_router(phase11_18_router)
 app.include_router(assets_library.router)
+app.include_router(assets_historical_router, prefix="/api/v1/assets", tags=["assets-historical"])
 
 # Security headers middleware
 @app.middleware("http")
