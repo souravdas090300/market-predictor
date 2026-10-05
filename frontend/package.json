@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:prod": "next dev --turbopack",
-    "build": "next build",
-    "build:dev": "next build",
-    "build:prod": "next build",
+    "build": "next build --webpack",
+    "build:dev": "next build --webpack",
+    "build:prod": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
