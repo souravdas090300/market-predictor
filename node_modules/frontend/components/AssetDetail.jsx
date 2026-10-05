@@ -7,7 +7,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, CandleStick, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, Area, AreaChart } from 'recharts';
 import axios from 'axios';
-import '../styles/AssetDetail.css';
 
 const TIMEFRAMES = {
   '24H': { label: '24 Hours', interval: '5min', days: 1 },
@@ -17,6 +16,123 @@ const TIMEFRAMES = {
   '1Y': { label: '1 Year', interval: 'weekly', days: 365 },
   '5Y': { label: '5 Years', interval: 'monthly', days: 1825 },
   'ALL': { label: 'All Time', interval: 'monthly', days: null }
+};
+
+const styles = {
+  container: {
+    backgroundColor: '#0F172A',
+    color: '#F9FAFB',
+    minHeight: '100vh',
+    padding: '1rem'
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.5rem',
+    padding: '1rem',
+    backgroundColor: 'rgba(45, 55, 72, 0.5)',
+    borderRadius: '8px',
+    border: '1px solid #2D3748'
+  },
+  backButton: {
+    padding: '0.5rem 1rem',
+    backgroundColor: '#3B82F6',
+    color: '#F9FAFB',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '0.9rem'
+  },
+  assetInfo: {
+    flex: 1
+  },
+  price: {
+    fontSize: '2rem',
+    fontWeight: '700',
+    color: '#10B981'
+  },
+  change: {
+    fontSize: '1.1rem',
+    marginLeft: '1rem'
+  },
+  positive: { color: '#10B981' },
+  negative: { color: '#EF4444' },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: '1rem',
+    marginTop: '1rem'
+  },
+  stat: {
+    padding: '0.5rem',
+    backgroundColor: 'rgba(45, 55, 72, 0.3)',
+    borderRadius: '4px'
+  },
+  statLabel: {
+    fontSize: '0.8rem',
+    color: '#D1D5DB'
+  },
+  statValue: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#F9FAFB'
+  },
+  timeframeSelector: {
+    display: 'flex',
+    gap: '0.5rem',
+    marginBottom: '1.5rem',
+    flexWrap: 'wrap'
+  },
+  timeframeBtn: {
+    padding: '0.5rem 1rem',
+    backgroundColor: '#1E293B',
+    color: '#D1D5DB',
+    border: '1px solid #2D3748',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '0.85rem'
+  },
+  timeframeBtnActive: {
+    backgroundColor: '#3B82F6',
+    color: '#F9FAFB',
+    borderColor: '#3B82F6'
+  },
+  chartContainer: {
+    backgroundColor: 'rgba(45, 55, 72, 0.3)',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #2D3748'
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem',
+    color: '#D1D5DB'
+  },
+  error: {
+    textAlign: 'center',
+    padding: '3rem',
+    color: '#EF4444'
+  },
+  volumeChart: {
+    marginTop: '2rem'
+  },
+  chartStats: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+    gap: '1rem',
+    marginTop: '1.5rem',
+    padding: '1rem',
+    backgroundColor: 'rgba(45, 55, 72, 0.3)',
+    borderRadius: '6px'
+  },
+  tooltip: {
+    backgroundColor: '#1E293B',
+    border: '1px solid #3B82F6',
+    borderRadius: '6px',
+    padding: '0.75rem',
+    fontSize: '0.85rem'
+  }
 };
 
 export default function AssetDetail({ symbol, category, onBack }) {
@@ -35,7 +151,6 @@ export default function AssetDetail({ symbol, category, onBack }) {
   });
   const [error, setError] = useState(null);
 
-  // Fetch historical price data
   useEffect(() => {
     fetchPriceData();
   }, [selectedTimeframe, symbol, category]);
@@ -45,24 +160,18 @@ export default function AssetDetail({ symbol, category, onBack }) {
     setError(null);
     
     try {
-      const timeframeConfig = TIMEFRAMES[selectedTimeframe];
-      
-      // Call backend to get historical data
       const response = await axios.get(
-        `/api/v1/assets/price-history/${symbol}`,
+        `http://localhost:8000/api/v1/assets/price-history/${symbol}`,
         {
           params: {
             timeframe: selectedTimeframe,
-            category: category,
-            interval: timeframeConfig.interval,
-            limit: getLimitForTimeframe(selectedTimeframe)
+            category: category
           }
         }
       );
 
       const { historical, current } = response.data;
 
-      // Update asset info
       setAssetInfo({
         name: response.data.name || symbol,
         price: current.price,
@@ -74,29 +183,14 @@ export default function AssetDetail({ symbol, category, onBack }) {
         marketCap: current.marketCap
       });
 
-      // Format data for chart
       const formattedData = formatChartData(historical, selectedTimeframe);
       setChartData(formattedData);
     } catch (err) {
       console.error('Error fetching price data:', err);
-      setError('Failed to load price data. Please try again.');
-      // Fallback to demo data for testing
+      setError('Failed to load price data. Using demo data.');
       setChartData(generateDemoData(selectedTimeframe));
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getLimitForTimeframe = (timeframe) => {
-    switch (timeframe) {
-      case '24H': return 288; // 5-min candles
-      case '1W': return 168; // hourly candles
-      case '1M': return 30;  // daily candles
-      case '6M': return 26;  // weekly candles
-      case '1Y': return 52;  // weekly candles
-      case '5Y': return 60;  // monthly candles
-      case 'ALL': return 200; // monthly candles
-      default: return 100;
     }
   };
 
@@ -111,7 +205,6 @@ export default function AssetDetail({ symbol, category, onBack }) {
       low: parseFloat(candle.low),
       close: parseFloat(candle.close),
       volume: parseFloat(candle.volume),
-      // For line chart fallback
       price: parseFloat(candle.close)
     }));
   };
@@ -138,7 +231,6 @@ export default function AssetDetail({ symbol, category, onBack }) {
   };
 
   const generateDemoData = (timeframe) => {
-    // Generate demo data if API fails
     const limit = getLimitForTimeframe(timeframe);
     const data = [];
     let basePrice = 45000 + Math.random() * 5000;
@@ -176,26 +268,30 @@ export default function AssetDetail({ symbol, category, onBack }) {
     return data;
   };
 
-  const getChangeColor = (value) => {
-    return value >= 0 ? '#10B981' : '#EF4444'; // Green or Red
+  const getLimitForTimeframe = (timeframe) => {
+    switch (timeframe) {
+      case '24H': return 288;
+      case '1W': return 168;
+      case '1M': return 30;
+      case '6M': return 26;
+      case '1Y': return 52;
+      case '5Y': return 60;
+      case 'ALL': return 200;
+      default: return 100;
+    }
   };
 
-  const getChartColor = (value) => {
-    return value >= 0 ? '#10B981' : '#EF4444';
-  };
-
-  // Custom tooltip for chart
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="chart-tooltip">
-          <p className="tooltip-date">{data.timestamp}</p>
-          <p className="tooltip-open">Open: ${data.open?.toFixed(2)}</p>
-          <p className="tooltip-high">High: ${data.high?.toFixed(2)}</p>
-          <p className="tooltip-low">Low: ${data.low?.toFixed(2)}</p>
-          <p className="tooltip-close">Close: ${data.close?.toFixed(2)}</p>
-          <p className="tooltip-volume">Volume: {(data.volume / 1000000).toFixed(2)}M</p>
+        <div style={styles.tooltip}>
+          <p>{data.timestamp}</p>
+          <p>Open: ${data.open?.toFixed(2)}</p>
+          <p>High: ${data.high?.toFixed(2)}</p>
+          <p>Low: ${data.low?.toFixed(2)}</p>
+          <p>Close: ${data.close?.toFixed(2)}</p>
+          <p>Volume: {(data.volume / 1000000).toFixed(2)}M</p>
         </div>
       );
     }
@@ -203,51 +299,51 @@ export default function AssetDetail({ symbol, category, onBack }) {
   };
 
   return (
-    <div className="asset-detail-container">
-      {/* Header */}
-      <div className="detail-header">
-        <button className="back-button" onClick={onBack}>
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <button style={styles.backButton} onClick={onBack}>
           ← Back
         </button>
         
-        <div className="asset-info">
+        <div style={styles.assetInfo}>
           <h1>{assetInfo.name} ({symbol})</h1>
-          <div className="price-info">
-            <span className="current-price">${assetInfo.price?.toFixed(2)}</span>
-            <span className={`change-24h ${assetInfo.change24h >= 0 ? 'positive' : 'negative'}`}>
+          <div>
+            <span style={styles.price}>${assetInfo.price?.toFixed(2)}</span>
+            <span style={{...styles.change, ...(assetInfo.change24h >= 0 ? styles.positive : styles.negative)}}>
               {assetInfo.change24h >= 0 ? '+' : ''}{assetInfo.change24h?.toFixed(2)} 
               ({assetInfo.changePercent >= 0 ? '+' : ''}{assetInfo.changePercent?.toFixed(2)}%)
             </span>
           </div>
 
-          {/* Stats Grid */}
-          <div className="stats-grid">
-            <div className="stat">
-              <span className="stat-label">24H High</span>
-              <span className="stat-value">${assetInfo.high?.toFixed(2)}</span>
+          <div style={styles.statsGrid}>
+            <div style={styles.stat}>
+              <div style={styles.statLabel}>24H High</div>
+              <div style={styles.statValue}>${assetInfo.high?.toFixed(2)}</div>
             </div>
-            <div className="stat">
-              <span className="stat-label">24H Low</span>
-              <span className="stat-value">${assetInfo.low?.toFixed(2)}</span>
+            <div style={styles.stat}>
+              <div style={styles.statLabel}>24H Low</div>
+              <div style={styles.statValue}>${assetInfo.low?.toFixed(2)}</div>
             </div>
-            <div className="stat">
-              <span className="stat-label">24H Volume</span>
-              <span className="stat-value">{(assetInfo.volume / 1000000000).toFixed(2)}B</span>
+            <div style={styles.stat}>
+              <div style={styles.statLabel}>24H Volume</div>
+              <div style={styles.statValue}>{(assetInfo.volume / 1000000000).toFixed(2)}B</div>
             </div>
-            <div className="stat">
-              <span className="stat-label">Market Cap</span>
-              <span className="stat-value">${(assetInfo.marketCap / 1000000000).toFixed(2)}B</span>
+            <div style={styles.stat}>
+              <div style={styles.statLabel}>Market Cap</div>
+              <div style={styles.statValue}>${(assetInfo.marketCap / 1000000000).toFixed(2)}B</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Timeframe Selector */}
-      <div className="timeframe-selector">
+      <div style={styles.timeframeSelector}>
         {Object.entries(TIMEFRAMES).map(([key, value]) => (
           <button
             key={key}
-            className={`timeframe-btn ${selectedTimeframe === key ? 'active' : ''}`}
+            style={{
+              ...styles.timeframeBtn,
+              ...(selectedTimeframe === key ? styles.timeframeBtnActive : {})
+            }}
             onClick={() => setSelectedTimeframe(key)}
           >
             {key}
@@ -255,21 +351,18 @@ export default function AssetDetail({ symbol, category, onBack }) {
         ))}
       </div>
 
-      {/* Chart Section */}
-      <div className="chart-container">
+      <div style={styles.chartContainer}>
         {loading ? (
-          <div className="loading">
-            <div className="spinner"></div>
+          <div style={styles.loading}>
             <p>Loading price data...</p>
           </div>
         ) : error ? (
-          <div className="error-message">
+          <div style={styles.error}>
             <p>{error}</p>
-            <button onClick={fetchPriceData}>Retry</button>
+            <button style={styles.backButton} onClick={fetchPriceData}>Retry</button>
           </div>
         ) : chartData.length > 0 ? (
           <>
-            {/* Area Chart for price trend */}
             <ResponsiveContainer width="100%" height={400}>
               <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
@@ -302,9 +395,8 @@ export default function AssetDetail({ symbol, category, onBack }) {
               </AreaChart>
             </ResponsiveContainer>
 
-            {/* Volume Chart */}
-            <div className="volume-chart">
-              <h3>24H Volume</h3>
+            <div style={styles.volumeChart}>
+              <h3>Volume</h3>
               <ResponsiveContainer width="100%" height={150}>
                 <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -316,34 +408,33 @@ export default function AssetDetail({ symbol, category, onBack }) {
               </ResponsiveContainer>
             </div>
 
-            {/* Chart Statistics */}
-            <div className="chart-stats">
-              <div className="stat-box">
-                <span className="stat-label">Open</span>
-                <span className="stat-value">${chartData[0]?.open?.toFixed(2)}</span>
+            <div style={styles.chartStats}>
+              <div style={styles.stat}>
+                <div style={styles.statLabel}>Open</div>
+                <div style={styles.statValue}>${chartData[0]?.open?.toFixed(2)}</div>
               </div>
-              <div className="stat-box">
-                <span className="stat-label">High</span>
-                <span className="stat-value">${Math.max(...chartData.map(d => d.high))?.toFixed(2)}</span>
+              <div style={styles.stat}>
+                <div style={styles.statLabel}>High</div>
+                <div style={styles.statValue}>${Math.max(...chartData.map(d => d.high))?.toFixed(2)}</div>
               </div>
-              <div className="stat-box">
-                <span className="stat-label">Low</span>
-                <span className="stat-value">${Math.min(...chartData.map(d => d.low))?.toFixed(2)}</span>
+              <div style={styles.stat}>
+                <div style={styles.statLabel}>Low</div>
+                <div style={styles.statValue}>${Math.min(...chartData.map(d => d.low))?.toFixed(2)}</div>
               </div>
-              <div className="stat-box">
-                <span className="stat-label">Close</span>
-                <span className="stat-value">${chartData[chartData.length - 1]?.close?.toFixed(2)}</span>
+              <div style={styles.stat}>
+                <div style={styles.statLabel}>Close</div>
+                <div style={styles.statValue}>${chartData[chartData.length - 1]?.close?.toFixed(2)}</div>
               </div>
-              <div className="stat-box">
-                <span className="stat-label">Avg Volume</span>
-                <span className="stat-value">
+              <div style={styles.stat}>
+                <div style={styles.statLabel}>Avg Volume</div>
+                <div style={styles.statValue}>
                   {(chartData.reduce((sum, d) => sum + d.volume, 0) / chartData.length / 1000000).toFixed(2)}M
-                </span>
+                </div>
               </div>
             </div>
           </>
         ) : (
-          <div className="no-data">
+          <div style={styles.loading}>
             <p>No price data available</p>
           </div>
         )}
