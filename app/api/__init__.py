@@ -90,6 +90,14 @@ async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
     # Startup
     ensure_admin_on_startup()
+    
+    # Start background price update task for performance
+    import asyncio
+    from ..core.background_tasks import background_price_update_task
+    
+    asyncio.create_task(background_price_update_task())
+    print("Background price update task started")
+    
     yield
     # Shutdown (cleanup if needed)
     pass
@@ -262,6 +270,8 @@ async def live_quotes_stream(request: Request, symbols: str):
 def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None):
     """Get live prices for all assets in the watchlist, optionally filtered by class."""
     try:
+        from ..core.background_tasks import get_all_cached_prices, get_cache_status
+        
         watchlist = config.WATCHLIST
         
         # Filter by asset class if provided
@@ -270,20 +280,15 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
                 raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
             watchlist = [asset for asset in watchlist if asset["class"] == asset_class]
         
-        symbols = [asset["symbol"] for asset in watchlist]
+        # Use cached prices for instant response (no API calls)
+        cached_prices = get_all_cached_prices()
+        cache_status = get_cache_status()
         
-        # Get live quotes for all symbols with error handling
-        try:
-            quotes = data.get_quotes(symbols)
-        except Exception as e:
-            print(f"Error fetching live quotes for assets: {e}")
-            quotes = {symbol: None for symbol in symbols}
-        
-        # Combine watchlist info with live quotes
+        # Combine watchlist info with cached quotes
         assets_data = []
         for asset in watchlist:
             symbol = asset["symbol"]
-            quote = quotes.get(symbol)
+            quote = cached_prices.get(symbol.upper())
             
             if quote:
                 assets_data.append({
@@ -300,7 +305,7 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
                     "previous_close": quote.get("previous_close", 0),
                     "market_cap": quote.get("market_cap"),
                     "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
-                    "source": quote.get("source", "yahoo")
+                    "source": quote.get("source", "cached")
                 })
             else:
                 # Include asset even if quote is not available
@@ -325,6 +330,7 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
             "assets": assets_data,
             "total": len(assets_data),
             "asset_class": asset_class,
+            "cache_status": cache_status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:
@@ -372,27 +378,22 @@ def get_all_assets(request: Request):
 def get_assets_by_class_new(request: Request, asset_class: str):
     """Get assets filtered by class (stock, crypto, forex, commodity)."""
     try:
+        from ..core.background_tasks import get_all_cached_prices
+        
         if asset_class not in config.CLASS_LABELS:
             raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
         
         watchlist = config.WATCHLIST
         filtered_assets = [asset for asset in watchlist if asset["class"] == asset_class]
-        symbols = [asset["symbol"] for asset in filtered_assets]
         
-        # Get live quotes for filtered symbols
-        try:
-            quotes = data.get_quotes(symbols)
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Error fetching quotes for {asset_class}: {e}")
-            quotes = {symbol: None for symbol in symbols}
+        # Use cached prices for instant response
+        cached_prices = get_all_cached_prices()
         
-        # Combine watchlist info with live quotes
+        # Combine watchlist info with cached quotes
         assets_data = []
         for asset in filtered_assets:
             symbol = asset["symbol"]
-            quote = quotes.get(symbol)
+            quote = cached_prices.get(symbol.upper())
             
             asset_data = {
                 "symbol": symbol,
@@ -403,10 +404,10 @@ def get_assets_by_class_new(request: Request, asset_class: str):
                 "price": quote.get("price", 0) if quote else 0,
                 "change_pct": quote.get("change_pct", 0) if quote else 0,
                 "volume": quote.get("volume", 0) if quote else 0,
-                "high_24h": quote.get("high_24h", 0) if quote else 0,
-                "low_24h": quote.get("low_24h", 0) if quote else 0,
+                "high_24h": quote.get("day_high", 0) if quote else 0,
+                "low_24h": quote.get("day_low", 0) if quote else 0,
                 "market_cap": quote.get("market_cap") if quote else None,
-                "last_update": quote.get("timestamp", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
+                "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
             }
             assets_data.append(asset_data)
         
@@ -428,28 +429,24 @@ def get_assets_by_class_new(request: Request, asset_class: str):
 def get_asset_categories(request: Request):
     """Get all asset categories with their asset counts and sample data."""
     try:
+        from app.core.background_tasks import get_all_cached_prices, get_cache_status
+        
+        # Use cached prices for instant response
+        cached_prices = get_all_cached_prices()
+        cache_status = get_cache_status()
+        
         watchlist = config.WATCHLIST
         
-        # Group assets by class and fetch live quotes
+        # Group assets by class using cached prices
         categories = {}
         for asset_class in config.CLASS_LABELS.keys():
             class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
-            symbols = [asset["symbol"] for asset in class_assets]
             
-            # Fetch live quotes for this class
-            try:
-                quotes = data.get_quotes(symbols)
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Error fetching quotes for {asset_class}: {e}")
-                quotes = {symbol: None for symbol in symbols}
-            
-            # Build asset list with live quotes
+            # Build asset list with cached prices (instant - no API calls)
             all_assets = []
             for asset in class_assets:
                 symbol = asset["symbol"]
-                quote = quotes.get(symbol)
+                quote = cached_prices.get(symbol.upper())
                 
                 all_assets.append({
                     "symbol": symbol,
@@ -466,7 +463,7 @@ def get_asset_categories(request: Request):
                     "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
                 })
             
-            # Calculate top gainers and losers
+            # Calculate top gainers and losers from cached data
             assets_with_change = [(a, a["change_pct"]) for a in all_assets if a["change_pct"] != 0]
             assets_with_change.sort(key=lambda x: x[1], reverse=True)
             
@@ -486,6 +483,7 @@ def get_asset_categories(request: Request):
         return {
             "categories": categories,
             "total_assets": len(watchlist),
+            "cache_status": cache_status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:

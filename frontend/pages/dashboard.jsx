@@ -64,15 +64,19 @@ export default function Dashboard() {
     try {
       console.log('Loading dashboard data from:', API_URL);
       
-      // Load all assets with live prices from the new endpoint
-      const assetsRes = await fetch(`${API_URL}/api/assets/live-prices`);
-      console.log('Assets response status:', assetsRes.status);
+      // PARALLELIZE ALL API CALLS - Load everything at once instead of sequentially
+      const [assetsRes, categoriesRes, portfolioRes, alertsRes] = await Promise.all([
+        fetch(`${API_URL}/api/assets/live-prices`),
+        fetch(`${API_URL}/api/assets/categories`),
+        fetch(`${API_URL}/api/portfolio`),
+        fetch(`${API_URL}/api/alerts`)
+      ]);
+      
+      // Process assets
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
         console.log('Assets data received:', assetsData.assets?.length, 'assets');
-        console.log('First asset sample:', assetsData.assets?.[0]);
         
-        // Transform the data to match the expected format
         const transformedAssets = (assetsData.assets || []).map(asset => ({
           symbol: asset.symbol,
           name: asset.name,
@@ -104,7 +108,6 @@ export default function Dashboard() {
         setWatchlist(transformedAssets);
       } else {
         console.error('Assets request failed:', assetsRes.status);
-        // Fallback to watchlist endpoint
         const watchlistRes = await fetch(`${API_URL}/api/watchlist`);
         if (watchlistRes.ok) {
           const watchlistData = await watchlistRes.json();
@@ -112,9 +115,7 @@ export default function Dashboard() {
         }
       }
 
-      // Load asset categories with top gainers/losers
-      const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
-      console.log('Categories response status:', categoriesRes.status);
+      // Process categories
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
         console.log('Categories data received:', Object.keys(categoriesData.categories || {}));
@@ -123,22 +124,19 @@ export default function Dashboard() {
         console.error('Categories request failed:', categoriesRes.status);
       }
 
-      // Load portfolio
-      const portfolioRes = await fetch(`${API_URL}/api/portfolio`);
+      // Process portfolio
       if (portfolioRes.ok) {
         const portfolioData = await portfolioRes.json();
         setPortfolio(portfolioData.portfolio);
       }
 
-      // Load alerts
-      const alertsRes = await fetch(`${API_URL}/api/alerts`);
+      // Process alerts
       if (alertsRes.ok) {
         const alertsData = await alertsRes.json();
         setAlerts(alertsData.alerts || []);
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      // Set fallback data on error
       setWatchlist([
         {"symbol": "AAPL", "name": "Apple", "class": "stock", "query": "Apple AAPL stock"},
         {"symbol": "BTC-USD", "name": "Bitcoin", "class": "crypto", "query": "Bitcoin price"},
@@ -152,12 +150,15 @@ export default function Dashboard() {
   // Refresh only prices (lighter weight than full dashboard load)
   const refreshPrices = async () => {
     try {
-      // Use the new live-prices endpoint to get all updated prices
-      const assetsRes = await fetch(`${API_URL}/api/assets/live-prices`);
+      // PARALLELIZE - fetch assets and categories at the same time
+      const [assetsRes, categoriesRes] = await Promise.all([
+        fetch(`${API_URL}/api/assets/live-prices`),
+        fetch(`${API_URL}/api/assets/categories`)
+      ]);
+      
       if (assetsRes.ok) {
         const assetsData = await assetsRes.json();
         
-        // Transform the data to match the expected format
         const transformedAssets = (assetsData.assets || []).map(asset => ({
           symbol: asset.symbol,
           name: asset.name,
@@ -190,8 +191,6 @@ export default function Dashboard() {
         console.log('Refreshed prices for', transformedAssets.length, 'assets');
       }
       
-      // Refresh categories
-      const categoriesRes = await fetch(`${API_URL}/api/assets/categories`);
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
         setAssetCategories(categoriesData.categories);
