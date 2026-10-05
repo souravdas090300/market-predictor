@@ -15,19 +15,115 @@ _price_cache: Dict[str, dict] = {}
 _cache_lock = threading.Lock()
 _last_update = None
 
-# Top assets to update (limited for performance and rate limits)
+# Top assets to update (expanded for comprehensive coverage)
 TOP_CRYPTO = [
     "BTC-USD", "ETH-USD", "BNB-USD", "XRP-USD", "SOL-USD", 
-    "ADA-USD", "DOGE-USD", "DOT-USD", "AVAX-USD", "LINK-USD"
+    "ADA-USD", "DOGE-USD", "DOT-USD", "AVAX-USD", "LINK-USD",
+    "MATIC-USD", "SHIB-USD", "TRX-USD", "LTC-USD", "BCH-USD",
+    "ATOM-USD", "NEAR-USD", "UNI-USD", "AAVE-USD", "COMP-USD",
+    "MKR-USD", "SUSHI-USD", "CRV-USD", "YFI-USD", "SNX-USD",
+    "OP-USD", "ARB-USD", "LDO-USD", "FTM-USD", "CELO-USD",
+    "ALGO-USD", "VET-USD", "ZIL-USD", "NEO-USD", "HBAR-USD",
+    "IOTA-USD", "ONE-USD", "QTUM-USD", "ONT-USD", "ICX-USD",
+    "IOST-USD", "SC-USD", "LUNC-USD", "CRO-USD", "KAVA-USD",
+    "MINA-USD", "AXS-USD", "GLM-USD", "RNDR-USD", "GRT-USD",
+    "FET-USD", "OCEAN-USD", "BAT-USD", "CVC-USD", "ENJ-USD",
+    "MANA-USD", "SAND-USD", "GALA-USD", "ILV-USD", "FLOW-USD",
+    "NEO-USD", "XEM-USD", "DASH-USD", "ZEC-USD", "KSM-USD",
+    "USDT-USD", "USDC-USD", "BUSD-USD", "DAI-USD", "FRAX-USD"
 ]
 
 TOP_STOCKS = [
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA",
-    "JPM", "V", "JNJ", "WMT", "PG", "XOM"
+    # Technology Giants
+    "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
+    # Financial Services
+    "JPM", "V", "BAC", "WFC", "C", "GS", "MS", "BLK",
+    # Healthcare
+    "JNJ", "UNH", "PFE", "ABBV", "MRK", "LLY", "ABT", "T",
+    # Consumer Goods
+    "PG", "KO", "PEP", "PM", "MO", "KMB", "GIS", "KHC",
+    # Energy
+    "XOM", "CVX", "COP", "SHEL", "MPC", "PSX", "OXY", "EOG",
+    # Industrials
+    "CAT", "DE", "GE", "HON", "MMM", "UPS", "RTX", "BA",
+    # Retail
+    "WMT", "COST", "HD", "TGT", "LOW", "KR", "TJX", "M",
+    # Telecom
+    "VZ", "T", "TMUS", "CMCSA", "CHTR", "DISH", "OMC",
+    # Semiconductors
+    "AMD", "INTC", "QCOM", "TXN", "ADI", "MRVL", "MU", "NVDA",
+    # Software
+    "ADBE", "CRM", "ORCL", "IBM", "INTU", "SNOW", "NOW", "VMW",
+    # Media
+    "DIS", "NFLX", "CMCSA", "NKE", "SBUX", "FOXA", "ROKU",
+    # Insurance
+    "ALL", "PGR", "TRV", "CB", "MET", "AIG", "HIG", "LNC",
+    # Real Estate
+    "PLD", "AMT", "EQIX", "PSA", "VTR", "SPG", "AVB", "EQR",
+    # Industrial Conglomerates
+    "MMM", "GE", "HON", "CAT", "DE", "EMR", "ITW", "ETN",
+    # Aerospace & Defense
+    "BA", "LMT", "RTX", "NOC", "GD", "TDG", "TXT", "HEI",
+    # Automobiles
+    "TSLA", "F", "GM", "STLA", "HMC", "TM", "RACE", "LCID",
+    # Utilities
+    "NEE", "DUK", "SO", "D", "ED", "AEP", "XEL", "ETR",
+    # Materials
+    "SHW", "FCX", "NUE", "VAL", "NEM", "CLF", "RIO", "BHP",
+    # Gold & Precious Metals
+    "GOLD", "BARRICK", "NEM", "FCX", "AEM", "WPM", "KLAC",
+    # Chemicals
+    "DOW", "DD", "APD", "CTVA", "EMN", "FMC", "HUN", "PPG",
+    # Agriculture
+    "ADM", "BG", "CAG", "MO", "ADM", "TSN", "BG", "CF",
+    # Banks
+    "JPM", "BAC", "WFC", "C", "GS", "MS", "PNC", "USB",
+    # Dividend Aristocrats
+    "KO", "PG", "JNJ", "MMM", "CAT", "XOM", "CVX", "CSCO",
+    # Growth Stocks
+    "NVDA", "AMD", "TSLA", "META", "AMZN", "GOOGL", "MSFT", "AAPL",
+    # Value Stocks
+    "BRK.B", "JPM", "V", "PG", "KO", "PEP", "WMT", "MCD",
+    # ETFs
+    "SPY", "QQQ", "IWM", "VTI", "VOO", "GLD", "SLV", "TLT"
 ]
 
 TOP_FOREX = [
-    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"
+    # Major Pairs
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "USDCAD=X",
+    "AUDUSD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X",
+    # Cross Pairs
+    "EURCHF=X", "EURCAD=X", "EURAUD=X", "EURGBP=X", "EURJPY=X",
+    "GBPCHF=X", "GBPAUD=X", "GBPJPY=X", "GBPCHF=X", "GBPCAD=X",
+    "AUDCHF=X", "AUDJPY=X", "AUDCAD=X", "AUDNZD=X", "EURNZD=X",
+    "CADCHF=X", "CADJPY=X", "CHFJPY=X", "NZDJPY=X", "NZDCHF=X",
+    # Emerging Markets
+    "USDTRY=X", "USDMXN=X", "USDZAR=X", "USDRUB=X", "USDINR=X",
+    "USDCNY=X", "USDKRW=X", "USDSGD=X", "USDHKD=X", "USDTWD=X",
+    "USDTHB=X", "USDPHP=X", "USDAED=X", "USDSAR=X", "USDBRL=X",
+    # Commodity Currencies
+    "USDCAD=X", "USDAUD=X", "USDNZD=X", "USDNOK=X", "USDSEK=X",
+    # Safe Haven
+    "USDCHF=X", "USDJPY=X", "XAUUSD=X", "XAGUSD=X"
+]
+
+TOP_COMMODITIES = [
+    # Gold & Precious Metals
+    "GC=F", "GLD", "IAU", "SLV", "PPLT", "PALL", "PLG",
+    # Energy
+    "CL=F", "NG=F", "RB=F", "HO=F", "XLE", "XOM", "CVX",
+    # Agriculture
+    "ZC=F", "ZW=F", "ZS=F", "ZC=F", "KE=F", "RR=F", "SB=F",
+    "LE=F", "HE=F", "GF=F", "KC=F", "CC=F", "CT=F", "OJ=F",
+    # Industrial Metals
+    "HG=F", "SI=F", "AL=F", "ZN=F", "CU=F", "LE=F", "NI=F",
+    # Livestock
+    "LE=F", "HE=F", "GF=F", "KC=F", "ZC=F", "SB=F", "ZM=F",
+    # Soft Commodities
+    "KC=F", "SB=F", "CC=F", "CT=F", "ZC=F", "ZW=F", "ZO=F",
+    # Indices
+    "ES=F", "NQ=F", "YM=F", "RTY=F", "ZB=F", "ZN=F", "CL=F",
+    "GC=F", "SI=F"
 ]
 
 
@@ -146,18 +242,45 @@ async def background_price_update_task():
         logger.info(f"Updated {len(forex_quotes)} forex prices")
         return forex_quotes
     
+    async def update_commodities():
+        """Update commodity prices in parallel using thread pool"""
+        logger.info("Updating commodity prices...")
+        commodity_quotes = {}
+        tasks = []
+        
+        for symbol in TOP_COMMODITIES:
+            # Run synchronous fetch in thread pool
+            task = asyncio.to_thread(
+                lambda sym=symbol: (sym, data.get_live_quote(sym) if data.get_live_quote(sym) else None)
+            )
+            tasks.append(task)
+        
+        # Run all commodity fetches in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for result in results:
+            if isinstance(result, tuple):
+                sym, quote = result
+                if quote:
+                    commodity_quotes[sym] = quote
+        
+        update_price_cache(commodity_quotes)
+        logger.info(f"Updated {len(commodity_quotes)} commodity prices")
+        return commodity_quotes
+    
     while True:
         try:
-            # PARALLELIZE ALL UPDATES - Run crypto, stocks, and forex simultaneously
+            # PARALLELIZE ALL UPDATES - Run crypto, stocks, forex, and commodities simultaneously
             await asyncio.gather(
                 update_crypto(),
                 update_stocks(),
-                update_forex()
+                update_forex(),
+                update_commodities()
             )
             
             logger.info(f"Total cached prices: {len(_price_cache)}")
             
-            await asyncio.sleep(5)  # Update every 5 seconds
+            await asyncio.sleep(10)  # Update every 10 seconds for larger lists
         
         except Exception as e:
             logger.error(f"Background task error: {e}")

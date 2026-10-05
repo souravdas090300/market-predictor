@@ -3,6 +3,16 @@ import os
 import re
 from pathlib import Path
 import warnings
+import sys
+
+# Add parent directory to path for imports
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Import extended asset providers
+from providers import crypto_extended_300
+from providers import stocks_global_500
+from providers import forex_global_100
+from providers import commodities_global_50
 
 # Environment
 ENV = os.getenv("ENV", "development").lower()
@@ -183,6 +193,7 @@ MATERIAL_HINTS = {
 }
 
 # Create deduplicated watchlist to avoid data fetching issues
+# Start with existing manually curated assets
 _RAW_WATCHLIST = [
     # Major Stocks (removed delisted TWTR, BRK.B, SQ - kept active stocks)
     {"symbol": "AAPL", "name": "Apple", "class": "stock", "query": "Apple AAPL stock"},
@@ -606,6 +617,53 @@ _RAW_WATCHLIST = [
     {"symbol": "LE=F", "name": "Live Cattle", "class": "commodity", "query": "live cattle futures price"},
     {"symbol": "GF=F", "name": "Feeder Cattle", "class": "commodity", "query": "feeder cattle futures price"},
     {"symbol": "OJ=F", "name": "Orange Juice", "class": "commodity", "query": "orange juice futures price"},
+
+    # ============================================================================
+    # EXTENDED ASSETS - Load from provider modules
+    # ============================================================================
+
+    # Extended Crypto (300+ from crypto_extended_300.py)
+    # Note: We format these to match watchlist structure
+] + [
+    {
+        "symbol": f"{crypto['symbol']}-USD",
+        "name": crypto["name"],
+        "class": "crypto",
+        "query": f"{crypto['name']} {crypto['symbol']} price",
+        "coingecko_id": crypto.get("coingecko_id")
+    }
+    for crypto in crypto_extended_300.TOP_300_CRYPTO
+    if crypto["symbol"] not in ["BTC", "ETH", "BNB", "XRP", "SOL", "ADA", "DOGE", "DOT", "AVAX", "LINK"]  # Avoid duplicates
+] + [
+    # Extended Stocks (500+ from stocks_global_500.py)
+    {
+        "symbol": stock["symbol"],
+        "name": stock["name"],
+        "class": "stock",
+        "query": f"{stock['name']} {stock['symbol']} stock"
+    }
+    for stock in stocks_global_500.GLOBAL_STOCKS_500
+    if stock["symbol"] not in ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM", "V", "JNJ", "WMT", "PG", "XOM", "CVX", "KO", "PEP", "MRK", "ABBV", "AVGO", "COST", "CSCO", "ADBE", "CRM", "NFLX", "AMD", "INTC", "PYPL", "DIS", "NKE", "ABT", "T", "IBM", "ORCL", "ACN", "QCOM", "TXN", "SHOP", "SPOT", "UBER", "LYFT", "SNAP", "COIN", "ROKU", "ZM", "DOCU", "SNOW", "PLTR", "U", "RBLX", "AFRM", "UPST", "HOOD", "GME", "AMC"]  # Avoid duplicates
+] + [
+    # Extended Forex (100+ from forex_global_100.py)
+    {
+        "symbol": pair["symbol"],
+        "name": pair["name"],
+        "class": "forex",
+        "query": f"{pair['name']} forex"
+    }
+    for pair in forex_global_100.FOREX_PAIRS_100
+    if pair["symbol"] not in ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "USDCAD=X", "AUDUSD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "EURCHF=X", "EURAUD=X", "EURCAD=X", "GBPJPY=X", "GBPCHF=X", "GBPAUD=X", "GBPCAD=X", "CHFJPY=X", "CADJPY=X", "AUDJPY=X", "NZDJPY=X", "AUDCHF=X", "NZDCHF=X", "AUDCAD=X", "NZDCAD=X", "EURNZD=X", "EURSEK=X", "EURNOK=X", "EURDKK=X", "EURMXN=X", "EURSGD=X", "EURHKD=X", "EURCNY=X", "EURINR=X", "EURTRY=X", "EURZAR=X", "EURRUB=X", "USDRUB=X", "USDTRY=X", "USDZAR=X", "USDMXN=X", "USDBRL=X", "USDCLP=X", "USDCOP=X", "USDPEN=X", "USDCNY=X", "USDHKD=X", "USDSGD=X", "USDINR=X", "USDKRW=X", "USDIDR=X", "USDPHP=X", "USDTHB=X", "USDMYR=X", "USDVND=X"]  # Avoid duplicates
+] + [
+    # Extended Commodities (50+ from commodities_global_50.py)
+    {
+        "symbol": commodity["symbol"],
+        "name": commodity["name"],
+        "class": "commodity",
+        "query": f"{commodity['name']} price"
+    }
+    for commodity in commodities_global_50.COMMODITIES_50
+    if commodity["symbol"] not in ["GC=F", "SI=F", "CL=F", "BZ=F", "NG=F", "HG=F", "PL=F", "PA=F", "ZC=F", "ZW=F", "ZS=F", "ZM=F", "ZL=F", "SB=F", "KC=F", "CC=F", "CT=F", "RB=F", "HO=F", "HE=F", "LE=F", "GF=F", "OJ=F"]  # Avoid duplicates
 ]
 
 # Deduplicate watchlist to avoid duplicate API calls and display issues

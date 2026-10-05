@@ -77,57 +77,84 @@ price_manager = PriceUpdateManager()
 
 
 # ============================================================================
-# 1. GET ASSETS LIST WITH FILTERING
+# 0. GET ASSET COUNTS BY CATEGORY
+# ============================================================================
+
+@router.get("/counts")
+def get_asset_counts():
+    """
+    Get total counts of assets by category
+
+    Query: /api/v2/assets/counts
+    """
+    watchlist = config.WATCHLIST
+
+    counts = {
+        "total": len(watchlist),
+        "crypto": len([a for a in watchlist if a["class"] == "crypto"]),
+        "stock": len([a for a in watchlist if a["class"] == "stock"]),
+        "forex": len([a for a in watchlist if a["class"] == "forex"]),
+        "commodity": len([a for a in watchlist if a["class"] == "commodity"]),
+    }
+
+    return counts
+
+
+# ============================================================================
+# 1. GET ASSETS LIST WITH FILTERING (PAGINATED)
 # ============================================================================
 
 @router.get("/list")
 def get_assets_list(
     category: Optional[AssetCategory] = Query(None),
     sort_by: AssetSort = Query(AssetSort.POPULAR),
-    limit: int = Query(20, ge=1, le=100)
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    include_prices: bool = Query(True)
 ):
     """
-    Get assets list with real-time prices and filtering
-    
-    Query: /api/v2/assets/list?category=crypto&sort_by=gainers&limit=20
+    Get assets list with optional real-time prices and filtering
+
+    Query: /api/v2/assets/list?category=crypto&sort_by=gainers&limit=50&offset=0&include_prices=true
     """
-    
+
     # Get assets by category from watchlist
     watchlist = config.WATCHLIST
-    
+
     if category:
         watchlist = [asset for asset in watchlist if asset["class"] == category.value]
-    
-    # Limit to first 50 assets to avoid timeout
-    watchlist = watchlist[:50]
-    
-    # Get live quotes for assets (with error handling)
-    symbols = [asset["symbol"] for asset in watchlist]
+
+    # Apply pagination
+    total_count = len(watchlist)
+    watchlist = watchlist[offset:offset + limit]
+
+    # Get live quotes for assets (with error handling) - only if requested
     quotes = {}
-    
-    try:
-        quotes = data.get_quotes(symbols)
-    except Exception as e:
-        print(f"Error fetching quotes: {e}")
-        quotes = {}
-    
+    if include_prices:
+        symbols = [asset["symbol"] for asset in watchlist]
+        try:
+            quotes = data.get_quotes(symbols)
+        except Exception as e:
+            print(f"Error fetching quotes: {e}")
+            quotes = {}
+
     results = []
-    
+
     for asset in watchlist:
         symbol = asset["symbol"]
-        quote = quotes.get(symbol)
-        
+        quote = quotes.get(symbol) if include_prices else None
+
         # Include asset even if quote is not available
         if not quote:
             # Get prediction accuracy for this asset
             accuracy_data = accuracy.get_prediction_accuracy(symbol, timeframe="7d")
-            
+
             results.append({
                 "symbol": symbol,
                 "name": asset["name"],
                 "icon": get_asset_icon(asset["class"]),
                 "category": asset["class"],
-                
+
                 # Price data (zeros if not available)
                 "current_price": 0,
                 "change_24h": 0,
@@ -135,11 +162,11 @@ def get_assets_list(
                 "high_24h": 0,
                 "low_24h": 0,
                 "volume_24h": 0,
-                
+
                 # Market data
                 "market_cap": None,
                 "apy": get_apy_for_asset(symbol, asset["class"]),
-                
+
                 # Prediction accuracy
                 "prediction_accuracy": {
                     "lstm": accuracy_data.get("lstm_accuracy", 0),
@@ -148,20 +175,20 @@ def get_assets_list(
                     "prophet": accuracy_data.get("prophet_accuracy", 0),
                     "ensemble": accuracy_data.get("ensemble_accuracy", 0)
                 },
-                
+
                 "updated_at": datetime.now(timezone.utc).isoformat()
             })
             continue
-        
+
         # Get prediction accuracy for this asset
         accuracy_data = accuracy.get_prediction_accuracy(symbol, timeframe="7d")
-        
+
         results.append({
             "symbol": symbol,
             "name": asset["name"],
             "icon": get_asset_icon(asset["class"]),
             "category": asset["class"],
-            
+
             # Price data
             "current_price": quote.get("price", 0),
             "change_24h": quote.get("change", 0),
@@ -169,11 +196,11 @@ def get_assets_list(
             "high_24h": quote.get("day_high", 0),
             "low_24h": quote.get("day_low", 0),
             "volume_24h": quote.get("volume", 0),
-            
+
             # Market data
             "market_cap": quote.get("market_cap"),
             "apy": get_apy_for_asset(symbol, asset["class"]),
-            
+
             # Prediction accuracy
             "prediction_accuracy": {
                 "lstm": accuracy_data.get("lstm_accuracy", 0),
@@ -182,10 +209,10 @@ def get_assets_list(
                 "prophet": accuracy_data.get("prophet_accuracy", 0),
                 "ensemble": accuracy_data.get("ensemble_accuracy", 0)
             },
-            
+
             "updated_at": quote.get("as_of", datetime.now(timezone.utc).isoformat())
         })
-    
+
     # Sort
     if sort_by == AssetSort.GAINERS:
         results.sort(key=lambda x: x["change_percent_24h"], reverse=True)
@@ -199,14 +226,62 @@ def get_assets_list(
         results.sort(key=lambda x: x["updated_at"], reverse=True)
     else:  # POPULAR - use a simple popularity metric based on change
         results.sort(key=lambda x: abs(x["change_percent_24h"]), reverse=True)
-    
+
     return {
         "category": category.value if category else "all",
         "sort_by": sort_by.value,
+        "total_count": total_count,
+        "offset": offset,
+        "limit": limit,
         "count": len(results),
-        "assets": results[:limit]
+        "assets": results
     }
 
+
+# ============================================================================
+# 1.5. GET ASSETS LIST WITHOUT PRICES (FAST)
+# ============================================================================
+
+@router.get("/list-fast")
+def get_assets_list_fast(
+    category: Optional[AssetCategory] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0)
+):
+    """
+    Get assets list without live prices for faster browsing
+
+    Query: /api/v2/assets/list-fast?category=crypto&limit=100&offset=0
+    """
+
+    # Get assets by category from watchlist
+    watchlist = config.WATCHLIST
+
+    if category:
+        watchlist = [asset for asset in watchlist if asset["class"] == category.value]
+
+    # Apply pagination
+    total_count = len(watchlist)
+    watchlist = watchlist[offset:offset + limit]
+
+    results = []
+
+    for asset in watchlist:
+        results.append({
+            "symbol": asset["symbol"],
+            "name": asset["name"],
+            "icon": get_asset_icon(asset["class"]),
+            "category": asset["class"],
+        })
+
+    return {
+        "category": category.value if category else "all",
+        "total_count": total_count,
+        "offset": offset,
+        "limit": limit,
+        "count": len(results),
+        "assets": results
+    }
 
 # ============================================================================
 # 2. GET SINGLE ASSET DETAIL
