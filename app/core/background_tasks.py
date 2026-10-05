@@ -1,6 +1,7 @@
 """
 Background tasks for real-time price updates
 Pre-fetches data every 5 seconds to avoid slow API calls on page load
+Uses database storage for persistence
 """
 import asyncio
 import logging
@@ -10,7 +11,7 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-# In-memory price cache (global for fast access)
+# In-memory price cache (global for fast access) - kept for instant responses
 _price_cache: Dict[str, dict] = {}
 _cache_lock = threading.Lock()
 _last_update = None
@@ -154,6 +155,7 @@ async def background_price_update_task():
     Background task to update prices every 5 seconds
     Pre-fetches data to avoid slow API calls on page load
     PARALLELIZED - Updates crypto, stocks, and forex simultaneously
+    Stores prices in database for persistence
     
     Usage in main.py:
         @app.on_event("startup")
@@ -161,6 +163,12 @@ async def background_price_update_task():
             asyncio.create_task(background_price_update_task())
     """
     from app.core import data
+    from app.database import SessionLocal
+    from app.providers.live_price_fetcher import (
+        CoinGeckoLivePriceFetcher,
+        YahooFinanceLivePriceFetcher,
+        update_live_prices_in_db
+    )
     
     logger.info("Starting background price update task...")
     
@@ -169,25 +177,53 @@ async def background_price_update_task():
         logger.info("Updating crypto prices...")
         crypto_quotes = {}
         tasks = []
-        
+
         for symbol in TOP_CRYPTO:
             # Run synchronous fetch in thread pool
             task = asyncio.to_thread(
                 lambda sym=symbol: (sym, data.get_crypto_quote(sym) if data.get_crypto_quote(sym) else None)
             )
             tasks.append(task)
-        
+
         # Run all crypto fetches in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for result in results:
             if isinstance(result, tuple):
                 sym, quote = result
                 if quote:
                     crypto_quotes[sym] = quote
-        
+
         update_price_cache(crypto_quotes)
         logger.info(f"Updated {len(crypto_quotes)} crypto prices")
+
+        # Also update database with live prices from CoinGecko for better data
+        try:
+            db_session = SessionLocal()
+            # Use the CoinGecko fetcher for better data quality
+            coingecko_prices = await CoinGeckoLivePriceFetcher.fetch_multiple(
+                [s.replace("-USD", "") for s in TOP_CRYPTO[:15]]  # Top 15 for CoinGecko
+            )
+            # Convert to format expected by database
+            db_prices = {}
+            for symbol, price_data in coingecko_prices.items():
+                db_prices[f"{symbol}-USD"] = {
+                    "current_price": price_data.get("current_price"),
+                    "change_24h": price_data.get("change_24h"),
+                    "change_percent_24h": price_data.get("change_24h"),  # CoinGecko returns absolute change
+                    "high_24h": price_data.get("high_24h"),
+                    "low_24h": price_data.get("low_24h"),
+                    "volume_24h": price_data.get("volume_24h"),
+                    "market_cap": price_data.get("market_cap"),
+                    "source": "coingecko"
+                }
+            if db_prices:
+                await update_live_prices_in_db(db_session, db_prices)
+                db_session.close()
+                logger.info(f"Updated {len(db_prices)} crypto prices in database")
+        except Exception as e:
+            logger.error(f"Error updating crypto prices in database: {e}")
+
         return crypto_quotes
     
     async def update_stocks():
@@ -195,25 +231,38 @@ async def background_price_update_task():
         logger.info("Updating stock prices...")
         stock_quotes = {}
         tasks = []
-        
+
         for symbol in TOP_STOCKS:
             # Run synchronous fetch in thread pool
             task = asyncio.to_thread(
                 lambda sym=symbol: (sym, data.get_live_quote(sym) if data.get_live_quote(sym) else None)
             )
             tasks.append(task)
-        
+
         # Run all stock fetches in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for result in results:
             if isinstance(result, tuple):
                 sym, quote = result
                 if quote:
                     stock_quotes[sym] = quote
-        
+
         update_price_cache(stock_quotes)
         logger.info(f"Updated {len(stock_quotes)} stock prices")
+
+        # Update database with live prices from Yahoo Finance
+        try:
+            db_session = SessionLocal()
+            # Use Yahoo Finance fetcher for top stocks
+            yahoo_prices = YahooFinanceLivePriceFetcher.fetch_multiple(TOP_STOCKS[:20])
+            if yahoo_prices:
+                await update_live_prices_in_db(db_session, yahoo_prices)
+                db_session.close()
+                logger.info(f"Updated {len(yahoo_prices)} stock prices in database")
+        except Exception as e:
+            logger.error(f"Error updating stock prices in database: {e}")
+
         return stock_quotes
     
     async def update_forex():

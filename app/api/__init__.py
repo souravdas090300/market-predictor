@@ -8,6 +8,9 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import random
 from contextlib import asynccontextmanager
+import logging
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, HTTPException, Depends, status, Request
 from fastapi.staticfiles import StaticFiles
@@ -91,14 +94,23 @@ async def lifespan(app: FastAPI):
     """Application lifespan context manager."""
     # Startup
     ensure_admin_on_startup()
-    
+
+    # Create database tables
+    try:
+        from ..database import engine
+        from ..database_models import create_tables
+        create_tables(engine)
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Warning: Could not create database tables: {e}")
+
     # Start background price update task for performance
     import asyncio
     from ..core.background_tasks import background_price_update_task
-    
+
     asyncio.create_task(background_price_update_task())
     print("Background price update task started")
-    
+
     yield
     # Shutdown (cleanup if needed)
     pass
@@ -273,25 +285,50 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
     """Get live prices for all assets in the watchlist, optionally filtered by class."""
     try:
         from ..core.background_tasks import get_all_cached_prices, get_cache_status
-        
+        from ..database import SessionLocal
+        from ..database_models import LivePrice
+
         watchlist = config.WATCHLIST
-        
+
         # Filter by asset class if provided
         if asset_class:
             if asset_class not in config.CLASS_LABELS:
                 raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
             watchlist = [asset for asset in watchlist if asset["class"] == asset_class]
-        
+
         # Use cached prices for instant response (no API calls)
         cached_prices = get_all_cached_prices()
         cache_status = get_cache_status()
-        
+
+        # Fallback to database if cache is empty
+        db_prices = {}
+        if len(cached_prices) == 0:
+            try:
+                db = SessionLocal()
+                live_prices = db.query(LivePrice).all()
+                for lp in live_prices:
+                    db_prices[lp.symbol] = {
+                        "price": lp.current_price,
+                        "change": lp.change_24h,
+                        "change_pct": lp.change_percent_24h,
+                        "volume": lp.volume_24h,
+                        "day_high": lp.high_24h,
+                        "day_low": lp.low_24h,
+                        "market_cap": lp.market_cap,
+                        "as_of": lp.updated_at.isoformat() if lp.updated_at else None,
+                        "source": "database"
+                    }
+                db.close()
+                logger.info(f"Loaded {len(db_prices)} prices from database")
+            except Exception as e:
+                logger.error(f"Error loading from database: {e}")
+
         # Combine watchlist info with cached quotes
         assets_data = []
         for asset in watchlist:
             symbol = asset["symbol"]
-            quote = cached_prices.get(symbol.upper())
-            
+            quote = cached_prices.get(symbol.upper()) or db_prices.get(symbol.upper())
+
             if quote:
                 assets_data.append({
                     "symbol": symbol,
@@ -327,7 +364,7 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
                     "as_of": datetime.now(timezone.utc).isoformat(),
                     "source": "unavailable"
                 })
-        
+
         return {
             "assets": assets_data,
             "total": len(assets_data),
@@ -381,22 +418,46 @@ def get_assets_by_class_new(request: Request, asset_class: str):
     """Get assets filtered by class (stock, crypto, forex, commodity)."""
     try:
         from ..core.background_tasks import get_all_cached_prices
-        
+        from ..database import SessionLocal
+        from ..database_models import LivePrice
+
         if asset_class not in config.CLASS_LABELS:
             raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
-        
+
         watchlist = config.WATCHLIST
         filtered_assets = [asset for asset in watchlist if asset["class"] == asset_class]
-        
+
         # Use cached prices for instant response
         cached_prices = get_all_cached_prices()
-        
+
+        # Fallback to database if cache is empty
+        db_prices = {}
+        if len(cached_prices) == 0:
+            try:
+                db = SessionLocal()
+                live_prices = db.query(LivePrice).all()
+                for lp in live_prices:
+                    db_prices[lp.symbol] = {
+                        "price": lp.current_price,
+                        "change": lp.change_24h,
+                        "change_pct": lp.change_percent_24h,
+                        "volume": lp.volume_24h,
+                        "day_high": lp.high_24h,
+                        "day_low": lp.low_24h,
+                        "market_cap": lp.market_cap,
+                        "as_of": lp.updated_at.isoformat() if lp.updated_at else None,
+                        "source": "database"
+                    }
+                db.close()
+            except Exception as e:
+                logger.error(f"Error loading from database: {e}")
+
         # Combine watchlist info with cached quotes
         assets_data = []
         for asset in filtered_assets:
             symbol = asset["symbol"]
-            quote = cached_prices.get(symbol.upper())
-            
+            quote = cached_prices.get(symbol.upper()) or db_prices.get(symbol.upper())
+
             asset_data = {
                 "symbol": symbol,
                 "name": asset["name"],
@@ -412,7 +473,7 @@ def get_assets_by_class_new(request: Request, asset_class: str):
                 "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
             }
             assets_data.append(asset_data)
-        
+
         return {
             "class": asset_class,
             "class_label": config.CLASS_LABELS.get(asset_class, asset_class),
@@ -432,24 +493,48 @@ def get_asset_categories(request: Request):
     """Get all asset categories with their asset counts and sample data."""
     try:
         from app.core.background_tasks import get_all_cached_prices, get_cache_status
-        
+        from ..database import SessionLocal
+        from ..database_models import LivePrice
+
         # Use cached prices for instant response
         cached_prices = get_all_cached_prices()
         cache_status = get_cache_status()
-        
+
+        # Fallback to database if cache is empty
+        db_prices = {}
+        if len(cached_prices) == 0:
+            try:
+                db = SessionLocal()
+                live_prices = db.query(LivePrice).all()
+                for lp in live_prices:
+                    db_prices[lp.symbol] = {
+                        "price": lp.current_price,
+                        "change": lp.change_24h,
+                        "change_pct": lp.change_percent_24h,
+                        "volume": lp.volume_24h,
+                        "day_high": lp.high_24h,
+                        "day_low": lp.low_24h,
+                        "market_cap": lp.market_cap,
+                        "as_of": lp.updated_at.isoformat() if lp.updated_at else None,
+                        "source": "database"
+                    }
+                db.close()
+            except Exception as e:
+                logger.error(f"Error loading from database: {e}")
+
         watchlist = config.WATCHLIST
-        
+
         # Group assets by class using cached prices
         categories = {}
         for asset_class in config.CLASS_LABELS.keys():
             class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
-            
+
             # Build asset list with cached prices (instant - no API calls)
             all_assets = []
             for asset in class_assets:
                 symbol = asset["symbol"]
-                quote = cached_prices.get(symbol.upper())
-                
+                quote = cached_prices.get(symbol.upper()) or db_prices.get(symbol.upper())
+
                 all_assets.append({
                     "symbol": symbol,
                     "name": asset["name"],
@@ -464,16 +549,16 @@ def get_asset_categories(request: Request):
                     "low_24h": quote.get("day_low", 0) if quote else 0,
                     "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
                 })
-            
+
             # Calculate top gainers and losers from cached data
             assets_with_change = [(a, a["change_pct"]) for a in all_assets if a["change_pct"] != 0]
             assets_with_change.sort(key=lambda x: x[1], reverse=True)
-            
-            top_gainers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]} 
+
+            top_gainers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]}
                           for a, _ in assets_with_change[:5]]
-            top_losers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]} 
+            top_losers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]}
                          for a, _ in assets_with_change[-5:]]
-            
+
             categories[asset_class] = {
                 "label": config.CLASS_LABELS.get(asset_class, asset_class),
                 "total_assets": len(class_assets),
@@ -481,7 +566,7 @@ def get_asset_categories(request: Request):
                 "top_losers": top_losers,
                 "all_assets": all_assets
             }
-        
+
         return {
             "categories": categories,
             "total_assets": len(watchlist),
@@ -490,6 +575,45 @@ def get_asset_categories(request: Request):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching asset categories: {str(e)}")
+
+
+@app.get("/api/v1/live-prices-status")
+@limiter.limit("30/minute")
+def live_prices_status(request: Request):
+    """Check how many live prices are in database"""
+    try:
+        from ..database import SessionLocal
+        from ..database_models import LivePrice
+
+        db = SessionLocal()
+        try:
+            count = db.query(LivePrice).count()
+
+            # Get some sample prices
+            samples = db.query(LivePrice).limit(5).all()
+            sample_data = [
+                {
+                    "symbol": s.symbol,
+                    "price": s.current_price,
+                    "change": s.change_percent_24h,
+                    "updated": s.updated_at.isoformat() if s.updated_at else None
+                }
+                for s in samples
+            ]
+
+            return {
+                "total_prices_in_db": count,
+                "sample_prices": sample_data,
+                "status": "live" if count > 0 else "no_prices_yet",
+                "last_updated": datetime.now(timezone.utc).isoformat()
+            }
+        finally:
+            db.close()
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "error"
+        }
 
 
 @app.get("/api/assets/by-class")
