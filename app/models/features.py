@@ -28,7 +28,7 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     macd = ema12 - ema26
     signal = macd.ewm(span=9, adjust=False).mean()
     f["macd_pct"] = macd / c
-    f["macd_hist_pct"] = (macd - signal) / c
+    f["macd_hist_pct"] = (macd - signal)
 
     for n in (10, 20, 50, 200):
         f[f"sma_{n}_dist"] = c / c.rolling(n).mean() - 1

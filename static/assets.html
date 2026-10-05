@@ -616,7 +616,7 @@
         // Load assets
         async function loadAssets() {
             try {
-                const response = await fetch('/api/assets/live-prices');
+                const response = await fetch('http://localhost:8000/api/v2/assets/list?category=' + currentCategory + '&limit=100');
                 if (!response.ok) throw new Error('Failed to fetch assets');
 
                 const data = await response.json();
@@ -633,7 +633,7 @@
         // Refresh live prices
         async function refreshPrices() {
             try {
-                const response = await fetch('/api/assets/live-prices');
+                const response = await fetch('http://localhost:8000/api/v2/assets/list?category=' + currentCategory + '&limit=100');
                 if (!response.ok) throw new Error('Failed to refresh prices');
 
                 const data = await response.json();
@@ -649,38 +649,38 @@
         // Render assets table
         function renderAssetsTable() {
             const tbody = $('assetsTableBody');
-            
+
             let filtered = allAssets;
-            
+
             if (currentCategory !== 'all') {
-                filtered = filtered.filter(asset => asset.class === currentCategory);
+                filtered = filtered.filter(asset => asset.category === currentCategory);
             }
-            
+
             if (searchQuery) {
                 const query = searchQuery.toLowerCase();
-                filtered = filtered.filter(asset => 
+                filtered = filtered.filter(asset =>
                     asset.symbol.toLowerCase().includes(query) ||
                     asset.name.toLowerCase().includes(query)
                 );
             }
-            
+
             // Show search results count
             const totalCount = allAssets.length;
             const categoryCount = currentCategory !== 'all' 
-                ? allAssets.filter(a => a.class === currentCategory).length 
+                ? allAssets.filter(a => a.category === currentCategory).length
                 : totalCount;
-            
+
             if (filtered.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="7" class="loading">No assets found matching "${searchQuery}"</td></tr>`;
                 return;
             }
-            
+
             tbody.innerHTML = filtered.map(asset => {
-                // Handle both old format (asset.quote) and new format (direct price fields)
-                const price = asset.price || (asset.quote && asset.quote.price) || 0;
-                const change = asset.change_pct || (asset.quote && asset.quote.change_pct) || 0;
-                const volume = asset.volume || (asset.quote && asset.quote.volume) || 0;
-                const marketCap = asset.market_cap || (asset.quote && asset.quote.market_cap) || 0;
+                // Use new API format
+                const price = asset.current_price || 0;
+                const change = asset.change_percent_24h || 0;
+                const volume = asset.volume_24h || 0;
+                const marketCap = asset.market_cap || 0;
                 const changeClass = change >= 0 ? 'positive' : 'negative';
                 const changeSign = change >= 0 ? '+' : '';
 
@@ -703,7 +703,7 @@
                             <div class="asset-name">${highlightedName}</div>
                         </td>
                         <td>
-                            <span class="asset-class ${asset.class}">${asset.class}</span>
+                            <span class="asset-class ${asset.category}">${asset.category}</span>
                         </td>
                         <td>
                             <div class="price">${fmt(price, 4)}</div>
@@ -736,11 +736,29 @@
         // Load top movers
         async function loadTopMovers() {
             try {
-                const response = await fetch('/api/assets/categories');
-                if (!response.ok) throw new Error('Failed to fetch top movers');
-                
-                const data = await response.json();
-                renderTopMovers(data.categories);
+                // Get counts for each category
+                const countsResponse = await fetch('http://localhost:8000/api/v2/assets/counts');
+                if (!countsResponse.ok) throw new Error('Failed to fetch counts');
+
+                const countsData = await countsResponse.json();
+
+                // Get top gainers for current category
+                const gainersResponse = await fetch('http://localhost:8000/api/v2/assets/list?category=' + currentCategory + '&sort_by=gainers&limit=5');
+                if (!gainersResponse.ok) throw new Error('Failed to fetch gainers');
+
+                const gainersData = await gainersResponse.json();
+
+                // Get top losers for current category
+                const losersResponse = await fetch('http://localhost:8000/api/v2/assets/list?category=' + currentCategory + '&sort_by=losers&limit=5');
+                if (!losersResponse.ok) throw new Error('Failed to fetch losers');
+
+                const losersData = await losersResponse.json();
+
+                renderTopMovers({
+                    counts: countsData,
+                    gainers: gainersData.assets,
+                    losers: losersData.assets
+                });
             } catch (error) {
                 console.error('Error loading top movers:', error);
                 $('topMoversGrid').innerHTML = '<div class="error">Failed to load top movers</div>';
@@ -748,52 +766,49 @@
         }
         
         // Render top movers
-        function renderTopMovers(categories) {
+        function renderTopMovers(data) {
             const grid = $('topMoversGrid');
-            
-            if (!categories) {
+
+            if (!data) {
                 grid.innerHTML = '<div class="loading">No data available</div>';
                 return;
             }
-            
-            const categoryOrder = ['crypto', 'stock', 'forex', 'commodity'];
-            const html = categoryOrder.map(catKey => {
-                const category = categories[catKey];
-                if (!category) return '';
-                
-                const gainersHtml = category.top_gainers && category.top_gainers.length > 0
-                    ? category.top_gainers.slice(0, 3).map(mover => `
-                        <div class="mover-item" onclick="openAssetModal('${mover.symbol}')">
-                            <span class="mover-symbol">${mover.symbol}</span>
-                            <span class="mover-change positive">+${pct(mover.change_pct)}</span>
-                        </div>
-                    `).join('')
-                    : '<div class="loading">No gainers</div>';
-                
-                const losersHtml = category.top_losers && category.top_losers.length > 0
-                    ? category.top_losers.slice(0, 3).map(mover => `
-                        <div class="mover-item" onclick="openAssetModal('${mover.symbol}')">
-                            <span class="mover-symbol">${mover.symbol}</span>
-                            <span class="mover-change negative">${pct(mover.change_pct)}</span>
-                        </div>
-                    `).join('')
-                    : '<div class="loading">No losers</div>';
-                
-                return `
-                    <div class="mover-card">
-                        <div class="mover-card-header">
-                            <span class="mover-card-title">${category.label}</span>
-                        </div>
-                        <div class="mover-list">
-                            <div class="mover-card-label gainer">Top Gainers</div>
-                            ${gainersHtml}
-                            <div class="mover-card-label loser">Top Losers</div>
-                            ${losersHtml}
-                        </div>
+
+            const { counts, gainers, losers } = data;
+
+            // Show gainers and losers
+            const gainersHtml = gainers && gainers.length > 0
+                ? gainers.slice(0, 5).map(mover => `
+                    <div class="mover-item" onclick="openAssetModal('${mover.symbol}')">
+                        <span class="mover-symbol">${mover.symbol}</span>
+                        <span class="mover-change positive">+${pct(mover.change_percent_24h)}</span>
                     </div>
-                `;
-            }).join('');
-            
+                `).join('')
+                : '<div class="loading">No gainers</div>';
+
+            const losersHtml = losers && losers.length > 0
+                ? losers.slice(0, 5).map(mover => `
+                    <div class="mover-item" onclick="openAssetModal('${mover.symbol}')">
+                        <span class="mover-symbol">${mover.symbol}</span>
+                        <span class="mover-change negative">${pct(mover.change_percent_24h)}</span>
+                    </div>
+                `).join('')
+                : '<div class="loading">No losers</div>';
+
+            const html = `
+                <div class="mover-card">
+                    <div class="mover-card-header">
+                        <span class="mover-card-title">Top Movers (${currentCategory.toUpperCase()})</span>
+                    </div>
+                    <div class="mover-list">
+                        <div class="mover-card-label gainer">Top Gainers</div>
+                        ${gainersHtml}
+                        <div class="mover-card-label loser">Top Losers</div>
+                        ${losersHtml}
+                    </div>
+                </div>
+            `;
+
             grid.innerHTML = html;
         }
         
