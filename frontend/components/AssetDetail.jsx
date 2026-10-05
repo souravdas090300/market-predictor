@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, CandleStick, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, Area, AreaChart } from 'recharts';
 import axios from 'axios';
-import './AssetDetail.css';
+import '../styles/AssetDetail.css';
 
 const TIMEFRAMES = {
   '24H': { label: '24 Hours', interval: '5min', days: 1 },
