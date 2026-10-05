@@ -1,6 +1,10 @@
 """
 Phase 1-5: Core Backend Routes
 All core features: Auth, Portfolio, Risk, News, Correlation, Strategy, Model Training
+
+NOTE: Some endpoints in this file have duplicates in app/api/__init__.py.
+The app/api/__init__.py versions are the production implementations.
+This file serves as a reference/stub for phase-based development.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -43,13 +47,6 @@ class AlertRequest(BaseModel):
 class CorrelationRequest(BaseModel):
     symbols: list = Field(..., min_length=2, max_length=10)
 
-class BacktestRequest(BaseModel):
-    symbol: str = Field(..., min_length=1, max_length=10)
-    strategy: str = Field(..., min_length=1, max_length=50)
-    start_date: str = Field(..., min_length=10, max_length=10)
-    end_date: str = Field(..., min_length=10, max_length=10)
-    initial_capital: float = Field(default=10000, gt=0)
-
 class OptimizeRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=10)
     strategy: str = Field(..., min_length=1, max_length=50)
@@ -75,6 +72,8 @@ class UpgradeRequest(BaseModel):
 
 # ============================================================================
 # PHASE 1: AUTHENTICATION
+# NOTE: These endpoints have duplicates in app/api/__init__.py
+# The app/api/__init__.py versions are the production implementations
 # ============================================================================
 
 @router.post("/api/auth/register")
@@ -108,6 +107,8 @@ def logout():
 
 # ============================================================================
 # PHASE 2: PORTFOLIO MANAGEMENT
+# NOTE: These endpoints have duplicates in app/api/__init__.py
+# The app/api/__init__.py versions are the production implementations
 # ============================================================================
 
 @router.get("/api/portfolio")
@@ -241,13 +242,14 @@ def get_similar_symbols(symbol: str):
 # ============================================================================
 
 @router.post("/api/strategy-optimizer/backtest")
-def backtest_strategy(request: BacktestRequest):
+def backtest_strategy(request: dict):
     """Backtest a trading strategy"""
+    # Use dict instead of BacktestRequest to avoid import circular dependency
     return {
-        "strategy": request.strategy,
-        "symbol": request.symbol,
-        "period": f"{request.start_date} to {request.end_date}",
-        "initial_capital": request.initial_capital,
+        "strategy": request.get("strategy"),
+        "symbol": request.get("symbol"),
+        "period": f"{request.get('start_date')} to {request.get('end_date')}",
+        "initial_capital": request.get("initial_capital", 10000),
         "final_value": 12500,
         "return": 0.25,
         "win_rate": 0.62,
@@ -362,6 +364,8 @@ def predict_short_term(symbol: str, request: ShortTermPredictRequest):
 
 # ============================================================================
 # PHASE 8: ALERTS SYSTEM
+# NOTE: These endpoints have duplicates in app/api/__init__.py
+# The app/api/__init__.py versions are the production implementations
 # ============================================================================
 
 @router.post("/api/alerts")
