@@ -162,7 +162,7 @@ def get_crypto_quote(symbol: str) -> dict | None:
         cache_key = "market_data"
         hit = _crypto_market_cache.get(cache_key)
         
-        if hit and now - hit[0] < 60:  # Cache for 60 seconds
+        if hit and now - hit[0] < 120:  # Cache for 120 seconds (increased to reduce rate limiting)
             market_data = hit[1]
         else:
             # Fetch fresh market data
