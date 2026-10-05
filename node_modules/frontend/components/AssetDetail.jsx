@@ -160,8 +160,10 @@ export default function AssetDetail({ symbol, category, onBack }) {
     setError(null);
     
     try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://market-predictor-production.up.railway.app');
+      
       const response = await axios.get(
-        `http://localhost:8000/api/v1/assets/price-history/${symbol}`,
+        `${API_URL}/api/v1/assets/price-history/${symbol}`,
         {
           params: {
             timeframe: selectedTimeframe,

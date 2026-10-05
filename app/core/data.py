@@ -197,25 +197,16 @@ def get_crypto_quote(symbol: str) -> dict | None:
                     return quote
         
     except Exception as e:
-        print(f"CoinGecko error for {symbol}, trying Polygon: {e}")
+        print(f"CoinGecko error for {symbol}, using Yahoo Finance: {e}")
     
-    # Fallback to Polygon for crypto
-    try:
-        quote = polygon.get_polygon_quote(symbol, asset_class="crypto")
-        if quote:
-            _crypto_cache[symbol] = (now, quote)
-            return quote
-    except Exception as e:
-        print(f"Polygon error for {symbol}, trying Yahoo: {e}")
-    
-    # Last resort: Yahoo Finance for crypto
+    # Fallback to Yahoo Finance for crypto (works with BTC-USD, ETH-USD, etc.)
     try:
         quote = get_live_quote(symbol)
         if quote:
             _crypto_cache[symbol] = (now, quote)
             return quote
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Yahoo Finance error for {symbol}: {e}")
     
     _crypto_cache[symbol] = (now, None)
     return None

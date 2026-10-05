@@ -42,7 +42,7 @@ class CoinGeckoClient:
         
         # Cache for API responses
         self._cache: Dict[str, tuple[float, dict]] = {}
-        self._cache_ttl = 60  # 60 seconds default cache
+        self._cache_ttl = 300  # 5 minutes cache to reduce rate limits
         
         # Rate limiting
         self._last_request_time = 0

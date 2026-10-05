@@ -15,24 +15,19 @@ _price_cache: Dict[str, dict] = {}
 _cache_lock = threading.Lock()
 _last_update = None
 
-# Top assets to update (limited for performance)
+# Top assets to update (limited for performance and rate limits)
 TOP_CRYPTO = [
     "BTC-USD", "ETH-USD", "BNB-USD", "XRP-USD", "SOL-USD", 
-    "ADA-USD", "DOGE-USD", "DOT-USD", "AVAX-USD", "LINK-USD",
-    "UNI-USD", "ATOM-USD", "LTC-USD", "XLM-USD", "ALGO-USD",
-    "VET-USD", "FIL-USD", "TRX-USD", "XMR-USD", "ETC-USD"
+    "ADA-USD", "DOGE-USD", "DOT-USD", "AVAX-USD", "LINK-USD"
 ]
 
 TOP_STOCKS = [
     "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA",
-    "JPM", "V", "JNJ", "WMT", "PG", "XOM", "CVX", "KO",
-    "PEP", "MRK", "ABBV", "AVGO", "COST", "CSCO", "ADBE",
-    "CRM", "NFLX", "AMD", "INTC", "PYPL", "DIS", "NKE"
+    "JPM", "V", "JNJ", "WMT", "PG", "XOM"
 ]
 
 TOP_FOREX = [
-    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X",
-    "USDCHF=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X"
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"
 ]
 
 
