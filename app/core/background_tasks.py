@@ -1,230 +1,184 @@
 """
 Background tasks for real-time price updates
-Pre-fetches data every 5 seconds to avoid slow API calls on page load
-Uses database storage for persistence
+Smart on-demand fetching with intelligent caching
 """
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Optional, List
 import threading
 
 logger = logging.getLogger(__name__)
 
-# In-memory price cache (global for fast access) - kept for instant responses
+# In-memory price cache with timestamps
 _price_cache: Dict[str, dict] = {}
+_cache_timestamps: Dict[str, datetime] = {}
 _cache_lock = threading.Lock()
-_last_update = None
+_cache_ttl = 60  # Cache for 60 seconds
 
-# Top assets to update (REDUCED to avoid rate limits)
-TOP_CRYPTO = [
-    "BTC-USD", "ETH-USD", "BNB-USD", "XRP-USD", "SOL-USD",
-    "ADA-USD", "DOGE-USD", "DOT-USD", "AVAX-USD", "LINK-USD",
-    "MATIC-USD", "ATOM-USD", "UNI-USD", "AAVE-USD", "COMP-USD"
-]
-
-TOP_STOCKS = [
-    # Technology Giants
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
-    # Financial Services
-    "JPM", "V", "BAC", "WFC", "C", "GS", "MS",
-    # Healthcare
-    "JNJ", "UNH", "PFE", "ABBV", "MRK", "LLY",
-    # Consumer Goods
-    "PG", "KO", "PEP", "PM", "WMT", "COST",
-    # Energy
-    "XOM", "CVX", "COP", "SHEL",
-    # Industrials
-    "CAT", "DE", "GE", "HON", "MMM", "UPS", "RTX", "BA",
-    # Semiconductors
-    "AMD", "INTC", "QCOM", "TXN",
-    # Software
-    "ADBE", "CRM", "ORCL", "IBM", "INTU",
-    # ETFs
-    "SPY", "QQQ", "IWM", "VTI", "VOO"
-]
-
-TOP_FOREX = [
-    # Major Pairs only
-    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "USDCAD=X",
-    "AUDUSD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X"
-]
-
-TOP_COMMODITIES = [
-    # Major commodities only
-    "GC=F", "GLD", "IAU", "SLV",
-    "CL=F", "NG=F",
-    "ZC=F", "ZW=F", "ZS=F"
-]
+# Fetching state to prevent duplicate requests
+_fetching: Dict[str, asyncio.Task] = {}
+_fetch_lock = threading.Lock()
 
 
-def get_cached_price(symbol: str) -> dict | None:
-    """Get price from in-memory cache"""
+def get_cached_price(symbol: str) -> Optional[dict]:
+    """Get price from cache if available and not expired"""
     with _cache_lock:
-        return _price_cache.get(symbol.upper())
-
-
-def get_all_cached_prices() -> Dict[str, dict]:
-    """Get all cached prices"""
-    with _cache_lock:
-        return _price_cache.copy()
+        symbol = symbol.upper()
+        if symbol in _price_cache:
+            timestamp = _cache_timestamps.get(symbol)
+            if timestamp and (datetime.now(timezone.utc) - timestamp).total_seconds() < _cache_ttl:
+                return _price_cache[symbol]
+    return None
 
 
 def update_price_cache(quotes: Dict[str, dict]):
     """Update price cache with new quotes"""
     with _cache_lock:
+        now = datetime.now(timezone.utc)
         for symbol, quote in quotes.items():
             if quote:
                 _price_cache[symbol.upper()] = quote
-        global _last_update
-        _last_update = datetime.now(timezone.utc)
+                _cache_timestamps[symbol.upper()] = now
+
+
+def get_all_cached_prices() -> Dict[str, dict]:
+    """Get all cached prices"""
+    with _cache_lock:
+        # Return only non-expired prices
+        now = datetime.now(timezone.utc)
+        return {
+            k: v for k, v in _price_cache.items()
+            if (now - _cache_timestamps.get(k, now)).total_seconds() < _cache_ttl
+        }
+
+
+async def fetch_price(symbol: str) -> Optional[dict]:
+    """
+    Fetch price for a single symbol with intelligent caching
+    Returns cached data if available and fresh, otherwise fetches fresh data
+    """
+    symbol = symbol.upper()
+    
+    # Check cache first
+    cached = get_cached_price(symbol)
+    if cached:
+        return cached
+    
+    # Check if already fetching this symbol
+    with _fetch_lock:
+        if symbol in _fetching:
+            # Wait for existing fetch to complete
+            try:
+                return await _fetching[symbol]
+            except:
+                del _fetching[symbol]
+    
+    # Start new fetch
+    from app.core import data
+    
+    async def _fetch():
+        try:
+            quote = data.get_live_quote(symbol)
+            if quote:
+                update_price_cache({symbol: quote})
+            return quote
+        except Exception as e:
+            logger.warning(f"Error fetching price for {symbol}: {e}")
+            return None
+        finally:
+            with _fetch_lock:
+                if symbol in _fetching:
+                    del _fetching[symbol]
+    
+    task = asyncio.create_task(_fetch())
+    with _fetch_lock:
+        _fetching[symbol] = task
+    
+    return await task
+
+
+async def fetch_prices_batch(symbols: List[str], batch_size: int = 10) -> Dict[str, dict]:
+    """
+    Fetch prices for multiple symbols in batches to respect rate limits
+    Returns cached data where available, fetches fresh data for others
+    """
+    results = {}
+    
+    # First, get all cached prices
+    for symbol in symbols:
+        cached = get_cached_price(symbol)
+        if cached:
+            results[symbol.upper()] = cached
+    
+    # Determine which symbols need fresh data
+    symbols_to_fetch = [s for s in symbols if s.upper() not in results]
+    
+    if not symbols_to_fetch:
+        return results
+    
+    # Fetch in batches with delays
+    from app.core import data
+    
+    for i in range(0, len(symbols_to_fetch), batch_size):
+        batch = symbols_to_fetch[i:i + batch_size]
+        
+        # Fetch batch in parallel
+        tasks = [fetch_price(symbol) for symbol in batch]
+        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for symbol, result in zip(batch, batch_results):
+            if isinstance(result, Exception):
+                logger.warning(f"Error fetching {symbol}: {result}")
+            elif result:
+                results[symbol.upper()] = result
+        
+        # Add delay between batches to respect rate limits
+        if i + batch_size < len(symbols_to_fetch):
+            await asyncio.sleep(1)  # 1 second delay between batches
+    
+    return results
 
 
 async def background_price_update_task():
     """
-    Background task to update prices every 5 seconds
-    Pre-fetches data to avoid slow API calls on page load
-    PARALLELIZED - Updates crypto, stocks, and forex simultaneously
-    Stores prices in database for persistence
-    
-    Usage in main.py:
-        @app.on_event("startup")
-        async def startup():
-            asyncio.create_task(background_price_update_task())
+    Lightweight background task that pre-fetches popular assets
+    All other assets are fetched on-demand when requested
     """
-    from app.core import data
+    from app.core import config
     
-    logger.info("Starting background price update task...")
+    # Popular assets to pre-fetch (top 10 from each category)
+    POPULAR_ASSETS = [
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "BTC-USD", "ETH-USD"
+    ]
     
-    async def update_crypto():
-        """Update crypto prices using Yahoo Finance only (no CoinGecko to avoid rate limits)"""
-        logger.info("Updating crypto prices...")
-        crypto_quotes = {}
-        tasks = []
-
-        for symbol in TOP_CRYPTO:
-            # Use Yahoo Finance for all crypto (more reliable, no rate limits)
-            task = asyncio.to_thread(
-                lambda sym=symbol: (sym, data.get_live_quote(sym) if data.get_live_quote(sym) else None)
-            )
-            tasks.append(task)
-
-        # Run all crypto fetches in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, tuple):
-                sym, quote = result
-                if quote:
-                    crypto_quotes[sym] = quote
-
-        update_price_cache(crypto_quotes)
-        logger.info(f"Updated {len(crypto_quotes)} crypto prices")
-
-        return crypto_quotes
-    
-    async def update_stocks():
-        """Update stock prices in parallel using thread pool"""
-        logger.info("Updating stock prices...")
-        stock_quotes = {}
-        tasks = []
-
-        for symbol in TOP_STOCKS:
-            # Run synchronous fetch in thread pool
-            task = asyncio.to_thread(
-                lambda sym=symbol: (sym, data.get_live_quote(sym) if data.get_live_quote(sym) else None)
-            )
-            tasks.append(task)
-
-        # Run all stock fetches in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for result in results:
-            if isinstance(result, tuple):
-                sym, quote = result
-                if quote:
-                    stock_quotes[sym] = quote
-
-        update_price_cache(stock_quotes)
-        logger.info(f"Updated {len(stock_quotes)} stock prices")
-
-        return stock_quotes
-    
-    async def update_forex():
-        """Update forex prices in parallel using thread pool"""
-        logger.info("Updating forex prices...")
-        forex_quotes = {}
-        tasks = []
-        
-        for symbol in TOP_FOREX:
-            # Run synchronous fetch in thread pool
-            task = asyncio.to_thread(
-                lambda sym=symbol: (sym, data.get_live_quote(sym) if data.get_live_quote(sym) else None)
-            )
-            tasks.append(task)
-        
-        # Run all forex fetches in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        for result in results:
-            if isinstance(result, tuple):
-                sym, quote = result
-                if quote:
-                    forex_quotes[sym] = quote
-        
-        update_price_cache(forex_quotes)
-        logger.info(f"Updated {len(forex_quotes)} forex prices")
-        return forex_quotes
-    
-    async def update_commodities():
-        """Update commodity prices in parallel using thread pool"""
-        logger.info("Updating commodity prices...")
-        commodity_quotes = {}
-        tasks = []
-        
-        for symbol in TOP_COMMODITIES:
-            # Run synchronous fetch in thread pool
-            task = asyncio.to_thread(
-                lambda sym=symbol: (sym, data.get_live_quote(sym) if data.get_live_quote(sym) else None)
-            )
-            tasks.append(task)
-        
-        # Run all commodity fetches in parallel
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        for result in results:
-            if isinstance(result, tuple):
-                sym, quote = result
-                if quote:
-                    commodity_quotes[sym] = quote
-        
-        update_price_cache(commodity_quotes)
-        logger.info(f"Updated {len(commodity_quotes)} commodity prices")
-        return commodity_quotes
+    logger.info("Starting lightweight background price update task...")
     
     while True:
         try:
-            # PARALLELIZE UPDATES - Run crypto and stocks only (to avoid rate limits)
-            await asyncio.gather(
-                update_crypto(),
-                update_stocks()
-            )
+            # Pre-fetch popular assets in small batches
+            logger.info("Pre-fetching popular assets...")
+            results = await fetch_prices_batch(POPULAR_ASSETS, batch_size=5)
+            logger.info(f"Pre-fetched {len(results)} popular assets")
             
-            logger.info(f"Total cached prices: {len(_price_cache)}")
-            
-            await asyncio.sleep(60)  # Update every 60 seconds to avoid rate limits
+            # Sleep for 60 seconds
+            await asyncio.sleep(60)
         
         except Exception as e:
             logger.error(f"Background task error: {e}")
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
 
 
 def get_cache_status() -> dict:
     """Get cache statistics"""
     with _cache_lock:
+        now = datetime.now(timezone.utc)
         return {
             "total_cached": len(_price_cache),
-            "last_update": _last_update.isoformat() if _last_update else None,
+            "fresh_count": len([
+                k for k, v in _cache_timestamps.items()
+                if (now - v).total_seconds() < _cache_ttl
+            ]),
             "crypto_count": len([s for s in _price_cache if s.endswith("-USD")]),
             "stock_count": len([s for s in _price_cache if not s.endswith("-USD") and not s.endswith("=X")]),
             "forex_count": len([s for s in _price_cache if s.endswith("=X")])

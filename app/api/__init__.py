@@ -134,12 +134,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not populate database with sample data: {e}")
 
-    # Start background price update task for performance
+    # Start smart background price update task for all 785+ assets
     import asyncio
-    from ..core.background_tasks import background_price_update_task
+    from ..database import SessionLocal
+    from ..providers.smart_price_fetcher import smart_background_price_update_task
 
-    asyncio.create_task(background_price_update_task())
-    print("Background price update task started")
+    db_session = SessionLocal()
+    asyncio.create_task(smart_background_price_update_task(db_session))
+    print("Smart background price update task started")
 
     yield
     # Shutdown (cleanup if needed)
@@ -311,8 +313,8 @@ async def live_quotes_stream(request: Request, symbols: str):
 
 @app.get("/api/assets/live-prices")
 @limiter.limit("10/minute")
-def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None):
-    """Get live prices for all assets in the watchlist, optionally filtered by class."""
+async def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None):
+    """Get live prices for all assets using on-demand fetching with intelligent caching."""
     try:
         watchlist = config.WATCHLIST
 
@@ -322,73 +324,18 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
                 raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
             watchlist = [asset for asset in watchlist if asset["class"] == asset_class]
 
-        # Try to get cached prices from background tasks
-        cached_prices = {}
-        cache_status = {"status": "unavailable"}
-        try:
-            from ..core.background_tasks import get_all_cached_prices, get_cache_status
-            cached_prices = get_all_cached_prices()
-            cache_status = get_cache_status()
-        except Exception as e:
-            logger.warning(f"Could not load cached prices: {e}")
+        # Fetch prices on-demand with intelligent caching
+        from ..core.background_tasks import fetch_prices_batch, get_cache_status
+        
+        symbols = [asset["symbol"] for asset in watchlist]
+        prices = await fetch_prices_batch(symbols, batch_size=10)
+        cache_status = get_cache_status()
 
-        # Fallback to database if cache is empty
-        db_prices = {}
-        if len(cached_prices) == 0:
-            try:
-                from ..database import SessionLocal
-                from ..database_models import LivePrice
-                db = SessionLocal()
-                live_prices = db.query(LivePrice).all()
-                for lp in live_prices:
-                    db_prices[lp.symbol] = {
-                        "price": lp.current_price,
-                        "change": lp.change_24h,
-                        "change_pct": lp.change_percent_24h,
-                        "volume": lp.volume_24h,
-                        "day_high": lp.high_24h,
-                        "day_low": lp.low_24h,
-                        "market_cap": lp.market_cap,
-                        "as_of": lp.updated_at.isoformat() if lp.updated_at else None,
-                        "source": "database"
-                    }
-                db.close()
-                logger.info(f"Loaded {len(db_prices)} prices from database")
-            except Exception as e:
-                logger.error(f"Error loading from database: {e}")
-
-        # Fallback to direct API call if both cache and database are empty
-        if len(cached_prices) == 0 and len(db_prices) == 0:
-            logger.warning("Cache and database empty, fetching prices directly")
-            try:
-                # Fetch prices for top 10 assets only to avoid rate limits
-                top_assets = watchlist[:10]
-                for asset in top_assets:
-                    try:
-                        quote = data.get_live_quote(asset["symbol"])
-                        if quote:
-                            db_prices[asset["symbol"]] = {
-                                "price": quote.get("price", 0),
-                                "change": quote.get("change", 0),
-                                "change_pct": quote.get("change_pct", 0),
-                                "volume": quote.get("volume", 0),
-                                "day_high": quote.get("day_high", 0),
-                                "day_low": quote.get("day_low", 0),
-                                "market_cap": quote.get("market_cap"),
-                                "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
-                                "source": "api"
-                            }
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch price for {asset['symbol']}: {e}")
-                logger.info(f"Fetched {len(db_prices)} prices from API")
-            except Exception as e:
-                logger.error(f"Error fetching prices from API: {e}")
-
-        # Combine watchlist info with cached quotes
+        # Combine watchlist info with prices
         assets_data = []
         for asset in watchlist:
             symbol = asset["symbol"]
-            quote = cached_prices.get(symbol.upper()) or db_prices.get(symbol.upper())
+            quote = prices.get(symbol.upper())
 
             if quote:
                 assets_data.append({
@@ -553,109 +500,28 @@ def get_assets_by_class_new(request: Request, asset_class: str):
 
 @app.get("/api/assets/categories")
 @limiter.limit("30/minute")
-def get_asset_categories(request: Request):
-    """Get all asset categories with their asset counts and sample data."""
+async def get_asset_categories(request: Request):
+    """Get all asset categories with their asset counts and sample data using on-demand fetching."""
     try:
         watchlist = config.WATCHLIST
 
-        # Try to get cached prices from background tasks
-        cached_prices = {}
-        cache_status = {"status": "unavailable"}
-        try:
-            from app.core.background_tasks import get_all_cached_prices, get_cache_status
-            cached_prices = get_all_cached_prices()
-            cache_status = get_cache_status()
-        except Exception as e:
-            logger.warning(f"Could not load cached prices: {e}")
+        # Fetch prices on-demand with intelligent caching
+        from ..core.background_tasks import fetch_prices_batch, get_cache_status
+        
+        symbols = [asset["symbol"] for asset in watchlist]
+        prices = await fetch_prices_batch(symbols, batch_size=10)
+        cache_status = get_cache_status()
 
-        # Fallback to database if cache is empty
-        db_prices = {}
-        if len(cached_prices) == 0:
-            try:
-                from ..database import SessionLocal
-                from ..database_models import LivePrice
-                db = SessionLocal()
-                live_prices = db.query(LivePrice).all()
-                for lp in live_prices:
-                    db_prices[lp.symbol] = {
-                        "price": lp.current_price,
-                        "change": lp.change_24h,
-                        "change_pct": lp.change_percent_24h,
-                        "volume": lp.volume_24h,
-                        "day_high": lp.high_24h,
-                        "day_low": lp.low_24h,
-                        "market_cap": lp.market_cap,
-                        "as_of": lp.updated_at.isoformat() if lp.updated_at else None,
-                        "source": "database"
-                    }
-                db.close()
-            except Exception as e:
-                logger.error(f"Error loading from database: {e}")
-
-        # Fallback to direct API call if both cache and database are empty
-        if len(cached_prices) == 0 and len(db_prices) == 0:
-            logger.warning("Cache and database empty, fetching prices directly")
-            try:
-                # Fetch prices for top 10 assets only to avoid rate limits
-                top_assets = watchlist[:10]
-                for asset in top_assets:
-                    try:
-                        quote = data.get_live_quote(asset["symbol"])
-                        if quote:
-                            db_prices[asset["symbol"]] = {
-                                "price": quote.get("price", 0),
-                                "change": quote.get("change", 0),
-                                "change_pct": quote.get("change_pct", 0),
-                                "volume": quote.get("volume", 0),
-                                "day_high": quote.get("day_high", 0),
-                                "day_low": quote.get("day_low", 0),
-                                "market_cap": quote.get("market_cap"),
-                                "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
-                                "source": "api"
-                            }
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch price for {asset['symbol']}: {e}")
-                logger.info(f"Fetched {len(db_prices)} prices from API")
-            except Exception as e:
-                logger.error(f"Error fetching prices from API: {e}")
-
-        # Fallback to direct API call if both cache and database are empty
-        if len(cached_prices) == 0 and len(db_prices) == 0:
-            logger.warning("Cache and database empty, fetching prices directly")
-            try:
-                # Fetch prices for top 10 assets only to avoid rate limits
-                top_assets = watchlist[:10]
-                for asset in top_assets:
-                    try:
-                        quote = data.get_live_quote(asset["symbol"])
-                        if quote:
-                            db_prices[asset["symbol"]] = {
-                                "price": quote.get("price", 0),
-                                "change": quote.get("change", 0),
-                                "change_pct": quote.get("change_pct", 0),
-                                "volume": quote.get("volume", 0),
-                                "day_high": quote.get("day_high", 0),
-                                "day_low": quote.get("day_low", 0),
-                                "market_cap": quote.get("market_cap"),
-                                "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
-                                "source": "api"
-                            }
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch price for {asset['symbol']}: {e}")
-                logger.info(f"Fetched {len(db_prices)} prices from API")
-            except Exception as e:
-                logger.error(f"Error fetching prices from API: {e}")
-
-        # Group assets by class using cached prices
+        # Group assets by class using fetched prices
         categories = {}
         for asset_class in config.CLASS_LABELS.keys():
             class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
 
-            # Build asset list with cached prices (instant - no API calls)
+            # Build asset list with fetched prices
             all_assets = []
             for asset in class_assets:
                 symbol = asset["symbol"]
-                quote = cached_prices.get(symbol.upper()) or db_prices.get(symbol.upper())
+                quote = prices.get(symbol.upper())
 
                 all_assets.append({
                     "symbol": symbol,
@@ -672,7 +538,7 @@ def get_asset_categories(request: Request):
                     "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
                 })
 
-            # Calculate top gainers and losers from cached data
+            # Calculate top gainers and losers from fetched data
             assets_with_change = [(a, a["change_pct"]) for a in all_assets if a["change_pct"] != 0]
             assets_with_change.sort(key=lambda x: x[1], reverse=True)
 
