@@ -134,14 +134,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not populate database with sample data: {e}")
 
-    # Start smart background price update task for all 785+ assets
+    # Start lightweight background price update task
     import asyncio
-    from ..database import SessionLocal
-    from ..providers.smart_price_fetcher import smart_background_price_update_task
+    from ..core.background_tasks import background_price_update_task
 
-    db_session = SessionLocal()
-    asyncio.create_task(smart_background_price_update_task(db_session))
-    print("Smart background price update task started")
+    asyncio.create_task(background_price_update_task())
+    print("Lightweight background price update task started")
 
     yield
     # Shutdown (cleanup if needed)
