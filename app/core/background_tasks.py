@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 _price_cache: Dict[str, dict] = {}
 _cache_timestamps: Dict[str, datetime] = {}
 _cache_lock = threading.Lock()
-_cache_ttl = 60  # Cache for 60 seconds
+_cache_ttl = 300  # Cache for 5 minutes (reduced API calls)
 
 # Fetching state to prevent duplicate requests
 _fetching: Dict[str, asyncio.Task] = {}
@@ -98,45 +98,45 @@ async def fetch_price(symbol: str) -> Optional[dict]:
     return await task
 
 
-async def fetch_prices_batch(symbols: List[str], batch_size: int = 10) -> Dict[str, dict]:
+async def fetch_prices_batch(symbols: List[str], batch_size: int = 20) -> Dict[str, dict]:
     """
     Fetch prices for multiple symbols in batches to respect rate limits
     Returns cached data where available, fetches fresh data for others
     """
     results = {}
-    
+
     # First, get all cached prices
     for symbol in symbols:
         cached = get_cached_price(symbol)
         if cached:
             results[symbol.upper()] = cached
-    
+
     # Determine which symbols need fresh data
     symbols_to_fetch = [s for s in symbols if s.upper() not in results]
-    
+
     if not symbols_to_fetch:
         return results
-    
-    # Fetch in batches with delays
+
+    # Fetch in batches with minimal delays
     from app.core import data
-    
+
     for i in range(0, len(symbols_to_fetch), batch_size):
         batch = symbols_to_fetch[i:i + batch_size]
-        
+
         # Fetch batch in parallel
         tasks = [fetch_price(symbol) for symbol in batch]
         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         for symbol, result in zip(batch, batch_results):
             if isinstance(result, Exception):
                 logger.warning(f"Error fetching {symbol}: {result}")
             elif result:
                 results[symbol.upper()] = result
-        
-        # Add delay between batches to respect rate limits
+
+        # Minimal delay between batches
         if i + batch_size < len(symbols_to_fetch):
-            await asyncio.sleep(1)  # 1 second delay between batches
-    
+            await asyncio.sleep(0.2)  # Reduced to 0.2 seconds
+
     return results
 
 
@@ -146,24 +146,24 @@ async def background_price_update_task():
     All other assets are fetched on-demand when requested
     """
     from app.core import config
-    
+
     # Popular assets to pre-fetch (top 10 from each category)
     POPULAR_ASSETS = [
         "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA", "BTC-USD", "ETH-USD"
     ]
-    
+
     logger.info("Starting lightweight background price update task...")
-    
+
     while True:
         try:
             # Pre-fetch popular assets in small batches
             logger.info("Pre-fetching popular assets...")
-            results = await fetch_prices_batch(POPULAR_ASSETS, batch_size=5)
+            results = await fetch_prices_batch(POPULAR_ASSETS, batch_size=10)
             logger.info(f"Pre-fetched {len(results)} popular assets")
-            
-            # Sleep for 60 seconds
-            await asyncio.sleep(60)
-        
+
+            # Sleep for 30 seconds (faster updates)
+            await asyncio.sleep(30)
+
         except Exception as e:
             logger.error(f"Background task error: {e}")
             await asyncio.sleep(10)
