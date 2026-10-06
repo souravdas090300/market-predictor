@@ -106,8 +106,8 @@ async def lifespan(app: FastAPI):
 
     # Populate database with initial prices if empty
     try:
-        from ..database import SessionLocal
-        from ..database_models import LivePrice
+        from app.database import SessionLocal
+        from app.database_models import LivePrice
         db = SessionLocal()
         count = db.query(LivePrice).count()
         if count == 0:
