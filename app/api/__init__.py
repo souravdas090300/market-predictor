@@ -327,6 +327,33 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
             except Exception as e:
                 logger.error(f"Error loading from database: {e}")
 
+        # Fallback to direct API call if both cache and database are empty
+        if len(cached_prices) == 0 and len(db_prices) == 0:
+            logger.warning("Cache and database empty, fetching prices directly")
+            try:
+                # Fetch prices for top 20 assets only to avoid timeout
+                top_assets = watchlist[:20]
+                for asset in top_assets:
+                    try:
+                        quote = data.get_live_quote(asset["symbol"])
+                        if quote:
+                            db_prices[asset["symbol"]] = {
+                                "price": quote.get("price", 0),
+                                "change": quote.get("change", 0),
+                                "change_pct": quote.get("change_pct", 0),
+                                "volume": quote.get("volume", 0),
+                                "day_high": quote.get("day_high", 0),
+                                "day_low": quote.get("day_low", 0),
+                                "market_cap": quote.get("market_cap"),
+                                "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
+                                "source": "api"
+                            }
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch price for {asset['symbol']}: {e}")
+                logger.info(f"Fetched {len(db_prices)} prices from API")
+            except Exception as e:
+                logger.error(f"Error fetching prices from API: {e}")
+
         # Combine watchlist info with cached quotes
         assets_data = []
         for asset in watchlist:
@@ -534,6 +561,33 @@ def get_asset_categories(request: Request):
                 db.close()
             except Exception as e:
                 logger.error(f"Error loading from database: {e}")
+
+        # Fallback to direct API call if both cache and database are empty
+        if len(cached_prices) == 0 and len(db_prices) == 0:
+            logger.warning("Cache and database empty, fetching prices directly")
+            try:
+                # Fetch prices for top 20 assets only to avoid timeout
+                top_assets = watchlist[:20]
+                for asset in top_assets:
+                    try:
+                        quote = data.get_live_quote(asset["symbol"])
+                        if quote:
+                            db_prices[asset["symbol"]] = {
+                                "price": quote.get("price", 0),
+                                "change": quote.get("change", 0),
+                                "change_pct": quote.get("change_pct", 0),
+                                "volume": quote.get("volume", 0),
+                                "day_high": quote.get("day_high", 0),
+                                "day_low": quote.get("day_low", 0),
+                                "market_cap": quote.get("market_cap"),
+                                "as_of": quote.get("as_of", datetime.now(timezone.utc).isoformat()),
+                                "source": "api"
+                            }
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch price for {asset['symbol']}: {e}")
+                logger.info(f"Fetched {len(db_prices)} prices from API")
+            except Exception as e:
+                logger.error(f"Error fetching prices from API: {e}")
 
         # Group assets by class using cached prices
         categories = {}
