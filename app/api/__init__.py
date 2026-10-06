@@ -104,6 +104,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not create database tables: {e}")
 
+    # Populate database with initial prices if empty
+    try:
+        from ..database import SessionLocal
+        from ..database_models import LivePrice
+        db = SessionLocal()
+        count = db.query(LivePrice).count()
+        if count == 0:
+            print("Database is empty, populating with sample data...")
+            # Add sample data for top assets
+            sample_data = [
+                {"symbol": "AAPL", "name": "Apple", "category": "stock", "current_price": 185.50, "change_24h": 1.25, "change_percent_24h": 0.68, "volume_24h": 50000000, "high_24h": 186.00, "low_24h": 184.00, "market_cap": 2900000000000},
+                {"symbol": "MSFT", "name": "Microsoft", "category": "stock", "current_price": 420.00, "change_24h": 3.50, "change_percent_24h": 0.84, "volume_24h": 20000000, "high_24h": 422.00, "low_24h": 418.00, "market_cap": 3100000000000},
+                {"symbol": "GOOGL", "name": "Alphabet", "category": "stock", "current_price": 145.00, "change_24h": 2.00, "change_percent_24h": 1.40, "volume_24h": 25000000, "high_24h": 146.00, "low_24h": 144.00, "market_cap": 1800000000000},
+                {"symbol": "AMZN", "name": "Amazon", "category": "stock", "current_price": 180.00, "change_24h": -1.50, "change_percent_24h": -0.83, "volume_24h": 40000000, "high_24h": 182.00, "low_24h": 179.00, "market_cap": 1900000000000},
+                {"symbol": "TSLA", "name": "Tesla", "category": "stock", "current_price": 240.00, "change_24h": 5.00, "change_percent_24h": 2.13, "volume_24h": 100000000, "high_24h": 245.00, "low_24h": 235.00, "market_cap": 760000000000},
+                {"symbol": "BTC-USD", "name": "Bitcoin", "category": "crypto", "current_price": 65000.00, "change_24h": 1000.00, "change_percent_24h": 1.56, "volume_24h": 30000000000, "high_24h": 66000.00, "low_24h": 64000.00, "market_cap": 1280000000000},
+                {"symbol": "ETH-USD", "name": "Ethereum", "category": "crypto", "current_price": 3500.00, "change_24h": 50.00, "change_percent_24h": 1.45, "volume_24h": 15000000000, "high_24h": 3550.00, "low_24h": 3450.00, "market_cap": 420000000000},
+                {"symbol": "NVDA", "name": "Nvidia", "category": "stock", "current_price": 890.00, "change_24h": 15.00, "change_percent_24h": 1.72, "volume_24h": 45000000, "high_24h": 895.00, "low_24h": 880.00, "market_cap": 2200000000000},
+                {"symbol": "META", "name": "Meta", "category": "stock", "current_price": 505.00, "change_24h": 8.00, "change_percent_24h": 1.61, "volume_24h": 18000000, "high_24h": 510.00, "low_24h": 500.00, "market_cap": 1300000000000},
+                {"symbol": "JPM", "name": "JPMorgan Chase", "category": "stock", "current_price": 195.00, "change_24h": 2.50, "change_percent_24h": 1.30, "volume_24h": 8000000, "high_24h": 196.00, "low_24h": 194.00, "market_cap": 560000000000},
+            ]
+            for data in sample_data:
+                lp = LivePrice(**data)
+                db.add(lp)
+            db.commit()
+            print(f"Added {len(sample_data)} sample prices to database")
+        db.close()
+    except Exception as e:
+        print(f"Warning: Could not populate database with sample data: {e}")
+
     # Start background price update task for performance
     import asyncio
     from ..core.background_tasks import background_price_update_task
