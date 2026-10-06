@@ -2,6 +2,7 @@
  * Asset Detail Component with Interactive Charts
  * Shows real price data with timeframe selector (24H, 1W, 1M, 6M, 1Y, 5Y, ALL)
  * Uses Recharts for candlestick/line charts with real OHLCV data
+ * Updated with smart price fetcher integration
  */
 
 import React, { useState, useEffect } from 'react';
