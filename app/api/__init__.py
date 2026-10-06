@@ -361,8 +361,8 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
         if len(cached_prices) == 0 and len(db_prices) == 0:
             logger.warning("Cache and database empty, fetching prices directly")
             try:
-                # Fetch prices for top 20 assets only to avoid timeout
-                top_assets = watchlist[:20]
+                # Fetch prices for top 10 assets only to avoid rate limits
+                top_assets = watchlist[:10]
                 for asset in top_assets:
                     try:
                         quote = data.get_live_quote(asset["symbol"])
@@ -596,8 +596,8 @@ def get_asset_categories(request: Request):
         if len(cached_prices) == 0 and len(db_prices) == 0:
             logger.warning("Cache and database empty, fetching prices directly")
             try:
-                # Fetch prices for top 20 assets only to avoid timeout
-                top_assets = watchlist[:20]
+                # Fetch prices for top 10 assets only to avoid rate limits
+                top_assets = watchlist[:10]
                 for asset in top_assets:
                     try:
                         quote = data.get_live_quote(asset["symbol"])
@@ -623,8 +623,8 @@ def get_asset_categories(request: Request):
         if len(cached_prices) == 0 and len(db_prices) == 0:
             logger.warning("Cache and database empty, fetching prices directly")
             try:
-                # Fetch prices for top 20 assets only to avoid timeout
-                top_assets = watchlist[:20]
+                # Fetch prices for top 10 assets only to avoid rate limits
+                top_assets = watchlist[:10]
                 for asset in top_assets:
                     try:
                         quote = data.get_live_quote(asset["symbol"])
