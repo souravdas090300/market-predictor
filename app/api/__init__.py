@@ -284,10 +284,6 @@ async def live_quotes_stream(request: Request, symbols: str):
 def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None):
     """Get live prices for all assets in the watchlist, optionally filtered by class."""
     try:
-        from ..core.background_tasks import get_all_cached_prices, get_cache_status
-        from ..database import SessionLocal
-        from ..database_models import LivePrice
-
         watchlist = config.WATCHLIST
 
         # Filter by asset class if provided
@@ -296,14 +292,22 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
                 raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
             watchlist = [asset for asset in watchlist if asset["class"] == asset_class]
 
-        # Use cached prices for instant response (no API calls)
-        cached_prices = get_all_cached_prices()
-        cache_status = get_cache_status()
+        # Try to get cached prices from background tasks
+        cached_prices = {}
+        cache_status = {"status": "unavailable"}
+        try:
+            from ..core.background_tasks import get_all_cached_prices, get_cache_status
+            cached_prices = get_all_cached_prices()
+            cache_status = get_cache_status()
+        except Exception as e:
+            logger.warning(f"Could not load cached prices: {e}")
 
         # Fallback to database if cache is empty
         db_prices = {}
         if len(cached_prices) == 0:
             try:
+                from ..database import SessionLocal
+                from ..database_models import LivePrice
                 db = SessionLocal()
                 live_prices = db.query(LivePrice).all()
                 for lp in live_prices:
@@ -372,7 +376,10 @@ def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = No
             "cache_status": cache_status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error fetching live prices: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching live prices: {str(e)}")
 
 
@@ -492,18 +499,24 @@ def get_assets_by_class_new(request: Request, asset_class: str):
 def get_asset_categories(request: Request):
     """Get all asset categories with their asset counts and sample data."""
     try:
-        from app.core.background_tasks import get_all_cached_prices, get_cache_status
-        from ..database import SessionLocal
-        from ..database_models import LivePrice
+        watchlist = config.WATCHLIST
 
-        # Use cached prices for instant response
-        cached_prices = get_all_cached_prices()
-        cache_status = get_cache_status()
+        # Try to get cached prices from background tasks
+        cached_prices = {}
+        cache_status = {"status": "unavailable"}
+        try:
+            from app.core.background_tasks import get_all_cached_prices, get_cache_status
+            cached_prices = get_all_cached_prices()
+            cache_status = get_cache_status()
+        except Exception as e:
+            logger.warning(f"Could not load cached prices: {e}")
 
         # Fallback to database if cache is empty
         db_prices = {}
         if len(cached_prices) == 0:
             try:
+                from ..database import SessionLocal
+                from ..database_models import LivePrice
                 db = SessionLocal()
                 live_prices = db.query(LivePrice).all()
                 for lp in live_prices:
@@ -521,8 +534,6 @@ def get_asset_categories(request: Request):
                 db.close()
             except Exception as e:
                 logger.error(f"Error loading from database: {e}")
-
-        watchlist = config.WATCHLIST
 
         # Group assets by class using cached prices
         categories = {}
@@ -573,7 +584,10 @@ def get_asset_categories(request: Request):
             "cache_status": cache_status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error fetching asset categories: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching asset categories: {str(e)}")
 
 
