@@ -307,8 +307,8 @@ async def live_quotes_stream(request: Request, symbols: str):
 
 @app.get("/api/assets/live-prices")
 @limiter.limit("10/minute")
-async def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None):
-    """Get live prices for all assets using on-demand fetching with intelligent caching."""
+async def get_all_assets_live_prices(request: Request, asset_class: Optional[str] = None, limit: int = 50):
+    """Get live prices for assets using cache-first approach with limit to avoid timeout."""
     try:
         watchlist = config.WATCHLIST
 
@@ -318,11 +318,14 @@ async def get_all_assets_live_prices(request: Request, asset_class: Optional[str
                 raise HTTPException(status_code=400, detail=f"Invalid asset class. Must be one of: {list(config.CLASS_LABELS.keys())}")
             watchlist = [asset for asset in watchlist if asset["class"] == asset_class]
 
-        # Fetch prices on-demand with intelligent caching
+        # Limit the number of assets to fetch to avoid timeout
+        watchlist = watchlist[:limit]
+
+        # Fetch prices with larger batch size
         from ..core.background_tasks import fetch_prices_batch, get_cache_status
-        
+
         symbols = [asset["symbol"] for asset in watchlist]
-        prices = await fetch_prices_batch(symbols, batch_size=10)
+        prices = await fetch_prices_batch(symbols, batch_size=30)
         cache_status = get_cache_status()
 
         # Combine watchlist info with prices
@@ -371,6 +374,7 @@ async def get_all_assets_live_prices(request: Request, asset_class: Optional[str
             "assets": assets_data,
             "total": len(assets_data),
             "asset_class": asset_class,
+            "limit": limit,
             "cache_status": cache_status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -495,64 +499,44 @@ def get_assets_by_class_new(request: Request, asset_class: str):
 @app.get("/api/assets/categories")
 @limiter.limit("30/minute")
 async def get_asset_categories(request: Request):
-    """Get all asset categories with their asset counts and sample data using on-demand fetching."""
+    """Get all asset categories with their asset counts. Fast response using cache-first approach."""
     try:
         watchlist = config.WATCHLIST
 
-        # Fetch prices on-demand with intelligent caching
-        from ..core.background_tasks import fetch_prices_batch, get_cache_status
-        
-        symbols = [asset["symbol"] for asset in watchlist]
-        prices = await fetch_prices_batch(symbols, batch_size=10)
-        cache_status = get_cache_status()
-
-        # Group assets by class using fetched prices
+        # Group assets by class WITHOUT fetching prices (much faster)
         categories = {}
         for asset_class in config.CLASS_LABELS.keys():
             class_assets = [asset for asset in watchlist if asset["class"] == asset_class]
 
-            # Build asset list with fetched prices
+            # Return basic asset info without prices (instant response)
             all_assets = []
             for asset in class_assets:
-                symbol = asset["symbol"]
-                quote = prices.get(symbol.upper())
-
                 all_assets.append({
-                    "symbol": symbol,
+                    "symbol": asset["symbol"],
                     "name": asset["name"],
                     "class": asset["class"],
                     "query": asset.get("query", ""),
-                    "price": quote.get("price", 0) if quote else 0,
-                    "change_pct": quote.get("change_pct", 0) if quote else 0,
-                    "change": quote.get("change", 0) if quote else 0,
-                    "volume": quote.get("volume", 0) if quote else 0,
-                    "market_cap": quote.get("market_cap") if quote else None,
-                    "high_24h": quote.get("day_high", 0) if quote else 0,
-                    "low_24h": quote.get("day_low", 0) if quote else 0,
-                    "last_update": quote.get("as_of", datetime.now(timezone.utc).isoformat()) if quote else datetime.now(timezone.utc).isoformat()
+                    "price": 0,  # Will be fetched on-demand
+                    "change_pct": 0,
+                    "change": 0,
+                    "volume": 0,
+                    "market_cap": None,
+                    "high_24h": 0,
+                    "low_24h": 0,
+                    "last_update": datetime.now(timezone.utc).isoformat()
                 })
-
-            # Calculate top gainers and losers from fetched data
-            assets_with_change = [(a, a["change_pct"]) for a in all_assets if a["change_pct"] != 0]
-            assets_with_change.sort(key=lambda x: x[1], reverse=True)
-
-            top_gainers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]}
-                          for a, _ in assets_with_change[:5]]
-            top_losers = [{"symbol": a["symbol"], "name": a["name"], "change_pct": a["change_pct"]}
-                         for a, _ in assets_with_change[-5:]]
 
             categories[asset_class] = {
                 "label": config.CLASS_LABELS.get(asset_class, asset_class),
                 "total_assets": len(class_assets),
-                "top_gainers": top_gainers,
-                "top_losers": top_losers,
+                "top_gainers": [],  # Will be computed client-side or via separate endpoint
+                "top_losers": [],
                 "all_assets": all_assets
             }
 
         return {
             "categories": categories,
             "total_assets": len(watchlist),
-            "cache_status": cache_status,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except HTTPException:
