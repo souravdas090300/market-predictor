@@ -9,5 +9,8 @@
         "ENV": "production"
       }
     }
+  },
+  "buildConfig": {
+    "envFile": ".env.prod"
   }
 }

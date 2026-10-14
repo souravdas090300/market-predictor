@@ -97,6 +97,8 @@ class TestInputValidation:
         assert sec.sanitize_symbol("aapl") == "AAPL"
         assert sec.sanitize_symbol("BTC-USD") == "BTC-USD"
         assert sec.sanitize_symbol("  msft  ") == "MSFT"
+        assert sec.sanitize_symbol("^GSPC") == "^GSPC"
+        assert sec.sanitize_symbol("M&M.NS") == "M&M.NS"
         
         
         # Invalid symbols
@@ -272,6 +274,9 @@ class TestSecurityHeaders:
         
         assert headers["X-Frame-Options"] == "DENY"
         assert headers["X-Content-Type-Options"] == "nosniff"
+        csp = headers["Content-Security-Policy"]
+        assert "https://fonts.googleapis.com" in csp
+        assert "https://fonts.gstatic.com" in csp
 
 
 class TestUserManagement:

@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 import warnings
 import sys
+from dotenv import load_dotenv
 
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
@@ -14,8 +15,20 @@ from providers import stocks_global_500
 from providers import forex_global_100
 from providers import commodities_global_50
 
-# Environment
+# Determine environment and load appropriate .env file
 ENV = os.getenv("ENV", "development").lower()
+
+# Load environment variables based on environment
+if ENV == "production":
+    # Load production env file
+    load_dotenv(Path(__file__).parent.parent.parent / ".env.prod")
+    # Also load common .env file
+    load_dotenv(Path(__file__).parent.parent.parent / ".env")
+else:
+    # Load development env file
+    load_dotenv(Path(__file__).parent.parent.parent / ".env.dev")
+    # Also load common .env file
+    load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 # Security warnings for production
 if ENV == "production":

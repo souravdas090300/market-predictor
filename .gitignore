@@ -55,6 +55,8 @@ signals.db
 
 # Security (NEVER COMMIT THESE)
 .env
+.env.dev
+.env.prod
 secrets/
 *.key
 *.pem

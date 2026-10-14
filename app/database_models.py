@@ -75,6 +75,7 @@ class LivePrice(Base):
     __table_args__ = (
         Index('idx_symbol_updated', 'symbol', 'updated_at'),
         Index('idx_category', 'category'),
+        Index('idx_category_updated', 'category', 'updated_at'),
     )
 
 
