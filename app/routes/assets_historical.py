@@ -26,7 +26,7 @@ price_cache = TTLCache(maxsize=500, ttl=3600)
 @router.get("/price-history/{symbol}")
 async def get_price_history(
     symbol: str,
-    timeframe: str = Query("24H", regex="^(24H|1W|1M|6M|1Y|5Y|ALL)$"),
+    timeframe: str = Query("24H", pattern="^(24H|1W|1M|6M|1Y|5Y|ALL)$"),
     category: str = Query("crypto")
 ):
     """

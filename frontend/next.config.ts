@@ -46,10 +46,12 @@ const nextConfig: NextConfig = {
   
   // Use webpack for better path resolution compatibility
   webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@': require('path').resolve(__dirname, 'src'),
-    };
+    // Note: '@' alias removed since there's no src/ directory
+    // If you add src/ later, uncomment this:
+    // config.resolve.alias = {
+    //   ...config.resolve.alias,
+    //   '@': require('path').resolve(__dirname, 'src'),
+    // };
     return config;
   },
 };
