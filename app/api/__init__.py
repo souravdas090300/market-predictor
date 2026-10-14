@@ -3958,26 +3958,148 @@ def update_user_subscription(request: Request, body: UpdateSubscriptionRequest, 
 @app.post("/api/auth/oauth/callback")
 @limiter.limit("10/minute")
 def oauth_callback(request: Request, body: OAuthCallbackRequest):
-    """Handle OAuth callback (placeholder for Google sign-up)."""
-    # TODO: Implement actual OAuth flow with Google
-    # This is a placeholder that simulates the OAuth flow
+    """Handle OAuth callback from Google."""
+    # Verify provider
+    if body.provider != "google":
+        raise HTTPException(
+            status_code=400,
+            detail="Only Google OAuth is currently supported"
+        )
     
-    # For now, return an error indicating not implemented
-    raise HTTPException(
-        status_code=501,
-        detail="OAuth not yet implemented. Please use email/password registration."
-    )
+    try:
+        # Exchange code for token
+        from app.oauth.google import exchange_code_for_token, get_google_user_info
+        token_data = exchange_code_for_token(body.code)
+        access_token = token_data.get("access_token")
+        
+        if not access_token:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to obtain access token from Google"
+            )
+        
+        # Get user info from Google
+        user_info = get_google_user_info(access_token)
+        
+        # Extract user data
+        google_id = user_info.get("id")
+        email = user_info.get("email")
+        name = user_info.get("name")
+        given_name = user_info.get("given_name")
+        family_name = user_info.get("family_name")
+        picture = user_info.get("picture")
+        
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail="Email is required from Google OAuth"
+            )
+        
+        # Check if user exists by OAuth
+        existing_user = user_manager.find_user_by_oauth("google", google_id)
+        
+        if existing_user:
+            # User exists, log them in
+            # Generate JWT token
+            from datetime import timedelta
+            from jose import jwt
+            
+            access_token_expires = timedelta(minutes=60)
+            access_token = jwt.encode(
+                {
+                    "sub": existing_user["user_id"],
+                    "username": existing_user["username"],
+                    "role": existing_user["roles"][0] if existing_user["roles"] else "user",
+                    "exp": datetime.now(timezone.utc) + access_token_expires
+                },
+                config.SECRET_KEY,
+                algorithm="HS256"
+            )
+            
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": {
+                    "user_id": existing_user["user_id"],
+                    "username": existing_user["username"],
+                    "email": existing_user["email"],
+                    "role": existing_user["roles"][0] if existing_user["roles"] else "user",
+                    "avatar_url": existing_user.get("profile", {}).get("avatar_url")
+                }
+            }
+        else:
+            # Create new user from OAuth
+            profile_data = {
+                "first_name": given_name,
+                "last_name": family_name,
+                "avatar_url": picture,
+                "location": None
+            }
+            
+            new_user = user_manager.create_user_from_oauth(
+                provider="google",
+                provider_user_id=google_id,
+                email=email,
+                profile_data=profile_data
+            )
+            
+            # Generate JWT token
+            from datetime import timedelta
+            from jose import jwt
+            
+            access_token_expires = timedelta(minutes=60)
+            access_token = jwt.encode(
+                {
+                    "sub": new_user["user_id"],
+                    "username": new_user["username"],
+                    "role": new_user["roles"][0] if new_user["roles"] else "user",
+                    "exp": datetime.now(timezone.utc) + access_token_expires
+                },
+                config.SECRET_KEY,
+                algorithm="HS256"
+            )
+            
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": {
+                    "user_id": new_user["user_id"],
+                    "username": new_user["username"],
+                    "email": new_user["email"],
+                    "role": new_user["roles"][0] if new_user["roles"] else "user",
+                    "avatar_url": new_user.get("profile", {}).get("avatar_url")
+                }
+            }
+            
+    except requests.RequestException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error communicating with Google: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"OAuth error: {str(e)}"
+        )
 
 
 @app.get("/api/auth/oauth/google")
 @limiter.limit("20/minute")
 def google_oauth_redirect(request: Request):
-    """Redirect to Google OAuth (placeholder)."""
-    # TODO: Implement actual Google OAuth redirect
-    raise HTTPException(
-        status_code=501,
-        detail="Google OAuth not yet implemented. Please use email/password registration."
-    )
+    """Redirect to Google OAuth."""
+    from app.oauth.google import get_google_auth_url
+    import secrets
+    
+    # Generate state parameter for CSRF protection
+    state = secrets.token_urlsafe(32)
+    
+    # Get Google OAuth URL
+    auth_url = get_google_auth_url(state=state)
+    
+    return {
+        "auth_url": auth_url,
+        "state": state
+    }
 
 
 # Protected endpoint example
