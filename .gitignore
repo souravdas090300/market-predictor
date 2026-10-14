@@ -25,6 +25,10 @@ MANIFEST
 # Frontend exception - allow frontend/src/lib/
 !frontend/src/lib/
 
+# Node modules
+node_modules/
+frontend/node_modules/
+
 # Virtual environments
 .venv/
 env/
