@@ -47,11 +47,13 @@ from ..services import batch_prediction
 from ..services import backtesting
 from ..services import advanced_sentiment
 from ..services import trading_automation
+from ..services.gemini_ai import gemini_service
 
 # Import new phase-based routes
 from ..routes import phase1_5_router, phase6_10_router, phase11_18_router
 from ..routes import assets_library
 from ..routes.assets_historical import router as assets_historical_router
+from ..websocket import router as websocket_router
 
 
 # Initialize admin user on startup (production only)
@@ -222,6 +224,7 @@ app.include_router(phase6_10_router)
 app.include_router(phase11_18_router)
 app.include_router(assets_library.router)
 app.include_router(assets_historical_router, prefix="/api/v1/assets", tags=["assets-historical"])
+app.include_router(websocket_router, prefix="/api/v2/assets", tags=["websocket"])
 
 # Security headers middleware
 @app.middleware("http")
@@ -2796,6 +2799,122 @@ async def execute_limit_order_v2(request: Request, body: LimitOrderRequest):
         raise HTTPException(status_code=500, detail=f"Error executing limit order: {str(e)}")
 
 
+# Pydantic models for advanced order types
+class StopLossOrderRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    side: str = Field(..., pattern="^(buy|sell)$")
+    quantity: float = Field(..., gt=0)
+    stop_price: float = Field(..., gt=0)
+    price: float = Field(default=None, gt=0)  # Optional limit price for stop-limit
+
+class StopLimitOrderRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    side: str = Field(..., pattern="^(buy|sell)$")
+    quantity: float = Field(..., gt=0)
+    stop_price: float = Field(..., gt=0)
+    limit_price: float = Field(..., gt=0)
+
+class TrailingStopOrderRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    side: str = Field(..., pattern="^(buy|sell)$")
+    quantity: float = Field(..., gt=0)
+    trail_amount: float = Field(..., gt=0)  # Dollar amount or percentage
+    trail_type: str = Field(default="amount", pattern="^(amount|percentage)$")
+
+
+@app.post("/api/v2/orders/stop-loss")
+@limiter.limit("20/minute")
+async def execute_stop_loss_order(request: Request, body: StopLossOrderRequest):
+    """Execute stop-loss order."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        order = await trading_automation.trade_executor.execute_stop_loss_order(
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            stop_price=body.stop_price,
+            limit_price=body.price
+        )
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "symbol": order.symbol,
+                "side": order.side,
+                "type": "stop_loss",
+                "quantity": order.quantity,
+                "stop_price": order.stop_price,
+                "limit_price": order.limit_price,
+                "status": order.status,
+                "created_at": order.created_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing stop-loss order: {str(e)}")
+
+
+@app.post("/api/v2/orders/stop-limit")
+@limiter.limit("20/minute")
+async def execute_stop_limit_order(request: Request, body: StopLimitOrderRequest):
+    """Execute stop-limit order."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        order = await trading_automation.trade_executor.execute_stop_limit_order(
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            stop_price=body.stop_price,
+            limit_price=body.limit_price
+        )
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "symbol": order.symbol,
+                "side": order.side,
+                "type": "stop_limit",
+                "quantity": order.quantity,
+                "stop_price": order.stop_price,
+                "limit_price": order.limit_price,
+                "status": order.status,
+                "created_at": order.created_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing stop-limit order: {str(e)}")
+
+
+@app.post("/api/v2/orders/trailing-stop")
+@limiter.limit("20/minute")
+async def execute_trailing_stop_order(request: Request, body: TrailingStopOrderRequest):
+    """Execute trailing stop order."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        order = await trading_automation.trade_executor.execute_trailing_stop_order(
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            trail_amount=body.trail_amount,
+            trail_type=body.trail_type
+        )
+        return {
+            "success": True,
+            "order": {
+                "id": order.id,
+                "symbol": order.symbol,
+                "side": order.side,
+                "type": "trailing_stop",
+                "quantity": order.quantity,
+                "trail_amount": order.trail_amount,
+                "trail_type": order.trail_type,
+                "status": order.status,
+                "created_at": order.created_at.isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing trailing stop order: {str(e)}")
+
+
 @app.delete("/api/v2/orders/{order_id}")
 @limiter.limit("20/minute")
 async def cancel_order_v2(request: Request, order_id: str):
@@ -2820,6 +2939,67 @@ def get_execution_history_v2(request: Request, symbol: Optional[str] = None, day
         return {"success": True, "history": history}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting history: {str(e)}")
+
+
+# ============================================================================
+# PAPER TRADING ROUTES
+# ============================================================================
+
+class PaperTradeRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    side: str = Field(..., pattern="^(buy|sell)$")
+    quantity: float = Field(..., gt=0)
+    price: float = Field(..., gt=0)
+
+
+@app.get("/api/paper/account")
+@limiter.limit("30/minute")
+def get_paper_account(request: Request):
+    """Get paper trading account status."""
+    try:
+        account = trading_automation.trade_executor.get_paper_account()
+        return {"success": True, "account": account}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting paper account: {str(e)}")
+
+
+@app.post("/api/paper/trade")
+@limiter.limit("20/minute")
+async def execute_paper_trade(request: Request, body: PaperTradeRequest):
+    """Execute a paper trade."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        result = await trading_automation.trade_executor.execute_paper_trade(
+            symbol=sanitized_symbol,
+            side=body.side,
+            quantity=body.quantity,
+            price=body.price
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing paper trade: {str(e)}")
+
+
+@app.post("/api/paper/reset")
+@limiter.limit("5/minute")
+def reset_paper_account(request: Request, initial_balance: float = 100000.0):
+    """Reset paper trading account."""
+    try:
+        result = trading_automation.trade_executor.reset_paper_account(initial_balance)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error resetting paper account: {str(e)}")
+
+
+@app.get("/api/paper/trades")
+@limiter.limit("30/minute")
+def get_paper_trades(request: Request, limit: int = 50):
+    """Get paper trading history."""
+    try:
+        trades = trading_automation.trade_executor.get_paper_trades(limit)
+        return {"success": True, "trades": trades}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting paper trades: {str(e)}")
 
 
 # ============================================================================
@@ -3398,11 +3578,108 @@ def position_check_v2(request: Request, body: PositionCheckRequest):
             )
             for h in body.holdings
         ]
-        
+
         violations = trading_automation.risk_management.check_position_sizing(holdings)
         return {"success": True, "violations": violations}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error checking positions: {str(e)}")
+
+
+# ============================================================================
+# GEMINI AI ROUTES
+# ============================================================================
+
+class GeminiSentimentRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    news_headlines: List[str] = Field(min_length=1, max_length=10)
+    additional_context: str = Field(default="", max_length=1000)
+
+
+class GeminiPredictionRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    time_horizon: str = Field(default="24h", pattern="^(1h|4h|24h|7d|30d)$")
+
+
+class GeminiStrategyRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    risk_tolerance: str = Field(default="moderate", pattern="^(low|moderate|high)$")
+    investment_horizon: str = Field(default="medium-term", pattern="^(short-term|medium-term|long-term)$")
+
+
+@app.post("/api/gemini/sentiment")
+@limiter.limit("10/minute")
+async def gemini_sentiment_analysis(request: Request, body: GeminiSentimentRequest):
+    """Analyze market sentiment using Gemini AI."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        result = await gemini_service.analyze_market_sentiment(
+            symbol=sanitized_symbol,
+            news_headlines=body.news_headlines,
+            additional_context=body.additional_context
+        )
+        return {"success": True, "analysis": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in Gemini sentiment analysis: {str(e)}")
+
+
+@app.post("/api/gemini/predict")
+@limiter.limit("10/minute")
+async def gemini_price_prediction(request: Request, body: GeminiPredictionRequest):
+    """Predict price movement using Gemini AI."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+
+        # Fetch historical data
+        from ..core import data
+        signal_data = _auto_signal(sanitized_symbol, news=True, refresh=False)
+        candles = signal_data.get('candles', [])
+
+        # Convert to list of dicts
+        historical_data = [
+            {
+                "close": c.get('c'),
+                "high": c.get('h'),
+                "low": c.get('l'),
+                "volume": c.get('v')
+            }
+            for c in candles[-50:]  # Last 50 candles
+        ]
+
+        result = await gemini_service.predict_price_movement(
+            symbol=sanitized_symbol,
+            historical_data=historical_data,
+            time_horizon=body.time_horizon
+        )
+        return {"success": True, "prediction": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in Gemini price prediction: {str(e)}")
+
+
+@app.post("/api/gemini/strategy")
+@limiter.limit("5/minute")
+async def gemini_trading_strategy(request: Request, body: GeminiStrategyRequest):
+    """Generate trading strategy using Gemini AI."""
+    try:
+        sanitized_symbol = sanitize_symbol(body.symbol)
+        result = await gemini_service.generate_trading_strategy(
+            symbol=sanitized_symbol,
+            risk_tolerance=body.risk_tolerance,
+            investment_horizon=body.investment_horizon
+        )
+        return {"success": True, "strategy": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in Gemini strategy generation: {str(e)}")
+
+
+@app.get("/api/gemini/status")
+@limiter.limit("30/minute")
+def gemini_status(request: Request):
+    """Check Gemini AI service status."""
+    return {
+        "success": True,
+        "enabled": gemini_service.is_available(),
+        "api_key_configured": bool(gemini_service.api_key)
+    }
 
 
 class CorrelationRequest(BaseModel):

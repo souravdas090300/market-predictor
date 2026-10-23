@@ -97,6 +97,7 @@ export default function AssetsLibrary() {
 
   const connectWebSocket = (symbol) => {
     const wsUrl = `${API_URL.replace('http', 'ws')}/api/v2/assets/ws/price/${symbol}`;
+    console.log('Connecting to WebSocket:', wsUrl);
     const websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {

@@ -33,6 +33,7 @@ class OrderType(Enum):
     LIMIT = "limit"
     STOP_LIMIT = "stop-limit"
     STOP_LOSS = "stop-loss"
+    TRAILING_STOP = "trailing_stop"
 
 
 class AlertType(Enum):
@@ -103,6 +104,7 @@ class Order:
     filled_quantity: float = 0.0
     fees: float = 0.0
     pnl: Optional[float] = None
+    is_paper_trade: bool = False  # Flag for paper trading
 
 
 @dataclass
@@ -117,13 +119,20 @@ class Notification:
 
 class TradeExecutor:
     """Automated trading execution and alert management."""
-    
+
     def __init__(self):
         """Initialize trade executor."""
         self.active_orders: Dict[str, Order] = {}
         self.execution_history: List[Order] = []
         self.alerts: List[Alert] = []
         self.notifications: List[Notification] = []
+        # Paper trading account
+        self.paper_account = {
+            "balance": 100000.0,  # Starting balance: $100,000
+            "holdings": {},  # {symbol: quantity}
+            "initial_balance": 100000.0,
+            "trades": []
+        }
     
     async def create_alert(
         self,
@@ -218,7 +227,78 @@ class TradeExecutor:
             stop_price=stop_price,
             status=OrderStatus.PENDING.value
         )
-        
+
+        self.active_orders[order.id] = order
+        return order
+
+    async def execute_stop_loss_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        stop_price: float,
+        limit_price: Optional[float] = None
+    ) -> Order:
+        """Execute a stop-loss order (or stop-limit if limit_price provided)."""
+        order = Order(
+            id=str(uuid.uuid4()),
+            symbol=symbol,
+            side=side,
+            type=OrderType.STOP_LIMIT.value if limit_price else OrderType.STOP_LOSS.value,
+            quantity=quantity,
+            stop_price=stop_price,
+            limit_price=limit_price,
+            status=OrderStatus.PENDING.value
+        )
+
+        self.active_orders[order.id] = order
+        return order
+
+    async def execute_stop_limit_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        stop_price: float,
+        limit_price: float
+    ) -> Order:
+        """Execute a stop-limit order."""
+        order = Order(
+            id=str(uuid.uuid4()),
+            symbol=symbol,
+            side=side,
+            type=OrderType.STOP_LIMIT.value,
+            quantity=quantity,
+            stop_price=stop_price,
+            limit_price=limit_price,
+            status=OrderStatus.PENDING.value
+        )
+
+        self.active_orders[order.id] = order
+        return order
+
+    async def execute_trailing_stop_order(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        trail_amount: float,
+        trail_type: str = "amount"
+    ) -> Order:
+        """Execute a trailing stop order."""
+        order = Order(
+            id=str(uuid.uuid4()),
+            symbol=symbol,
+            side=side,
+            type="trailing_stop",
+            quantity=quantity,
+            # Store trail_amount in a custom field (reusing stop_price for amount)
+            stop_price=trail_amount,
+            # Store trail_type in limit_price field
+            limit_price=float(trail_type == "percentage"),
+            status=OrderStatus.PENDING.value
+        )
+
         self.active_orders[order.id] = order
         return order
     
@@ -279,6 +359,118 @@ class TradeExecutor:
             "sells": sells,
             "history": history
         }
+
+    # ============================================================================
+    # PAPER TRADING METHODS
+    # ============================================================================
+
+    def get_paper_account(self) -> Dict[str, Any]:
+        """Get paper trading account status."""
+        # Calculate portfolio value
+        portfolio_value = 0.0
+        from ..core import data
+
+        for symbol, quantity in self.paper_account["holdings"].items():
+            try:
+                price_data = data.get_live_price(symbol)
+                if price_data:
+                    current_price = price_data.get("current_price", 0)
+                    portfolio_value += current_price * quantity
+            except:
+                pass
+
+        total_value = self.paper_account["balance"] + portfolio_value
+        total_return = ((total_value - self.paper_account["initial_balance"]) / self.paper_account["initial_balance"]) * 100
+
+        return {
+            "balance": round(self.paper_account["balance"], 2),
+            "initial_balance": round(self.paper_account["initial_balance"], 2),
+            "portfolio_value": round(portfolio_value, 2),
+            "total_value": round(total_value, 2),
+            "total_return": round(total_return, 2),
+            "holdings": self.paper_account["holdings"].copy(),
+            "trade_count": len(self.paper_account["trades"])
+        }
+
+    async def execute_paper_trade(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float
+    ) -> Dict[str, Any]:
+        """Execute a paper trade (virtual money)."""
+        total_cost = quantity * price
+
+        if side == OrderSide.BUY.value:
+            if self.paper_account["balance"] < total_cost:
+                return {
+                    "success": False,
+                    "error": "Insufficient balance",
+                    "required": total_cost,
+                    "available": self.paper_account["balance"]
+                }
+
+            # Deduct from balance
+            self.paper_account["balance"] -= total_cost
+
+            # Add to holdings
+            if symbol not in self.paper_account["holdings"]:
+                self.paper_account["holdings"][symbol] = 0
+            self.paper_account["holdings"][symbol] += quantity
+
+        else:  # SELL
+            if symbol not in self.paper_account["holdings"] or self.paper_account["holdings"][symbol] < quantity:
+                return {
+                    "success": False,
+                    "error": "Insufficient holdings",
+                    "required": quantity,
+                    "available": self.paper_account["holdings"].get(symbol, 0)
+                }
+
+            # Add to balance
+            self.paper_account["balance"] += total_cost
+
+            # Remove from holdings
+            self.paper_account["holdings"][symbol] -= quantity
+            if self.paper_account["holdings"][symbol] <= 0:
+                del self.paper_account["holdings"][symbol]
+
+        # Record trade
+        trade = {
+            "id": str(uuid.uuid4()),
+            "symbol": symbol,
+            "side": side,
+            "quantity": quantity,
+            "price": price,
+            "total": total_cost,
+            "timestamp": datetime.now(tz.utc).isoformat()
+        }
+        self.paper_account["trades"].append(trade)
+
+        return {
+            "success": True,
+            "trade": trade,
+            "account": self.get_paper_account()
+        }
+
+    def reset_paper_account(self, initial_balance: float = 100000.0) -> Dict[str, Any]:
+        """Reset paper trading account."""
+        self.paper_account = {
+            "balance": initial_balance,
+            "holdings": {},
+            "initial_balance": initial_balance,
+            "trades": []
+        }
+        return {
+            "success": True,
+            "message": "Paper account reset",
+            "account": self.get_paper_account()
+        }
+
+    def get_paper_trades(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get paper trading history."""
+        return self.paper_account["trades"][-limit:]
 
 
 # ============================================================================

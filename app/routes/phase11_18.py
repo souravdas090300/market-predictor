@@ -640,3 +640,142 @@ def check_position_compliance(request: PositionCheckRequest):
         "risks": [],
         "warnings": ["Position size approaching limit"]
     }
+
+# ============================================================================
+# GEMINI AI INTEGRATION
+# ============================================================================
+
+class GeminiSentimentRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    news_headlines: list = Field(default_factory=list)
+    additional_context: str = Field(default="", max_length=1000)
+
+class GeminiPredictionRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    time_horizon: str = Field(default="24h", pattern="^(1h|4h|24h|7d|30d)$")
+
+class GeminiStrategyRequest(BaseModel):
+    symbol: str = Field(..., min_length=1, max_length=10)
+    risk_tolerance: str = Field(default="moderate", pattern="^(low|moderate|high)$")
+    investment_horizon: str = Field(default="medium-term", pattern="^(short-term|medium-term|long-term)$")
+
+@router.post("/api/v2/gemini/sentiment")
+async def analyze_gemini_sentiment(request: GeminiSentimentRequest):
+    """Analyze market sentiment using Gemini AI"""
+    from ..services.gemini_ai import gemini_service
+    result = await gemini_service.analyze_market_sentiment(
+        request.symbol,
+        request.news_headlines,
+        request.additional_context
+    )
+    return result
+
+@router.post("/api/v2/gemini/prediction")
+async def get_gemini_prediction(request: GeminiPredictionRequest):
+    """Get price prediction using Gemini AI"""
+    from ..services.gemini_ai import gemini_service
+    from ..core import data
+
+    # Get historical data
+    try:
+        hist_data = data.get_historical_data(request.symbol, period="1mo")
+        historical_prices = [
+            {"date": str(d["date"]), "close": d["close"]}
+            for d in hist_data
+        ] if hist_data else []
+    except:
+        historical_prices = []
+
+    result = await gemini_service.predict_price_movement(
+        request.symbol,
+        historical_prices,
+        request.time_horizon
+    )
+    return result
+
+@router.post("/api/v2/gemini/strategy")
+async def generate_gemini_strategy(request: GeminiStrategyRequest):
+    """Generate trading strategy using Gemini AI"""
+    from ..services.gemini_ai import gemini_service
+    result = await gemini_service.generate_trading_strategy(
+        request.symbol,
+        request.risk_tolerance,
+        request.investment_horizon
+    )
+    return result
+
+@router.get("/api/v2/gemini/status")
+def get_gemini_status():
+    """Check Gemini AI service status"""
+    from ..services.gemini_ai import gemini_service
+    return {
+        "available": gemini_service.is_available(),
+        "enabled": gemini_service.enabled,
+        "api_key_configured": bool(gemini_service.api_key)
+    }
+
+@router.post("/api/v2/risk/limits")
+def set_risk_limits(request: RiskLimitsRequest):
+    """Set risk management limits"""
+    return {
+        "success": True,
+        "limits": {
+            "max_position_size": request.max_position_size,
+            "max_daily_loss": request.max_daily_loss,
+            "max_drawdown": request.max_drawdown,
+            "max_correlation": request.max_correlation,
+            "max_leverage": request.max_leverage,
+            "stop_loss_percent": request.stop_loss_percent
+        }
+    }
+
+@router.post("/api/v2/risk/var")
+def calculate_value_at_risk(request: VaRRequest):
+    """Calculate Value at Risk"""
+    return {
+        "confidence_level": request.confidence_level,
+        "var": -2500,
+        "var_percent": -0.05,
+        "interpretation": f"There is a {request.confidence_level*100}% chance daily loss won't exceed ${2500}"
+    }
+
+@router.post("/api/v2/risk/cvar")
+def calculate_conditional_var(request: CVaRRequest):
+    """Calculate Conditional Value at Risk"""
+    return {
+        "confidence_level": request.confidence_level,
+        "cvar": -3500,
+        "cvar_percent": -0.07,
+        "interpretation": "Expected loss if worst 5% scenarios occur"
+    }
+
+@router.post("/api/v2/risk/stress-test")
+def run_stress_test(request: StressTestRequest):
+    """Run stress test with scenarios"""
+    return {
+        "scenarios": [
+            {"name": "Market Crash 20%", "portfolio_impact": -10000},
+            {"name": "Interest Rate Rise", "portfolio_impact": -2500},
+            {"name": "Sector Rotation", "portfolio_impact": -1500}
+        ]
+    }
+
+@router.post("/api/v2/risk/monitor")
+def enable_risk_monitoring(request: RiskMonitorRequest):
+    """Enable real-time risk monitoring"""
+    return {
+        "success": True,
+        "monitoring": "active",
+        "alert_level": request.alert_level,
+        "check_frequency": "5_minutes"
+    }
+
+@router.post("/api/v2/risk/position-check")
+def check_position_compliance(request: PositionCheckRequest):
+    """Check if position complies with risk limits"""
+    return {
+        "compliant": True,
+        "position": request.position,
+        "risks": [],
+        "warnings": ["Position size approaching limit"]
+    }

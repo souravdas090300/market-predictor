@@ -28,7 +28,8 @@ class RedisCache:
                 1: 1,  # TCP_KEEPIDLE
                 2: 1,  # TCP_KEEPINTVL
                 3: 3,  # TCP_KEEPCNT
-            }
+            },
+            protocol=2  # Use RESP2 protocol for compatibility
         )
 
         # Test connection

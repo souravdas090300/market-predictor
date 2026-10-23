@@ -3,9 +3,19 @@
  * Protected route for authenticated users with full feature implementation
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { useWatchlistWebSocket } from '../hooks/useWebSocket';
+import EnsemblePredictions from '../components/EnsemblePredictions';
+import PortfolioOptimization from '../components/PortfolioOptimization';
+import AdvancedOrders from '../components/AdvancedOrders';
+import PaperTrading from '../components/PaperTrading';
+import GeminiAI from '../components/GeminiAI';
+import SocialTrading from '../components/SocialTrading';
+import BrokerIntegration from '../components/BrokerIntegration';
+import RiskManagement from '../components/RiskManagement';
+import Community from '../components/Community';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -28,8 +38,40 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [assetCategories, setAssetCategories] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [enableWebSocket, setEnableWebSocket] = useState(true);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://market-predictor-production-0f87.up.railway.app');
+
+  // WebSocket for real-time price updates
+  const watchlistSymbols = watchlist.map(asset => asset.symbol);
+  const { isConnected: wsConnected, priceUpdates, lastUpdateTime: wsLastUpdate } = useWatchlistWebSocket(
+    API_URL,
+    enableWebSocket ? watchlistSymbols : []
+  );
+
+  // Update watchlist with WebSocket price updates
+  useEffect(() => {
+    if (Object.keys(priceUpdates).length > 0) {
+      setWatchlist(prevWatchlist => {
+        return prevWatchlist.map(asset => {
+          const update = priceUpdates[asset.symbol];
+          if (update) {
+            return {
+              ...asset,
+              price: update.current_price,
+              change_pct: update.change_percent_24h,
+              change: update.change_24h,
+              volume: update.volume_24h,
+              high_24h: update.high_24h,
+              low_24h: update.low_24h,
+              last_update: update.timestamp
+            };
+          }
+          return asset;
+        });
+      });
+    }
+  }, [priceUpdates]);
 
   useEffect(() => {
     const token = localStorage.getItem('auth-token');
@@ -48,12 +90,14 @@ export default function Dashboard() {
 
     setLoading(false);
     loadDashboardData();
-    
-    // Auto-refresh prices every 60 seconds (increased from 15s since we now fetch all assets)
+
+    // Fallback: Auto-refresh prices every 60 seconds (WebSocket handles real-time updates)
     const refreshInterval = setInterval(() => {
-      refreshPrices();
+      if (!wsConnected) {
+        refreshPrices();
+      }
     }, 60000);
-    
+
     // Clean up interval on unmount
     return () => {
       clearInterval(refreshInterval);
@@ -402,6 +446,19 @@ export default function Dashboard() {
 
   return (
     <div style={{ backgroundColor: '#0F172A', color: '#F9FAFB', minHeight: '100vh' }}>
+      <style jsx global>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes flash {
+          0%, 100% { background-color: transparent; }
+          50% { background-color: rgba(16, 185, 129, 0.1); }
+        }
+        .price-updated {
+          animation: flash 0.5s ease-out;
+        }
+      `}</style>
       {/* Header */}
       <div style={{
         borderBottom: '1px solid #2D3748',
@@ -414,7 +471,37 @@ export default function Dashboard() {
         flexWrap: 'wrap',
         gap: '1rem'
       }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: '700' }}>📈 Market Predictor Pro</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h1 style={{ fontSize: '1.4rem', fontWeight: '700' }}>📈 Market Predictor Pro</h1>
+          {/* WebSocket Status Indicator */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '9999px',
+            backgroundColor: wsConnected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+            border: `1px solid ${wsConnected ? '#10B981' : '#EF4444'}`,
+            fontSize: '0.75rem',
+            fontWeight: '600'
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: wsConnected ? '#10B981' : '#EF4444',
+              animation: wsConnected ? 'pulse 2s infinite' : 'none'
+            }} />
+            <span style={{ color: wsConnected ? '#10B981' : '#EF4444' }}>
+              {wsConnected ? 'Live' : 'Offline'}
+            </span>
+            {wsLastUpdate && (
+              <span style={{ color: '#9CA3AF', marginLeft: '0.5rem' }}>
+                ({new Date(wsLastUpdate).toLocaleTimeString()})
+              </span>
+            )}
+          </div>
+        </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{user.username || user.email}</div>
@@ -422,6 +509,21 @@ export default function Dashboard() {
               {localStorage.getItem('user-role') || 'user'}
             </div>
           </div>
+          <button
+            onClick={() => setEnableWebSocket(!enableWebSocket)}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: enableWebSocket ? '#3B82F6' : '#6B7280',
+              color: '#F9FAFB',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '0.85rem'
+            }}
+          >
+            {enableWebSocket ? 'WS On' : 'WS Off'}
+          </button>
           <button
             onClick={handleLogout}
             style={{
@@ -486,7 +588,7 @@ export default function Dashboard() {
               overflowX: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}>
-              {['watchlist', 'portfolio', 'signals', 'prediction', 'categories', 'analysis', 'backtesting', 'alerts'].map(tab => (
+              {['watchlist', 'portfolio', 'optimization', 'orders', 'paper', 'gemini', 'social', 'brokers', 'risk', 'community', 'signals', 'prediction', 'ensemble', 'categories', 'analysis', 'backtesting', 'alerts'].map(tab => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -526,13 +628,67 @@ export default function Dashboard() {
               )}
               
               {activeTab === 'portfolio' && (
-                <PortfolioComponent 
-                  portfolio={portfolio} 
+                <PortfolioComponent
+                  portfolio={portfolio}
                   onCalculateRisk={calculateRisk}
                   riskMetrics={riskMetrics}
                 />
               )}
-              
+
+              {activeTab === 'optimization' && (
+                <PortfolioOptimization
+                  portfolio={portfolio}
+                  API_URL={API_URL}
+                />
+              )}
+
+              {activeTab === 'orders' && (
+                <AdvancedOrders
+                  symbol={selectedSymbol}
+                  currentPrice={watchlist.find(w => w.symbol === selectedSymbol)?.price}
+                  API_URL={API_URL}
+                />
+              )}
+
+              {activeTab === 'paper' && (
+                <PaperTrading
+                  symbol={selectedSymbol}
+                  currentPrice={watchlist.find(w => w.symbol === selectedSymbol)?.price}
+                  API_URL={API_URL}
+                />
+              )}
+
+              {activeTab === 'gemini' && (
+                <GeminiAI
+                  symbol={selectedSymbol}
+                />
+              )}
+
+              {activeTab === 'social' && (
+                <SocialTrading
+                  symbol={selectedSymbol}
+                  API_URL={API_URL}
+                />
+              )}
+
+              {activeTab === 'brokers' && (
+                <BrokerIntegration
+                  API_URL={API_URL}
+                />
+              )}
+
+              {activeTab === 'risk' && (
+                <RiskManagement
+                  API_URL={API_URL}
+                />
+              )}
+
+              {activeTab === 'community' && (
+                <Community
+                  API_URL={API_URL}
+                />
+              )}
+
               {activeTab === 'signals' && (
                 <SignalsComponent 
                   watchlist={watchlist}
@@ -556,7 +712,7 @@ export default function Dashboard() {
               )}
               
               {activeTab === 'prediction' && (
-                <ShortTermPredictionComponent 
+                <ShortTermPredictionComponent
                   watchlist={watchlist}
                   selectedSymbol={selectedSymbol}
                   onSelectSymbol={setSelectedSymbol}
@@ -566,7 +722,14 @@ export default function Dashboard() {
                   onLoadPrediction={loadShortTermPrediction}
                 />
               )}
-              
+
+              {activeTab === 'ensemble' && (
+                <EnsemblePredictions
+                  symbol={selectedSymbol}
+                  API_URL={API_URL}
+                />
+              )}
+
               {activeTab === 'categories' && (
                 <AssetCategoriesComponent 
                   assetCategories={assetCategories}
@@ -601,16 +764,43 @@ export default function Dashboard() {
 function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [updatedSymbols, setUpdatedSymbols] = useState(new Set());
+
+  // Track which symbols were recently updated via WebSocket
+  useEffect(() => {
+    if (watchlist.length > 0) {
+      const now = Date.now();
+      const recentUpdates = new Set();
+
+      watchlist.forEach(asset => {
+        if (asset.last_update) {
+          const updateTime = new Date(asset.last_update).getTime();
+          if (now - updateTime < 10000) { // Updated within last 10 seconds
+            recentUpdates.add(asset.symbol);
+          }
+        }
+      });
+
+      setUpdatedSymbols(recentUpdates);
+
+      // Clear the highlight after 2 seconds
+      const timeout = setTimeout(() => {
+        setUpdatedSymbols(new Set());
+      }, 2000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [watchlist]);
 
   const filteredAssets = watchlist.filter(item => {
     const symbol = (item.symbol || '').toLowerCase();
     const name = (item.name || '').toLowerCase();
     const query = searchQuery.toLowerCase();
     const category = item.class || item.category || 'stock';
-    
+
     const matchesSearch = symbol.includes(query) || name.includes(query);
     const matchesCategory = filterCategory === 'all' || category === filterCategory;
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -727,10 +917,11 @@ function WatchlistComponent({ watchlist, onSelectSymbol, selectedSymbol }) {
                   padding: '0.75rem',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: selectedSymbol === symbol ? 'rgba(59, 130, 246, 0.3)' : 'rgba(45, 55, 72, 0.3)',
+                  backgroundColor: updatedSymbols.has(symbol) ? 'rgba(16, 185, 129, 0.2)' : (selectedSymbol === symbol ? 'rgba(59, 130, 246, 0.3)' : 'rgba(45, 55, 72, 0.3)'),
                   transition: 'all 0.2s',
                   textDecoration: 'none',
-                  display: 'block'
+                  display: 'block',
+                  animation: updatedSymbols.has(symbol) ? 'flash 0.5s ease-out' : 'none'
                 }}
                 onMouseEnter={(e) => {
                   if (selectedSymbol !== symbol) {
