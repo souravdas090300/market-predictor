@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, TrendingUp, Shield, Loader2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import { normalizeNewsResponse } from '../lib/marketData.mjs';
 
 const GeminiAI = ({ symbol }) => {
   const [status, setStatus] = useState(null);
@@ -32,9 +33,23 @@ const GeminiAI = ({ symbol }) => {
   const analyzeSentiment = async () => {
     setLoading(true);
     try {
+      const assetClass = symbol?.toUpperCase().endsWith('-USD') ? 'crypto' : 'stock';
+      let headlines = [];
+
+      try {
+        const newsResponse = await axios.get(`${API_URL}/api/news/${symbol}`, {
+          params: { asset_class: assetClass }
+        });
+        headlines = normalizeNewsResponse(newsResponse.data).articles
+          .map((article) => article.title)
+          .filter(Boolean);
+      } catch (newsError) {
+        console.warn('Could not load headlines for Gemini sentiment:', newsError);
+      }
+
       const response = await axios.post(`${API_URL}/api/v2/gemini/sentiment`, {
         symbol,
-        news_headlines: [],
+        news_headlines: headlines,
         additional_context: ''
       });
       setSentiment(response.data);

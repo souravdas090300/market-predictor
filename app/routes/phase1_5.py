@@ -7,11 +7,14 @@ The app/api/__init__.py versions are the production implementations.
 This file serves as a reference/stub for phase-based development.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime
 import jwt
 import os
 from pydantic import BaseModel, Field
+
+from ..security import sanitize_symbol
+from ..services import news as news_service
 
 router = APIRouter()
 
@@ -176,37 +179,49 @@ def get_risk_scenarios():
 # ============================================================================
 
 @router.get("/api/news/{symbol}")
-def get_news(symbol: str):
-    """Get news for a symbol"""
+def get_news(
+    symbol: str,
+    asset_class: str = "stock",
+    max_articles: int = Query(20, ge=1, le=50)
+):
+    """Get real Yahoo Finance/RSS news for a symbol."""
+    clean_symbol = sanitize_symbol(symbol)
+    result = news_service.get_news_with_sentiment(clean_symbol, asset_class, max_articles)
+    sentiment = result['sentiment']
     return {
-        "news": [
-            {
-                "title": f"{symbol} Reports Strong Q3 Earnings",
-                "source": "Reuters",
-                "date": datetime.utcnow().isoformat(),
-                "sentiment": "positive"
-            },
-            {
-                "title": f"{symbol} Faces Regulatory Challenges",
-                "source": "Bloomberg",
-                "date": datetime.utcnow().isoformat(),
-                "sentiment": "negative"
-            }
-        ]
+        "symbol": clean_symbol,
+        "asset_class": asset_class,
+        "news": result['news'],
+        "articles": result['articles'],
+        "sentiment": {
+            "overall_sentiment": sentiment['sentiment_trend'],
+            "sentiment_score": sentiment['overall_sentiment']
+        },
+        "sentiment_summary": sentiment,
+        "sources": result['sources'],
+        "fetched_at": result['fetched_at']
     }
 
 @router.get("/api/sentiment/{symbol}")
-def get_sentiment(symbol: str):
-    """Get sentiment analysis for symbol"""
+def get_sentiment(symbol: str, asset_class: str = "stock"):
+    """Get news-derived sentiment for a symbol."""
+    clean_symbol = sanitize_symbol(symbol)
+    result = news_service.get_news_with_sentiment(clean_symbol, asset_class, 20)
+    summary = result['sentiment']
     return {
-        "symbol": symbol,
-        "overall_sentiment": "bullish",
-        "sentiment_score": 0.72,
+        "symbol": clean_symbol,
+        "overall_sentiment": summary['sentiment_trend'],
+        "sentiment_score": summary['overall_sentiment'],
+        "confidence": summary['confidence'],
         "sources": {
-            "news": {"bullish": 5, "bearish": 2, "neutral": 3},
-            "social": {"bullish": 45, "bearish": 15, "neutral": 40},
-            "fear_greed": 65
-        }
+            "news": {
+                "bullish": summary['positive'],
+                "bearish": summary['negative'],
+                "neutral": summary['neutral']
+            },
+            "providers": result['sources']
+        },
+        "fetched_at": result['fetched_at']
     }
 
 # ============================================================================

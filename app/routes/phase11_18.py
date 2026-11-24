@@ -7,6 +7,9 @@ from fastapi import APIRouter
 from datetime import datetime
 from pydantic import BaseModel, Field
 
+from ..security import sanitize_symbol
+from ..services import advanced_sentiment
+
 router = APIRouter()
 
 # Pydantic models for request bodies
@@ -198,49 +201,24 @@ def optimize_parameters(request: OptimizeParametersRequest):
 # ============================================================================
 
 @router.get("/api/v2/sentiment/news/{symbol}")
-def get_news_sentiment(symbol: str):
-    """Get news sentiment analysis"""
-    return {
-        "symbol": symbol,
-        "sentiment_type": "news",
-        "overall_score": 0.72,
-        "bullish_count": 5,
-        "bearish_count": 2,
-        "neutral_count": 3,
-        "impact_score": 0.65,
-        "recent_news": [
-            {"title": f"{symbol} Reports Strong Q3", "sentiment": "positive", "impact": 0.8},
-            {"title": f"{symbol} Faces Challenges", "sentiment": "negative", "impact": 0.5}
-        ]
-    }
+async def get_news_sentiment(symbol: str):
+    """Get real news sentiment analysis."""
+    clean_symbol = sanitize_symbol(symbol)
+    sentiment = await advanced_sentiment.get_news_sentiment(clean_symbol)
+    return {"success": True, "sentiment": sentiment}
 
 @router.get("/api/v2/sentiment/social/{symbol}/{platform}")
-def get_social_sentiment(symbol: str, platform: str = "twitter"):
-    """Get social media sentiment"""
-    return {
-        "symbol": symbol,
-        "platform": platform,
-        "sentiment_score": 0.65,
-        "bullish": 450,
-        "bearish": 150,
-        "neutral": 400,
-        "trending": True,
-        "volume": 1000
-    }
+async def get_social_sentiment(symbol: str, platform: str = "twitter"):
+    """Get social media sentiment."""
+    clean_symbol = sanitize_symbol(symbol)
+    sentiment = await advanced_sentiment.get_social_sentiment(clean_symbol, platform)
+    return {"success": True, "sentiment": sentiment}
 
 @router.get("/api/v2/sentiment/fear-greed")
-def get_fear_greed_index():
-    """Get Crypto Fear & Greed Index"""
-    return {
-        "index": "Fear & Greed",
-        "current_value": 65,
-        "classification": "greed",
-        "24h_change": 3,
-        "history": [
-            {"date": "2024-01-01", "value": 62},
-            {"date": "2024-01-02", "value": 65}
-        ]
-    }
+async def get_fear_greed_index():
+    """Get Crypto Fear & Greed Index."""
+    index = await advanced_sentiment.get_fear_greed_index()
+    return {"success": True, "index": index}
 
 @router.post("/api/v2/sentiment/earnings")
 def analyze_earnings_sentiment(request: EarningsSentimentRequest):

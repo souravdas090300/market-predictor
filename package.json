@@ -6,7 +6,8 @@
     "dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
     "start": "cd frontend && npm start",
-    "lint": "cd frontend && npm run lint"
+    "lint": "cd frontend && npm run lint",
+    "test:frontend": "cd frontend && npm test"
   },
   "workspaces": [
     "frontend"

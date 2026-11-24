@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, CandleStick, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Bar, Area, AreaChart } from 'recharts';
 import axios from 'axios';
+import { normalizePriceHistory } from '../lib/marketData.mjs';
 
 const TIMEFRAMES = {
   '24H': { label: '24 Hours', interval: '5min', days: 1 },
@@ -19,6 +20,26 @@ const TIMEFRAMES = {
   'ALL': { label: 'All Time', interval: 'monthly', days: null }
 };
 
+<<<<<<< Updated upstream
+=======
+function CustomTooltip({ active, payload }) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div style={styles.tooltip}>
+        <p>{data.timestamp}</p>
+        <p>Open: ${data.open?.toFixed(2)}</p>
+        <p>High: ${data.high?.toFixed(2)}</p>
+        <p>Low: ${data.low?.toFixed(2)}</p>
+        <p>Close: ${data.close?.toFixed(2)}</p>
+        <p>Volume: {(data.volume / 1000000).toFixed(2)}M</p>
+      </div>
+    );
+  }
+  return null;
+}
+
+>>>>>>> Stashed changes
 const styles = {
   container: {
     backgroundColor: '#0F172A',
@@ -151,6 +172,7 @@ export default function AssetDetail({ symbol, category, onBack }) {
     marketCap: 0
   });
   const [error, setError] = useState(null);
+  const [dataSource, setDataSource] = useState(null);
 
   useEffect(() => {
     fetchPriceData();
@@ -173,30 +195,25 @@ export default function AssetDetail({ symbol, category, onBack }) {
         }
       );
 
-      const { historical, current } = response.data;
+      const normalized = normalizePriceHistory(response.data, selectedTimeframe);
 
-      setAssetInfo({
-        name: response.data.name || symbol,
-        price: current.price,
-        change24h: current.change24h,
-        changePercent: current.changePercent,
-        high: current.high24h,
-        low: current.low24h,
-        volume: current.volume24h,
-        marketCap: current.marketCap
-      });
-
-      const formattedData = formatChartData(historical, selectedTimeframe);
-      setChartData(formattedData);
+      setAssetInfo(normalized.assetInfo);
+      setChartData(normalized.chartData);
+      setDataSource(normalized.dataSource);
+      if (normalized.chartData.length === 0) {
+        setError('No live price history is available for this timeframe.');
+      }
     } catch (err) {
       console.error('Error fetching price data:', err);
-      setError('Failed to load price data. Using demo data.');
-      setChartData(generateDemoData(selectedTimeframe));
+      setError(err.response?.data?.detail || 'Failed to load live price data.');
+      setChartData([]);
+      setDataSource(null);
     } finally {
       setLoading(false);
     }
   };
 
+<<<<<<< Updated upstream
   const formatChartData = (historical, timeframe) => {
     if (!historical || historical.length === 0) return [];
 
@@ -301,6 +318,8 @@ export default function AssetDetail({ symbol, category, onBack }) {
     return null;
   };
 
+=======
+>>>>>>> Stashed changes
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -310,6 +329,11 @@ export default function AssetDetail({ symbol, category, onBack }) {
         
         <div style={styles.assetInfo}>
           <h1>{assetInfo.name} ({symbol})</h1>
+          {dataSource && (
+            <div style={{ fontSize: '0.75rem', color: '#93C5FD', marginBottom: '0.35rem', textTransform: 'capitalize' }}>
+              Live data via {dataSource}
+            </div>
+          )}
           <div>
             <span style={styles.price}>${assetInfo.price?.toFixed(2)}</span>
             <span style={{...styles.change, ...(assetInfo.change24h >= 0 ? styles.positive : styles.negative)}}>

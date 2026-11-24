@@ -2122,12 +2122,25 @@ class NewsRequest(BaseModel):
 
 @app.get("/api/news/{symbol:path}")
 @limiter.limit("30/minute")
-def get_news(request: Request, symbol: str, asset_class: str = "stock", max_articles: int = 20):
+def get_news(
+    request: Request,
+    symbol: str,
+    asset_class: str = "stock",
+    max_articles: int = Query(20, ge=1, le=50)
+):
     """Get news with sentiment analysis for a symbol."""
     try:
         sanitized_symbol = sanitize_symbol(symbol)
-        news_data = news.get_news_with_sentiment(sanitized_symbol, asset_class)
-        return news_data
+        result = news.get_news_with_sentiment(sanitized_symbol, asset_class, max_articles)
+        summary = result['sentiment']
+        return {
+            **result,
+            "sentiment": {
+                "overall_sentiment": summary['sentiment_trend'],
+                "sentiment_score": summary['overall_sentiment']
+            },
+            "sentiment_summary": summary
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching news: {str(e)}")
 

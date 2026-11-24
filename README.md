@@ -196,6 +196,17 @@ docker run -p 8000:8000 market-predictor
 pytest -q
 ```
 
+<<<<<<< Updated upstream
+=======
+The root-level Redis/cache checks use `TestClient` with a fake cache and quote provider, so they run offline with the rest of the suite. No running server, Redis instance, or `RUN_LIVE_API_TESTS` flag is required.
+
+Frontend normalizer tests run with:
+
+```bash
+npm --prefix frontend test
+```
+
+>>>>>>> Stashed changes
 ### Manual Testing
 ```bash
 # Test market prediction
@@ -288,6 +299,19 @@ pytest -q
 
 # Linting (if configured)
 flake8 app/
+```
+
+## 🧭 Data providers
+
+- **Yahoo Finance news:** `GET /api/news/{symbol}` now uses Yahoo Finance headlines via `yfinance`, supplemented by Google News and Bloomberg RSS. Responses include normalized articles, provider names, and a sentiment summary. The dashboard and Gemini sentiment panel consume this endpoint.
+- **CoinGecko:** crypto quotes use `/coins/markets` with `/simple/price` fallback for coins outside the top 250. Crypto price history uses `/coins/{id}/ohlc` with a market-chart fallback; the asset chart exposes `data_source` so live data is distinguishable from unavailable data. No synthetic candles are returned for crypto.
+- **Configuration:** set `COINGECKO_API_KEY` (optional) and `COINGECKO_API_TYPE=demo|pro` in the environment. Demo keys use the public API host; Pro keys use `pro-api.coingecko.com`.
+
+Offline checks:
+
+```bash
+py -3.12 -m pytest -q
+npm --prefix frontend test
 ```
 
 ## 🤝 Contributing

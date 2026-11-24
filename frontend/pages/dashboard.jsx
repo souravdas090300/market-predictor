@@ -16,6 +16,7 @@ import SocialTrading from '../components/SocialTrading';
 import BrokerIntegration from '../components/BrokerIntegration';
 import RiskManagement from '../components/RiskManagement';
 import Community from '../components/Community';
+import { normalizeNewsResponse } from '../lib/marketData.mjs';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export default function Dashboard() {
   const [selectedSymbol, setSelectedSymbol] = useState('');
   const [signalData, setSignalData] = useState(null);
   const [newsData, setNewsData] = useState([]);
+  const [newsError, setNewsError] = useState(null);
   const [sentimentData, setSentimentData] = useState(null);
   const [technicalIndicators, setTechnicalIndicators] = useState(null);
   const [riskMetrics, setRiskMetrics] = useState(null);
@@ -249,6 +251,9 @@ export default function Dashboard() {
     if (!symbol) return;
     
     setLoadingData(true);
+    setNewsError(null);
+    setNewsData([]);
+    setSentimentData(null);
     try {
       // Load live quote first
       const quoteRes = await fetch(`${API_URL}/api/quote/${symbol}`);
@@ -283,15 +288,21 @@ export default function Dashboard() {
         setSignalData(signal);
       }
 
-      // Load news
-      const newsRes = await fetch(`${API_URL}/api/news/${symbol}`);
+      // Load real Yahoo Finance/RSS news and normalize the backend payload.
+      const assetClass = symbol.toUpperCase().endsWith('-USD') ? 'crypto' : 'stock';
+      const newsRes = await fetch(`${API_URL}/api/news/${symbol}?asset_class=${assetClass}`);
       if (newsRes.ok) {
-        const news = await newsRes.json();
-        setNewsData(news.news || []);
+        const normalized = normalizeNewsResponse(await newsRes.json());
+        setNewsData(normalized.articles);
+        if (normalized.articles.length > 0) {
+          setSentimentData(normalized.sentiment);
+        }
+      } else {
+        setNewsError('News provider is unavailable. Please retry.');
       }
 
-      // Load sentiment
-      const sentimentRes = await fetch(`${API_URL}/api/sentiment/${symbol}`);
+      // Sentiment endpoint remains the source of truth when news is unavailable.
+      const sentimentRes = await fetch(`${API_URL}/api/sentiment/${symbol}?asset_class=${assetClass}`);
       if (sentimentRes.ok) {
         const sentiment = await sentimentRes.json();
         setSentimentData(sentiment);
@@ -704,6 +715,7 @@ export default function Dashboard() {
                   watchlist={watchlist}
                   selectedSymbol={selectedSymbol}
                   newsData={newsData}
+                  newsError={newsError}
                   sentimentData={sentimentData}
                   technicalIndicators={technicalIndicators}
                   onSelectSymbol={setSelectedSymbol}
@@ -1176,7 +1188,7 @@ function SignalsComponent({ watchlist, selectedSymbol, onSelectSymbol, signalDat
 }
 
 // Analysis Component
-function AnalysisComponent({ watchlist, selectedSymbol, newsData, sentimentData, technicalIndicators, onSelectSymbol, onLoadData }) {
+function AnalysisComponent({ watchlist, selectedSymbol, newsData, newsError, sentimentData, technicalIndicators, onSelectSymbol, onLoadData }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredAssets = watchlist.filter(item => {
@@ -1276,13 +1288,19 @@ function AnalysisComponent({ watchlist, selectedSymbol, newsData, sentimentData,
         </div>
       )}
       
-      {newsData && newsData.length > 0 && (
+      {(newsData.length > 0 || newsError) && (
         <div style={{ marginBottom: '1rem' }}>
           <h4 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem' }}>📰 Recent News</h4>
+          {newsError && (
+            <div style={{ fontSize: '0.85rem', color: '#FBBF24', marginBottom: '0.75rem' }}>{newsError}</div>
+          )}
+          {newsData.length === 0 && !newsError && (
+            <div style={{ fontSize: '0.85rem', color: '#9CA3AF' }}>No recent headlines found.</div>
+          )}
           <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {newsData.map((news, index) => (
+            {newsData.map((news) => (
               <div
-                key={index}
+                key={news.id}
                 style={{
                   padding: '0.75rem',
                   borderRadius: '6px',
@@ -1290,9 +1308,15 @@ function AnalysisComponent({ watchlist, selectedSymbol, newsData, sentimentData,
                   border: '1px solid #2D3748'
                 }}
               >
-                <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '0.5rem' }}>{news.title}</div>
+                <div style={{ fontWeight: '600', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  {news.url ? (
+                    <a href={news.url} target="_blank" rel="noopener noreferrer" style={{ color: '#F9FAFB', textDecoration: 'none' }}>
+                      {news.title}
+                    </a>
+                  ) : news.title}
+                </div>
                 <div style={{ fontSize: '0.8rem', color: '#D1D5DB', marginBottom: '0.5rem' }}>
-                  {news.source} • {new Date(news.date).toLocaleDateString()}
+                  {news.source} • {news.date ? new Date(news.date).toLocaleDateString() : 'Date unavailable'}
                 </div>
                 <div style={{
                   fontSize: '0.75rem',

@@ -38,3 +38,15 @@ dependencies = [
 
 [tool.vercel]
 entrypoint = "app.api:app"
+<<<<<<< Updated upstream
+=======
+
+[tool.pytest.ini_options]
+markers = [
+    "live: requires a running Market Predictor API server and configured cache services",
+]
+filterwarnings = [
+    # Passlib still reads argon2.__version__, which argon2-cffi now deprecates.
+    "ignore:Accessing argon2.__version__ is deprecated:DeprecationWarning:passlib.handlers.argon2",
+]
+>>>>>>> Stashed changes

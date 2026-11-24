@@ -19,6 +19,14 @@ router = APIRouter()
 # Cache for historical data (1 hour TTL)
 price_cache = TTLCache(maxsize=500, ttl=3600)
 
+
+def _as_float(value) -> float:
+    """Convert optional quote fields to a finite float without failing the response."""
+    try:
+        return float(value) if value is not None else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
 # ============================================================================
 # HISTORICAL PRICE DATA ENDPOINTS
 # ============================================================================
@@ -76,11 +84,11 @@ async def get_price_history(
         
         # Fetch historical data based on category
         if category.lower() == "crypto":
-            historical = await get_crypto_history(symbol, timeframe)
+            historical, data_source = await fetch_crypto_history(symbol, timeframe)
         elif category.lower() == "stock":
-            historical = await get_stock_history(symbol, timeframe)
+            historical, data_source = await get_stock_history(symbol, timeframe), "yfinance"
         elif category.lower() == "forex":
-            historical = await get_forex_history(symbol, timeframe)
+            historical, data_source = await get_forex_history(symbol, timeframe), "yfinance"
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported category: {category}")
         
@@ -90,6 +98,7 @@ async def get_price_history(
             "category": category.lower(),
             "timeframe": timeframe,
             "current": current_price,
+            "data_source": data_source,
             "historical": historical
         }
         
@@ -98,6 +107,8 @@ async def get_price_history(
         
         return response
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching price history: {str(e)}")
 
@@ -108,83 +119,94 @@ async def get_current_price(symbol: str, category: str) -> dict:
     # Use existing data module
     try:
         if category.lower() == "crypto":
-            quote = data.get_crypto_quote(symbol)
+            crypto_symbol = symbol if symbol.upper().endswith('-USD') else f"{symbol.upper()}-USD"
+            quote = data.get_crypto_quote(crypto_symbol)
         else:
             quote = data.get_live_quote(symbol)
         
         if quote:
             return {
-                "price": float(quote.get("price", 0)),
-                "change24h": float(quote.get("change", 0)),
-                "changePercent": float(quote.get("change_pct", 0) * 100),
-                "high24h": float(quote.get("day_high", 0)),
-                "low24h": float(quote.get("day_low", 0)),
-                "volume24h": float(quote.get("volume", 0)),
-                "marketCap": float(quote.get("market_cap", 0))
+                "price": _as_float(quote.get("price")),
+                "change24h": _as_float(quote.get("change")),
+                "changePercent": _as_float(quote.get("change_pct")) * 100,
+                "high24h": _as_float(quote.get("day_high")),
+                "low24h": _as_float(quote.get("day_low")),
+                "volume24h": _as_float(quote.get("volume")),
+                "marketCap": _as_float(quote.get("market_cap")),
+                "source": quote.get("source", "unknown")
             }
     except Exception as e:
         print(f"Error fetching current price: {e}")
     
-    return {"price": 0, "change24h": 0, "changePercent": 0, "high24h": 0, "low24h": 0, "volume24h": 0, "marketCap": 0}
+    return {"price": 0, "change24h": 0, "changePercent": 0, "high24h": 0, "low24h": 0, "volume24h": 0, "marketCap": 0, "source": "unavailable"}
 
 
 # ============================================================================
 # CRYPTO PRICE HISTORY (CoinGecko)
 # ============================================================================
 
-async def get_crypto_history(symbol: str, timeframe: str) -> List[Dict]:
+CRYPTO_PERIOD_MAP = {
+    "24H": "1d",
+    "1W": "7d",
+    "1M": "1mo",
+    "6M": "6mo",
+    "1Y": "1y",
+    "5Y": "5y",
+    "ALL": "max"
+}
+
+
+def _dataframe_to_candles(df, limit: int = 200) -> List[Dict]:
+    """Convert a Yahoo-style OHLC DataFrame to API candles."""
+    historical = []
+    for idx, row in df.iterrows():
+        historical.append({
+            "timestamp": idx.isoformat() + "Z" if hasattr(idx, "isoformat") else str(idx),
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "volume": float(row["volume"])
+        })
+    return historical[-limit:]
+
+
+async def fetch_crypto_history(symbol: str, timeframe: str) -> tuple[List[Dict], str]:
+    """Fetch real crypto history from CoinGecko, with Yahoo Finance as fallback.
+
+    Synthetic demo candles are never returned. If both providers fail, the API
+    returns an error so the frontend cannot silently show fabricated data.
     """
-    Fetch crypto price history using existing coingecko module
-    Supports 24H (5min intervals), 1W (hourly), 1M+ (daily)
-    """
-    
+    normalized = (symbol or '').strip().upper()
+    if not normalized.endswith('-USD'):
+        normalized = f"{normalized}-USD"
+
     try:
-        # Use existing yfinance for crypto (e.g., BTC-USD, ETH-USD)
-        crypto_symbol = f"{symbol}-USD"
-        
-        interval_map = {
-            "24H": "5m",   # 5 minute candles
-            "1W": "1h",    # Hourly candles
-            "1M": "1d",    # Daily candles
-            "6M": "1d",
-            "1Y": "1d",
-            "5Y": "1wk",   # Weekly candles
-            "ALL": "1mo"   # Monthly candles
-        }
-        
-        period_map = {
-            "24H": "1d",
-            "1W": "7d",
-            "1M": "1mo",
-            "6M": "6mo",
-            "1Y": "1y",
-            "5Y": "5y",
-            "ALL": "max"
-        }
-        
-        interval = interval_map.get(timeframe, "1d")
-        period = period_map.get(timeframe, "1d")
-        
-        # Fetch data using existing data module
-        df = data.get_prices(crypto_symbol, period)
-        
-        # Convert to OHLCV format
-        historical = []
-        for idx, row in df.iterrows():
-            historical.append({
-                "timestamp": idx.isoformat() + "Z",
-                "open": float(row["open"]),
-                "high": float(row["high"]),
-                "low": float(row["low"]),
-                "close": float(row["close"]),
-                "volume": float(row["volume"])
-            })
-        
-        return historical[-200:]  # Return last 200 candles
-        
-    except Exception as e:
-        print(f"Error fetching crypto history for {symbol}: {e}")
-        return generate_demo_ohlcv(timeframe, symbol)
+        candles = await asyncio.to_thread(coingecko.get_coin_history, normalized, timeframe)
+        if candles:
+            return candles[-200:], "coingecko"
+    except Exception as exc:
+        print(f"CoinGecko history error for {normalized}: {exc}")
+
+    try:
+        period = CRYPTO_PERIOD_MAP.get(timeframe, "1mo")
+        df = await asyncio.to_thread(data.get_prices, normalized, period)
+        candles = _dataframe_to_candles(df)
+        if candles:
+            return candles, "yfinance"
+    except Exception as exc:
+        print(f"Yahoo crypto history error for {normalized}: {exc}")
+
+    raise HTTPException(
+        status_code=502,
+        detail=f"Live price history is unavailable for {normalized}. Please retry."
+    )
+
+
+async def get_crypto_history(symbol: str, timeframe: str) -> List[Dict]:
+    """Fetch crypto history (CoinGecko primary) as a candle list."""
+    candles, _ = await fetch_crypto_history(symbol, timeframe)
+    return candles
 
 
 # ============================================================================

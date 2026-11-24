@@ -191,7 +191,7 @@ class AdvancedSentimentAnalyzer:
         try:
             # Fetch news if not provided
             if news_articles is None:
-                news_articles = await self._fetch_news(symbol)
+                news_articles = await self._fetch_news(symbol, asset_class)
             
             if not news_articles:
                 return NewsSentimentResult(
@@ -693,34 +693,23 @@ class AdvancedSentimentAnalyzer:
         else:
             return FearGreedLabel.EXTREME_FEAR
     
-    async def _fetch_news(self, symbol: str) -> List[Dict]:
-        """Fetch news articles for symbol (mock implementation)."""
-        # In production, integrate with NewsAPI, Bloomberg, etc.
-        # This is a mock implementation
-        mock_news = [
+    async def _fetch_news(self, symbol: str, asset_class: Optional[str] = None) -> List[Dict]:
+        """Fetch real Yahoo Finance/RSS news through the shared news service."""
+        from .news import NewsAggregator
+
+        resolved_class = asset_class or ('crypto' if symbol.upper().endswith('-USD') else 'stock')
+        aggregator = NewsAggregator()
+        articles = await asyncio.to_thread(aggregator.fetch_news, symbol, resolved_class, 20)
+        return [
             {
-                'title': f'{symbol} Beats Earnings Expectations',
-                'description': 'Strong quarterly results exceed analyst estimates',
-                'source': 'Bloomberg',
-                'url': f'https://example.com/{symbol.lower()}-earnings',
-                'publishedAt': (datetime.now(tz.utc) - timedelta(hours=2)).isoformat()
-            },
-            {
-                'title': f'Analysts Upgrade {symbol} Price Target',
-                'description': 'Positive outlook with strong growth prospects',
-                'source': 'Reuters',
-                'url': f'https://example.com/{symbol.lower()}-upgrade',
-                'publishedAt': (datetime.now(tz.utc) - timedelta(hours=4)).isoformat()
-            },
-            {
-                'title': f'{symbol} Announces New Partnership',
-                'description': 'Strategic alliance to expand market presence',
-                'source': 'CNBC',
-                'url': f'https://example.com/{symbol.lower()}-partnership',
-                'publishedAt': (datetime.now(tz.utc) - timedelta(hours=6)).isoformat()
+                'title': article.get('title', ''),
+                'description': article.get('summary', ''),
+                'source': article.get('source') or article.get('provider') or 'Unknown',
+                'url': article.get('link', ''),
+                'publishedAt': article.get('published', '')
             }
+            for article in articles
         ]
-        return mock_news
     
     async def _fetch_social_media_posts(
         self,
@@ -930,3 +919,27 @@ async def get_comprehensive_sentiment(
     result['timestamp'] = datetime.now(tz.utc).isoformat()
     
     return result
+
+
+async def get_news_sentiment(symbol: str, asset_class: Optional[str] = None) -> NewsSentimentResult:
+    """Module-level wrapper used by the v2 news sentiment endpoint."""
+    analyzer = AdvancedSentimentAnalyzer()
+    return await analyzer.analyze_news_sentiment(symbol, asset_class=asset_class)
+
+
+async def get_social_sentiment(symbol: str, platform: str = Platform.TWITTER.value) -> SocialMediaSentimentResult:
+    """Module-level wrapper used by the v2 social sentiment endpoint."""
+    analyzer = AdvancedSentimentAnalyzer()
+    return await analyzer.analyze_social_media_sentiment(symbol, platform=platform)
+
+
+async def get_fear_greed_index() -> FearGreedIndex:
+    """Module-level wrapper used by the v2 fear/greed endpoint."""
+    analyzer = AdvancedSentimentAnalyzer()
+    return await analyzer.calculate_fear_greed_index()
+
+
+async def analyze_earnings_sentiment(symbol: str, transcript_text: str) -> EarningsSentimentResult:
+    """Module-level wrapper used by the v2 earnings sentiment endpoint."""
+    analyzer = AdvancedSentimentAnalyzer()
+    return await analyzer.analyze_earnings_sentiment(symbol, transcript_text)

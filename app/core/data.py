@@ -199,6 +199,15 @@ def get_crypto_quote(symbol: str) -> dict | None:
     except Exception as e:
         print(f"CoinGecko error for {symbol}, using Yahoo Finance: {e}")
     
+    # Coin outside the top-250 snapshot: use /simple/price with the mapped id.
+    try:
+        quote = coingecko.get_coin_quote(symbol)
+        if quote:
+            _crypto_cache[symbol] = (now, quote)
+            return quote
+    except Exception as e:
+        print(f"CoinGecko single-coin quote error for {symbol}: {e}")
+    
     # Fallback to Yahoo Finance for crypto (works with BTC-USD, ETH-USD, etc.)
     try:
         quote = get_live_quote(symbol)
